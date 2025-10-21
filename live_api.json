@@ -2,535 +2,639 @@
   "coins": [
     {
       "item": {
-        "id": "bitcoin",
-        "name": "Bitcoin",
-        "symbol": "BTC",
+        "id": "first-digital-usd",
+        "name": "First Digital USD",
+        "symbol": "FDUSD",
         "status": "current",
         "attractiveness_score": 7.5,
         "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
+          "High trading volume",
+          "Good liquidity"
         ],
-        "market_cap_rank": 1,
+        "market_cap_rank": 110,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 111724,
+          "price": 0.99846,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": 0.76772
+            "usd": 0.07267
           },
-          "market_cap": "$2,231,624,046,476",
-          "total_volume": "$94,467,539,974",
+          "market_cap": "$999,412,685",
+          "total_volume": "$8,371,433,712",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "ethereum",
-        "name": "Ethereum",
-        "symbol": "ETH",
+        "id": "spx6900",
+        "name": "SPX6900",
+        "symbol": "SPX",
         "status": "current",
-        "attractiveness_score": 8.0,
+        "attractiveness_score": 6.0,
         "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
+          "Good liquidity"
         ],
-        "market_cap_rank": 2,
+        "market_cap_rank": 111,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 3995.32,
+          "price": 1.061,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": 0.44801
+            "usd": 2.20255
           },
-          "market_cap": "$483,748,922,344",
-          "total_volume": "$42,365,031,793",
+          "market_cap": "$991,098,142",
+          "total_volume": "$47,308,151",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "tether",
-        "name": "Tether",
-        "symbol": "USDT",
+        "id": "mantle-staked-ether",
+        "name": "Mantle Staked Ether",
+        "symbol": "METH",
         "status": "current",
-        "attractiveness_score": 8.5,
+        "attractiveness_score": 4.5,
         "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
+          "Low liquidity risk",
+          "Decent volume"
         ],
-        "market_cap_rank": 3,
+        "market_cap_rank": 112,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 1.001,
+          "price": 4262.57,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": 0.01252
+            "usd": -0.52438
           },
-          "market_cap": "$182,059,099,243",
-          "total_volume": "$145,772,588,444",
+          "market_cap": "$985,175,952",
+          "total_volume": "$2,886,252",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "binancecoin",
-        "name": "BNB",
-        "symbol": "BNB",
+        "id": "pancakeswap-token",
+        "name": "PancakeSwap",
+        "symbol": "CAKE",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Active trading",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 113,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 2.82,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.92661
+          },
+          "market_cap": "$970,987,245",
+          "total_volume": "$305,983,927",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "jupiter-staked-sol",
+        "name": "Jupiter Staked SOL",
+        "symbol": "JUPSOL",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "market_cap_rank": 114,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 220.66,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 1.83382
+          },
+          "market_cap": "$953,924,242",
+          "total_volume": "$19,184,267",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "doublezero",
+        "name": "DoubleZero",
+        "symbol": "2Z",
         "status": "current",
         "attractiveness_score": 7.0,
         "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
+          "Good uptrend",
+          "Good liquidity"
         ],
-        "market_cap_rank": 4,
+        "market_cap_rank": 115,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 1091.01,
+          "price": 0.27334,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.87121
+            "usd": 15.4568
           },
-          "market_cap": "$151,952,936,824",
-          "total_volume": "$3,017,708,599",
+          "market_cap": "$947,720,915",
+          "total_volume": "$65,687,635",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "ripple",
-        "name": "XRP",
-        "symbol": "XRP",
+        "id": "global-dollar",
+        "name": "Global Dollar",
+        "symbol": "USDG",
         "status": "current",
-        "attractiveness_score": 7.0,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
+          "Good liquidity"
         ],
-        "market_cap_rank": 5,
+        "market_cap_rank": 116,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 2.5,
+          "price": 0.999998,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.69012
+            "usd": -0.00189
           },
-          "market_cap": "$149,823,886,133",
-          "total_volume": "$4,691,397,715",
+          "market_cap": "$918,863,198",
+          "total_volume": "$24,302,939",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "solana",
-        "name": "Solana",
-        "symbol": "SOL",
-        "status": "current",
-        "attractiveness_score": 8.0,
-        "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 6,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 194.12,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 2.86063
-          },
-          "market_cap": "$106,136,541,443",
-          "total_volume": "$7,451,786,209",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "usd-coin",
-        "name": "USDC",
-        "symbol": "USDC",
-        "status": "current",
-        "attractiveness_score": 8.0,
-        "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 7,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 0.999807,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.00695
-          },
-          "market_cap": "$76,344,762,347",
-          "total_volume": "$14,420,240,466",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "staked-ether",
-        "name": "Lido Staked Ether",
-        "symbol": "STETH",
-        "status": "current",
-        "attractiveness_score": 7.5,
-        "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 8,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 3994.13,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.47808
-          },
-          "market_cap": "$33,949,553,996",
-          "total_volume": "$92,149,335",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "tron",
-        "name": "TRON",
-        "symbol": "TRX",
-        "status": "current",
-        "attractiveness_score": 7.5,
-        "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "Good liquidity",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 9,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 0.324644,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.74617
-          },
-          "market_cap": "$30,747,473,416",
-          "total_volume": "$691,234,184",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "dogecoin",
-        "name": "Dogecoin",
-        "symbol": "DOGE",
-        "status": "current",
-        "attractiveness_score": 8.0,
-        "investment_highlights": [
-          "Top 10 cryptocurrency",
-          "High liquidity",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 10,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 0.201745,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 1.11429
-          },
-          "market_cap": "$30,581,660,986",
-          "total_volume": "$2,380,579,527",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "cardano",
-        "name": "Cardano",
-        "symbol": "ADA",
-        "status": "current",
-        "attractiveness_score": 7.5,
-        "investment_highlights": [
-          "Top 50 market cap",
-          "High liquidity",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 11,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 0.669403,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.55582
-          },
-          "market_cap": "$24,493,495,959",
-          "total_volume": "$1,282,755,246",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "wrapped-steth",
-        "name": "Wrapped stETH",
-        "symbol": "WSTETH",
-        "status": "current",
-        "attractiveness_score": 7.0,
-        "investment_highlights": [
-          "Top 50 market cap",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 12,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 4863.35,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.55658
-          },
-          "market_cap": "$15,716,493,118",
-          "total_volume": "$23,897,440",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "wrapped-bitcoin",
-        "name": "Wrapped Bitcoin",
+        "id": "arbitrum-bridged-wbtc-arbitrum-one",
+        "name": "Arbitrum Bridged WBTC (Arbitrum One)",
         "symbol": "WBTC",
         "status": "current",
-        "attractiveness_score": 7.0,
+        "attractiveness_score": 6.5,
         "investment_highlights": [
-          "Top 50 market cap",
-          "Good liquidity",
-          "Large cap stability"
+          "Active trading",
+          "Good liquidity"
         ],
-        "market_cap_rank": 13,
+        "market_cap_rank": 117,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 111562,
+          "price": 110832,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": 0.44629
+            "usd": -0.11666
           },
-          "market_cap": "$14,159,977,421",
-          "total_volume": "$484,553,029",
+          "market_cap": "$897,575,912",
+          "total_volume": "$206,494,296",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "wrapped-beacon-eth",
-        "name": "Wrapped Beacon ETH",
-        "symbol": "WBETH",
+        "id": "ripple-usd",
+        "name": "Ripple USD",
+        "symbol": "RLUSD",
         "status": "current",
-        "attractiveness_score": 7.0,
+        "attractiveness_score": 6.0,
         "investment_highlights": [
-          "Top 50 market cap",
-          "Large cap stability"
+          "Good liquidity"
         ],
-        "market_cap_rank": 14,
+        "market_cap_rank": 119,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 4310.69,
+          "price": 0.998959,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": 0.38153
+            "usd": -0.1176
           },
-          "market_cap": "$14,122,754,694",
-          "total_volume": "$17,797,221",
+          "market_cap": "$872,987,171",
+          "total_volume": "$87,432,802",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "figure-heloc",
-        "name": "Figure Heloc",
-        "symbol": "FIGR_HELOC",
+        "id": "fasttoken",
+        "name": "Fasttoken",
+        "symbol": "FTN",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "market_cap_rank": 120,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 2.01,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.44566
+          },
+          "market_cap": "$872,549,499",
+          "total_volume": "$27,312,409",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "celestia",
+        "name": "Celestia",
+        "symbol": "TIA",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "market_cap_rank": 118,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 1.058,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 2.37328
+          },
+          "market_cap": "$871,725,562",
+          "total_volume": "$78,857,426",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "injective-protocol",
+        "name": "Injective",
+        "symbol": "INJ",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "market_cap_rank": 121,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 8.78,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.36787
+          },
+          "market_cap": "$858,410,842",
+          "total_volume": "$93,209,845",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "lido-dao",
+        "name": "Lido DAO",
+        "symbol": "LDO",
         "status": "current",
         "attractiveness_score": 6.5,
         "investment_highlights": [
-          "Top 50 market cap",
-          "Large cap stability"
+          "Good liquidity"
         ],
-        "market_cap_rank": 15,
+        "market_cap_rank": 122,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 0.992392,
+          "price": 0.932295,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.46884
+            "usd": 1.17752
           },
-          "market_cap": "$13,064,724,426",
-          "total_volume": "$9,047,076",
+          "market_cap": "$839,627,484",
+          "total_volume": "$118,072,355",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "chainlink",
-        "name": "Chainlink",
-        "symbol": "LINK",
+        "id": "clbtc",
+        "name": "clBTC",
+        "symbol": "CLBTC",
         "status": "current",
-        "attractiveness_score": 7.0,
+        "attractiveness_score": 4.5,
         "investment_highlights": [
-          "Top 50 market cap",
-          "High liquidity",
-          "Large cap stability"
+          "Low liquidity risk",
+          "Low volume"
         ],
-        "market_cap_rank": 16,
+        "market_cap_rank": 123,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 18.19,
+          "price": 108123,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -3.34832
+            "usd": -3.45072
           },
-          "market_cap": "$12,694,108,101",
-          "total_volume": "$1,253,557,901",
+          "market_cap": "$835,053,886",
+          "total_volume": "$6",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "ethena-usde",
-        "name": "Ethena USDe",
-        "symbol": "USDE",
-        "status": "current",
-        "attractiveness_score": 7.0,
-        "investment_highlights": [
-          "Top 50 market cap",
-          "Good liquidity",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 17,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 0.999279,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.0089
-          },
-          "market_cap": "$11,404,407,883",
-          "total_volume": "$963,949,439",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "wrapped-eeth",
-        "name": "Wrapped eETH",
-        "symbol": "WEETH",
-        "status": "current",
-        "attractiveness_score": 7.0,
-        "investment_highlights": [
-          "Top 50 market cap",
-          "Large cap stability"
-        ],
-        "market_cap_rank": 18,
-        "price_btc": null,
-        "risk_level": "low",
-        "data": {
-          "price": 4313.66,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.42982
-          },
-          "market_cap": "$10,753,826,095",
-          "total_volume": "$17,077,725",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "stellar",
-        "name": "Stellar",
-        "symbol": "XLM",
+        "id": "optimism",
+        "name": "Optimism",
+        "symbol": "OP",
         "status": "current",
         "attractiveness_score": 6.5,
         "investment_highlights": [
-          "Top 50 market cap",
-          "Good liquidity",
-          "Large cap stability"
+          "Good liquidity"
         ],
-        "market_cap_rank": 19,
+        "market_cap_rank": 124,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 0.327116,
+          "price": 0.45328,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.29131
+            "usd": 0.73393
           },
-          "market_cap": "$10,485,375,202",
-          "total_volume": "$228,312,075",
+          "market_cap": "$810,370,932",
+          "total_volume": "$134,362,197",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "hyperliquid",
-        "name": "Hyperliquid",
-        "symbol": "HYPE",
+        "id": "msol",
+        "name": "Marinade Staked SOL",
+        "symbol": "MSOL",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Decent volume"
+        ],
+        "market_cap_rank": 125,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 256.58,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 1.73739
+          },
+          "market_cap": "$805,392,838",
+          "total_volume": "$8,778,668",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "blockstack",
+        "name": "Stacks",
+        "symbol": "STX",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "market_cap_rank": 126,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.445193,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 0.44243
+          },
+          "market_cap": "$804,087,304",
+          "total_volume": "$21,700,407",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "curve-dao-token",
+        "name": "Curve DAO",
+        "symbol": "CRV",
         "status": "current",
         "attractiveness_score": 7.0,
         "investment_highlights": [
-          "Top 50 market cap",
-          "Good liquidity",
-          "Large cap stability"
+          "Active trading",
+          "Good liquidity"
         ],
-        "market_cap_rank": 20,
+        "market_cap_rank": 127,
         "price_btc": null,
-        "risk_level": "low",
+        "risk_level": "high",
         "data": {
-          "price": 37.02,
+          "price": 0.561518,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -2.39025
+            "usd": 1.09057
           },
-          "market_cap": "$10,024,576,513",
-          "total_volume": "$559,879,415",
+          "market_cap": "$798,750,868",
+          "total_volume": "$173,012,768",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ousg",
+        "name": "OUSG",
+        "symbol": "OUSG",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Low liquidity risk",
+          "Low volume"
+        ],
+        "market_cap_rank": 128,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 113.0,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 0.02115
+          },
+          "market_cap": "$787,354,428",
+          "total_volume": null,
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "cgeth-hashkey-cloud",
+        "name": "cgETH Hashkey Cloud",
+        "symbol": "CGETH.HASHKEY",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Low liquidity risk",
+          "Low volume"
+        ],
+        "market_cap_rank": 129,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 3835.29,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 0.99509
+          },
+          "market_cap": "$766,786,202",
+          "total_volume": "$58",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "plasma",
+        "name": "Plasma",
+        "symbol": "XPL",
+        "status": "current",
+        "attractiveness_score": 7.5,
+        "investment_highlights": [
+          "Positive movement",
+          "Active trading",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 130,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.414306,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 6.27254
+          },
+          "market_cap": "$750,371,578",
+          "total_volume": "$315,102,872",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "floki",
+        "name": "FLOKI",
+        "symbol": "FLOKI",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Active trading",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 131,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 7.686e-05,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.38612
+          },
+          "market_cap": "$744,587,715",
+          "total_volume": "$239,393,366",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "aerodrome-finance",
+        "name": "Aerodrome Finance",
+        "symbol": "AERO",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "market_cap_rank": 132,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.821118,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.93513
+          },
+          "market_cap": "$742,792,148",
+          "total_volume": "$41,930,262",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "superstate-short-duration-us-government-securities-fund-ustb",
+        "name": "Superstate Short Duration U.S. Government Securities Fund (USTB)",
+        "symbol": "USTB",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Low liquidity risk",
+          "Low volume"
+        ],
+        "market_cap_rank": 133,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 10.86,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 0.03177
+          },
+          "market_cap": "$722,606,936",
+          "total_volume": null,
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "l2-standard-bridged-weth-base",
+        "name": "L2 Standard Bridged WETH (Base)",
+        "symbol": "WETH",
+        "status": "current",
+        "attractiveness_score": 7.0,
+        "investment_highlights": [
+          "High trading volume",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 134,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 3972.33,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.45871
+          },
+          "market_cap": "$718,276,754",
+          "total_volume": "$929,745,904",
           "content": null
         }
       }

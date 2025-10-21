@@ -126,15 +126,15 @@ class CryptoDisplay:
         """Display trending coins with positive momentum"""
         trending = self.analyzer.get_trending_coins()[:15]  # Show more trending coins
         if trending:
-            self.console.print("[bold green]📊 TRENDING CRYPTOCURRENCY ACTIVITY[/bold green]\n")
-            table = self.create_coin_table(trending, "🚀 Market Movers & Active Coins", show_rank=False)
+            self.console.print("[bold green]📊 LOW CAP CRYPTOCURRENCY OPPORTUNITIES[/bold green]\n")
+            table = self.create_coin_table(trending, "� Low Cap Gems & Market Movers", show_rank=False)
             self.console.print(table)
             self.console.print()
         else:
             # If no trending coins, show top coins by score
             top_coins = self.analyzer.get_top_coins(15)
-            self.console.print("[bold green]📊 TOP CRYPTOCURRENCY ACTIVITY[/bold green]\n")
-            table = self.create_coin_table(top_coins, "🚀 Most Active Cryptocurrencies", show_rank=False)
+            self.console.print("[bold green]📊 LOW CAP CRYPTOCURRENCY OPPORTUNITIES[/bold green]\n")
+            table = self.create_coin_table(top_coins, "� Low Cap Investment Opportunities", show_rank=False)
             self.console.print(table)
             self.console.print()
     

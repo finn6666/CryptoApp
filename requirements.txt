@@ -1,0 +1,7 @@
+# Requirements for cloud deployment
+rich>=13.0.0
+tabulate>=0.9.0
+colorama>=0.4.6
+requests>=2.31.0
+flask>=2.3.0
+gunicorn>=21.0.0
