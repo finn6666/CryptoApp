@@ -1,130 +1,77 @@
-# 🔵 Azure VM Deployment Guide
+# 🚀 Quick Azure VM Deploy
 
-Simple deployment guide for your Crypto Investment Analyzer on Azure Virtual Machine.
-
-## Prerequisites
-
-- Azure VM running Ubuntu/Linux
-- SSH access to your VM
-- Git repository with your code
-- Python 3.9+ on the VM
+Deploy your Crypto App to Azure VM in 5 minutes.
 
 ---
 
-## Initial VM Setup
+## 1. Setup VM
 
-SSH into your Azure VM and run:
-
+SSH into your Azure VM:
 ```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
+# Install stuff
+sudo apt update && sudo apt install python3 python3-pip python3-venv git -y
 
-# Install required packages
-sudo apt install python3 python3-pip python3-venv git -y
-
-# Create app directory
-sudo mkdir -p /var/www/crypto-analyzer
-sudo chown $USER:$USER /var/www/crypto-analyzer
+# Create folder
+mkdir ~/crypto-app && cd ~/crypto-app
 ```
 
-## Deploy Application
+## 2. Deploy App
 
 ```bash
-# Clone your repository
-cd /var/www/crypto-analyzer
-git clone https://github.com/your-username/your-repo.git .
+# Get your code
+git clone https://github.com/your-username/CryptoApp.git .
 
-# Setup Python environment
+# Setup Python
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-
-# Test the app
-python3 web_app.py
+pip install -r requirements.txt gunicorn
 ```
 
-## Production Setup
+## 3. Run It
 
-### 1. Install Gunicorn
 ```bash
-pip install gunicorn
+# Test first
+python app.py
+
+# Run in background
+nohup gunicorn --bind 0.0.0.0:8080 app:app &
 ```
 
-### 2. Create systemd service
-```bash
-sudo nano /etc/systemd/system/crypto-analyzer.service
-```
+## 4. Access
 
-Add this content:
-```ini
-[Unit]
-Description=Crypto Analyzer Flask App
-After=network.target
-
-[Service]
-User=azureuser
-Group=www-data
-WorkingDirectory=/var/www/crypto-analyzer
-Environment="PATH=/var/www/crypto-analyzer/.venv/bin"
-ExecStart=/var/www/crypto-analyzer/.venv/bin/gunicorn --bind 0.0.0.0:8080 web_app:app
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-### 3. Start the service
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable crypto-analyzer
-sudo systemctl start crypto-analyzer
-```
-
-## Easy Updates
-
-Create an update script:
-```bash
-nano /var/www/crypto-analyzer/update.sh
-```
-
-Script content:
-```bash
-#!/bin/bash
-cd /var/www/crypto-analyzer
-git pull origin main
-source .venv/bin/activate
-pip install -r requirements.txt
-sudo systemctl restart crypto-analyzer
-echo "✅ App updated!"
-```
-
-Make it executable:
-```bash
-chmod +x update.sh
-```
-
-## Access Your App
-
-- **URL**: `http://your-vm-ip:8080`
-- **Status**: `sudo systemctl status crypto-analyzer`
-- **Logs**: `sudo journalctl -u crypto-analyzer -f`
-- **Update**: `./update.sh`
-
-## Troubleshooting
-
-**App won't start:**
-```bash
-sudo journalctl -u crypto-analyzer -f
-```
-
-**Permission issues:**
-```bash
-sudo chown -R azureuser:www-data /var/www/crypto-analyzer
-```
-
-**Port blocked:**
-- Azure Portal → VM → Networking → Add inbound rule (port 8080)
+Open: `http://your-vm-ip:8080`
 
 ---
 
-That's it! Simple VM deployment with no container overhead.
+## Quick Commands
+
+```bash
+# Update app
+cd ~/crypto-app && git pull && sudo pkill gunicorn && nohup gunicorn --bind 0.0.0.0:8080 app:app &
+
+# Check if running
+ps aux | grep gunicorn
+
+# Stop app
+sudo pkill gunicorn
+```
+
+## Fix Common Issues
+
+**Can't access?** 
+- Azure Portal → VM → Networking → Add port 8080
+
+**App crashes?**
+```bash
+# See what's wrong
+python app.py
+```
+
+**Permission error?**
+```bash
+chmod +x ~/crypto-app/*
+```
+
+---
+
+**Done!** Your crypto app is live at `http://your-vm-ip:8080`
