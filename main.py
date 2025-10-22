@@ -1,8 +1,4 @@
 #!/usr/bin/env python3
-"""
-Crypto Investment Analyzer
-A tool to analyze and recommend attractive cryptocurrency investments
-"""
 
 import sys
 import argparse

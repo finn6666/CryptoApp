@@ -166,61 +166,7 @@ class CryptoDisplay:
         panel = Panel(stats_text.strip(), box=box.ROUNDED, style="blue")
         self.console.print(panel)
         self.console.print()
-    
-    def show_interactive_menu(self):
-        """Show interactive menu options"""
-        menu_text = """
-[bold yellow]🎯 QUICK ACTIONS[/bold yellow]
-
-[cyan]1.[/cyan] View All Coins by Score
-[cyan]2.[/cyan] Filter by Status (Current/New/Upcoming)  
-[cyan]3.[/cyan] Show High Potential Coins (8.0+ Score)
-[cyan]4.[/cyan] Refresh Local Data
-[cyan]5.[/cyan] Fetch Live Data from CoinGecko
-[cyan]6.[/cyan] Exit
-
-[dim]Enter your choice (1-6):[/dim]
-        """
         
-        self.console.print(menu_text.strip())
-    
-    def run_full_analysis(self):
-        """Run complete analysis display"""
-        self.show_header()
-        self.show_trending_coins()
-    
-    def run_interactive(self):
-        """Run interactive mode"""
-        while True:
-            self.show_interactive_menu()
-            try:
-                choice = input().strip()
-                self.console.clear()
-                
-                if choice == "1":
-                    self.show_all_coins()
-                elif choice == "2":
-                    self.filter_by_status_menu()
-                elif choice == "3":
-                    self.show_high_potential()
-                elif choice == "4":
-                    self.analyzer.load_data()
-                    self.console.print("[green]✅ Local data refreshed![/green]\n")
-                elif choice == "5":
-                    self.fetch_live_data_interactive()
-                elif choice == "6":
-                    self.console.print("[yellow]👋 Thanks for using Crypto Analyzer![/yellow]")
-                    break
-                else:
-                    self.console.print("[red]❌ Invalid choice. Please try again.[/red]\n")
-                    
-                input("\nPress Enter to continue...")
-                self.console.clear()
-                
-            except KeyboardInterrupt:
-                self.console.print("\n[yellow]👋 Goodbye![/yellow]")
-                break
-    
     def show_all_coins(self):
         """Show all coins sorted by score"""
         all_coins = self.analyzer.get_top_coins(len(self.analyzer.coins))
