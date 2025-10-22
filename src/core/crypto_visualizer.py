@@ -3,7 +3,7 @@ Simple ASCII-based data visualization for cryptocurrency analysis
 """
 
 from typing import List
-from crypto_analyzer import Coin
+from .crypto_analyzer import Coin
 
 class CryptoVisualizer:
     """Simple ASCII charts for crypto data"""

@@ -13,8 +13,8 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #333;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e2e8f0;
             min-height: 100vh;
         }
 
@@ -26,11 +26,12 @@
 
         .header {
             text-align: center;
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(26, 32, 46, 0.95);
+            border: 1px solid #2d3748;
             border-radius: 20px;
             padding: 30px;
             margin-bottom: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             position: relative;
         }
 
@@ -44,7 +45,7 @@
         }
 
         .refresh-btn {
-            background: #4CAF50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             padding: 8px 16px;
@@ -55,38 +56,42 @@
             align-items: center;
             gap: 5px;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
 
         .refresh-btn:hover {
-            background: #45a049;
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
             transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         }
 
         .refresh-btn:disabled {
-            background: #ccc;
+            background: #4a5568;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
 
         .refresh-status {
             font-size: 12px;
-            color: #666;
+            color: #a0aec0;
             text-align: right;
         }
 
         .last-updated {
             font-weight: bold;
-            color: #4CAF50;
+            color: #68d391;
         }
 
         .header h1 {
-            color: #4a5568;
+            color: #e2e8f0;
             font-size: 2.5em;
             margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .header p {
-            color: #718096;
+            color: #a0aec0;
             font-size: 1.2em;
         }
 
@@ -98,27 +103,33 @@
         }
 
         .stat-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(26, 32, 46, 0.95);
+            border: 1px solid #2d3748;
             border-radius: 15px;
             padding: 25px;
             text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
         }
 
         .stat-card:hover {
             transform: translateY(-5px);
+            border-color: #667eea;
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
         }
 
         .stat-number {
             font-size: 2.5em;
             font-weight: bold;
-            color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
             margin-bottom: 10px;
         }
 
         .stat-label {
-            color: #718096;
+            color: #a0aec0;
             font-size: 1.1em;
         }
 
@@ -127,33 +138,12 @@
             margin-bottom: 30px;
         }
 
-        .refresh-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 1.1em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        .refresh-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 7px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .refresh-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
         .coins-container {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(26, 32, 46, 0.95);
+            border: 1px solid #2d3748;
             border-radius: 20px;
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
         }
 
         .coins-header {
@@ -162,9 +152,14 @@
         }
 
         .coins-header h2 {
-            color: #4a5568;
+            color: #e2e8f0;
             font-size: 2em;
             margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .coins-header p {
+            color: #a0aec0;
         }
 
         .coins-table {
@@ -172,40 +167,48 @@
             border-collapse: collapse;
             overflow: hidden;
             border-radius: 15px;
+            background: #1a202c;
         }
 
         .coins-table th,
         .coins-table td {
             padding: 15px;
             text-align: left;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #2d3748;
         }
 
         .coins-table th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            color: #e2e8f0;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
+        .coins-table tr {
+            background: rgba(26, 32, 46, 0.5);
+            transition: all 0.3s ease;
+        }
+
         .coins-table tr:hover {
-            background-color: #f7fafc;
+            background: rgba(45, 55, 72, 0.7);
+            transform: scale(1.01);
         }
 
         .coin-symbol {
             font-weight: bold;
             color: #667eea;
             font-size: 1.1em;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
         .coin-name {
-            color: #4a5568;
+            color: #cbd5e0;
         }
 
         .price {
             font-weight: bold;
-            color: #2d3748;
+            color: #e2e8f0;
         }
 
         .price-change {
@@ -215,13 +218,15 @@
         }
 
         .positive {
-            color: #38a169;
-            background-color: #f0fff4;
+            color: #68d391;
+            background-color: rgba(104, 211, 145, 0.1);
+            border: 1px solid rgba(104, 211, 145, 0.2);
         }
 
         .negative {
-            color: #e53e3e;
-            background-color: #fff5f5;
+            color: #fc8181;
+            background-color: rgba(252, 129, 129, 0.1);
+            border: 1px solid rgba(252, 129, 129, 0.2);
         }
 
         .score {
@@ -229,39 +234,61 @@
             padding: 5px 10px;
             border-radius: 10px;
             color: white;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
         }
 
         .score-high {
-            background-color: #38a169;
+            background: linear-gradient(135deg, #38a169 0%, #48bb78 100%);
+            box-shadow: 0 2px 8px rgba(56, 161, 105, 0.3);
         }
 
         .score-medium {
-            background-color: #d69e2e;
+            background: linear-gradient(135deg, #d69e2e 0%, #ecc94b 100%);
+            box-shadow: 0 2px 8px rgba(214, 158, 46, 0.3);
         }
 
         .score-low {
-            background-color: #e53e3e;
+            background: linear-gradient(135deg, #e53e3e 0%, #fc8181 100%);
+            box-shadow: 0 2px 8px rgba(229, 62, 62, 0.3);
         }
 
         .loading {
             text-align: center;
             padding: 50px;
-            color: #718096;
+            color: #a0aec0;
             font-size: 1.2em;
         }
 
         .error {
             text-align: center;
             padding: 50px;
-            color: #e53e3e;
+            color: #fc8181;
             font-size: 1.2em;
         }
 
         .last-updated {
             text-align: center;
             margin-top: 20px;
-            color: #718096;
+            color: #a0aec0;
             font-style: italic;
+        }
+
+        /* Scrollbar styling for dark theme */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a202c;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #667eea;
         }
 
         @media (max-width: 768px) {
@@ -281,6 +308,12 @@
             .stat-number {
                 font-size: 2em;
             }
+
+            .refresh-controls {
+                position: static;
+                justify-content: center;
+                margin-bottom: 20px;
+            }
         }
     </style>
 </head>
@@ -296,7 +329,7 @@
                     🔄 Refresh Now
                 </button>
             </div>
-            <h1>🚀 Crypto Investment Analyzer</h1>
+            <h1>Investment Analyzer</h1>
             <p>Low Cap Cryptocurrency Opportunities & Market Analysis</p>
             <p style="margin-top: 10px; font-size: 0.9em; color: #888;">
                 Data powered by CoinGecko API | Updated every 5 minutes
@@ -324,7 +357,7 @@
 
         <div class="coins-container">
             <div class="coins-header">
-                <h2>💎 Low Cap Cryptocurrency Opportunities</h2>
+                <h2>Low Cap Cryptocurrency Opportunities</h2>
                 <p>Real-time market data and analysis</p>
             </div>
 

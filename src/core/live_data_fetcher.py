@@ -3,7 +3,7 @@ import json
 import time
 from typing import Dict, List, Optional
 from datetime import datetime
-from crypto_analyzer import Coin, CoinStatus, RiskLevel
+from .crypto_analyzer import Coin, CoinStatus, RiskLevel
 
 class LiveDataFetcher:
     """Fetches live cryptocurrency data from APIs"""

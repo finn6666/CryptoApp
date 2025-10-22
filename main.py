@@ -6,8 +6,8 @@ A tool to analyze and recommend attractive cryptocurrency investments
 
 import sys
 import argparse
-from crypto_display import CryptoDisplay
-from live_data_fetcher import fetch_and_update_data
+from src.cli.crypto_display import CryptoDisplay
+from src.core.live_data_fetcher import fetch_and_update_data
 
 def main():
     parser = argparse.ArgumentParser(
