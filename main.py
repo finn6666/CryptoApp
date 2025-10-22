@@ -51,8 +51,9 @@ def main():
             display.run_full_analysis()
             
     except FileNotFoundError:
-        print("❌ Error: api.json file not found!")
-        print("Make sure the API data file exists in the current directory.")
+        print("❌ Error: live_api.json file not found!")
+        print("Make sure the live API data file exists in the data directory.")
+        print("Try running the live data fetcher first.")
         sys.exit(1)
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")

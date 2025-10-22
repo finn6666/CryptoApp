@@ -12,12 +12,13 @@ project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(project_root, 'src'))
 
 from core.crypto_analyzer import CryptoAnalyzer, CoinStatus
+from core.live_data_fetcher import fetch_and_update_data
 from datetime import datetime
 
 app = Flask(__name__, template_folder='src/web/templates')
 
-# Initialize analyzer with correct data path
-analyzer = CryptoAnalyzer(data_file='data/api.json')
+# Initialize analyzer with live data
+analyzer = CryptoAnalyzer(data_file='data/live_api.json')
 
 @app.route('/')
 def index():
@@ -70,11 +71,16 @@ def get_coins():
 
 @app.route('/api/refresh', methods=['POST'])
 def force_refresh():
-    """Force refresh of data"""
+    """Force refresh with live data"""
     try:
-        # Reload local data
-        analyzer.load_local_data()
-        return jsonify({'success': True})
+        # Fetch fresh live data
+        live_data = fetch_and_update_data()
+        if live_data:
+            # Reload the analyzer with new data
+            analyzer.load_data()
+            return jsonify({'success': True, 'message': 'Live data refreshed successfully'})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to fetch live data'}), 500
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

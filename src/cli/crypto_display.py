@@ -11,8 +11,6 @@ from typing import List
 import sys
 
 class CryptoDisplay:
-    """Beautiful CLI display for cryptocurrency data"""
-    
     def __init__(self):
         self.console = Console()
         self.analyzer = CryptoAnalyzer()

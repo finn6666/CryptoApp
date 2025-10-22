@@ -37,7 +37,7 @@ class Coin:
 class CryptoAnalyzer:
     """Main class for analyzing cryptocurrency data"""
     
-    def __init__(self, data_file: str = "api.json"):
+    def __init__(self, data_file: str = "data/live_api.json"):
         self.data_file = data_file
         self.coins: List[Coin] = []
         self.load_data()

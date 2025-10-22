@@ -100,7 +100,8 @@ CryptoApp/
 ├── crypto_analyzer.py   # Core data processing and filtering
 ├── crypto_display.py    # Rich terminal UI and formatting
 ├── crypto_visualizer.py # ASCII charts and data visualization
-├── api.json            # Cryptocurrency data (your dataset)
+├── data/
+│   └── live_api.json   # Live cryptocurrency data (fetched from APIs)
 ├── pyproject.toml      # Project configuration and dependencies
 └── README.md           # This file
 ```
@@ -147,11 +148,15 @@ Attractiveness scores (1-10) based on:
 
 ## 🔮 Data Sources
 
-Currently uses curated dataset in `api.json`. Future versions may integrate:
-- Live CoinGecko API feeds
-- Real-time price updates
+Uses live cryptocurrency data in `data/live_api.json` fetched from:
+- **CoinGecko API** - Real-time prices and market data
+- **Live market updates** - Fresh data on each refresh
+- **Low-cap focus** - Specialized filtering for emerging coins
+
+Future integrations may include:
 - Social sentiment analysis
 - On-chain metrics
+- Advanced technical indicators
 
 ## 🚀 Future Enhancements
 
