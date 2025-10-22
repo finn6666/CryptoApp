@@ -1,9 +1,4 @@
-# Cloud Deployment Guide
-
-## File Overview
-- `.dockerignore` - Docker build exclusions
-- `.gitignore` - Git exclusions
-- `runtime.txt` - Python version specification
+# CryptoApp - Git Ignore Rules
 
 ## Virtual Environment
 .venv/
@@ -60,3 +55,12 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+
+## Build Artifacts
+*.tar.gz
+*.zip
+*.tar
+*.tar.bz2
+
+## Data Files (add specific patterns if needed)
+# live_api.json  # Remove if you don't want to track live data

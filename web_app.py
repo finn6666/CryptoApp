@@ -172,13 +172,5 @@ if __name__ == '__main__':
         print("📱 App will continue with existing data if available")
     
     print("🔄 Data will refresh automatically when users visit the page")
-    print("⚡ This saves API calls and reduces costs!")
-    
-    print("🚀 Starting web server on http://0.0.0.0:8080")
-    print("🌐 Access your app at:")
-    print("   • Local: http://localhost:8080")
-    print("   • Network: http://192.168.88.123:8080")
-    print("   • Azure VM: http://YOUR_VM_IP:8080")
-    
     # Run Flask app
     app.run(host='0.0.0.0', port=8080, debug=False)
