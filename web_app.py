@@ -172,5 +172,6 @@ if __name__ == '__main__':
         print("📱 App will continue with existing data if available")
     
     print("🔄 Data will refresh automatically when users visit the page")
+    
     # Run Flask app
     app.run(host='0.0.0.0', port=8080, debug=False)

@@ -1,189 +1,374 @@
-# 🔵 Azure Deployment Guide# 🚀 Cloud Deployment Guide
+# 🔵 Azure VM Deployment Guide# 🔵 Azure Deployment Guide# 🚀 Cloud Deployment Guide
 
 
 
-Your Crypto Investment Analyzer deployment guide for Microsoft Azure.Your Crypto Investment Analyzer is now ready for cloud deployment! Choose from multiple hosting options below.
+Simple deployment guide for running your Crypto Investment Analyzer on an Azure Virtual Machine using Git and bash scripts.
 
 
 
-## 📋 **Prerequisites**## 📋 **Quick Setup**
+## 📋 **Prerequisites**Your Crypto Investment Analyzer deployment guide for Microsoft Azure.Your Crypto Investment Analyzer is now ready for cloud deployment! Choose from multiple hosting options below.
 
 
+
+- Azure VM with Ubuntu/Linux
+
+- SSH access to your VM
+
+- Git repository with your code## 📋 **Prerequisites**## 📋 **Quick Setup**
+
+- Python 3.9+ installed on VM
+
+
+
+## 🚀 **One-Time VM Setup**
 
 - Azure account ([Create free account](https://azure.microsoft.com/free/))### 1. Install Web Dependencies
 
+SSH into your Azure VM and run these commands:
+
 - Azure CLI installed locally```bash
 
-- Git repository with your codepip install flask gunicorn
+```bash
+
+# Update system- Git repository with your codepip install flask gunicorn
+
+sudo apt update && sudo apt upgrade -y
 
 ```
 
-### Install Azure CLI
+# Install Python and essential tools
 
-```bash### 2. Test Locally
+sudo apt install python3 python3-pip python3-venv git nginx -y### Install Azure CLI
 
-# macOS```bash
+
+
+# Create application directory```bash### 2. Test Locally
+
+sudo mkdir -p /var/www/crypto-analyzer
+
+sudo chown $USER:$USER /var/www/crypto-analyzer# macOS```bash
+
+```
 
 brew install azure-clipython web_app.py
 
+## 📥 **Deploy Your Application**
+
 # Visit: http://localhost:8080
 
-# Windows (PowerShell)```
+```bash
+
+# Navigate to app directory# Windows (PowerShell)```
+
+cd /var/www/crypto-analyzer
 
 Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile .\AzureCLI.msi; Start-Process msiexec.exe -Wait -ArgumentList '/I AzureCLI.msi /quiet'
 
-## ☁️ **Cloud Hosting Options**
+# Clone your repository
 
-# Ubuntu/Debian
+git clone https://github.com/your-username/your-repo.git .## ☁️ **Cloud Hosting Options**
 
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash### 🔥 **Option 1: Heroku (Easiest)**
 
-```
+
+# Create virtual environment# Ubuntu/Debian
+
+python3 -m venv .venv
+
+source .venv/bin/activatecurl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash### 🔥 **Option 1: Heroku (Easiest)**
+
+
+
+# Install dependencies```
+
+pip install -r requirements.txt
 
 **Steps:**
 
-## 🚀 **Deployment Options**1. Create Heroku account at [heroku.com](https://heroku.com)
+# Test the application
+
+python3 web_app.py## 🚀 **Deployment Options**1. Create Heroku account at [heroku.com](https://heroku.com)
+
+```
 
 2. Install Heroku CLI
 
+## 🔧 **Production Setup with Systemd**
+
 ### **Option 1: Azure App Service (Recommended)**3. Deploy:
 
-Best for Python web applications with automatic scaling.```bash
+### 1. Install Gunicorn
 
-# Login to Heroku
+```bashBest for Python web applications with automatic scaling.```bash
 
-#### **Quick Deployment**heroku login
+pip install gunicorn
+
+```# Login to Heroku
+
+
+
+### 2. Create Service File#### **Quick Deployment**heroku login
 
 ```bash
+
+sudo nano /etc/systemd/system/crypto-analyzer.service```bash
+
+```
 
 # 1. Login to Azure# Create app
 
-az loginheroku create your-crypto-analyzer
+**Add this content:**
 
+```iniaz loginheroku create your-crypto-analyzer
 
+[Unit]
+
+Description=Crypto Analyzer Flask App
+
+After=network.target
 
 # 2. Create resource group# Deploy
 
-az group create --name crypto-analyzer-rg --location eastusgit add .
+[Service]
 
-git commit -m "Deploy crypto analyzer"
+User=azureuseraz group create --name crypto-analyzer-rg --location eastusgit add .
 
-# 3. Create App Service plangit push heroku main
+Group=www-data
+
+WorkingDirectory=/var/www/crypto-analyzergit commit -m "Deploy crypto analyzer"
+
+Environment="PATH=/var/www/crypto-analyzer/.venv/bin"
+
+ExecStart=/var/www/crypto-analyzer/.venv/bin/gunicorn --bind 0.0.0.0:8080 web_app:app# 3. Create App Service plangit push heroku main
+
+Restart=always
 
 az appservice plan create \
 
-  --name crypto-analyzer-plan \# Open your app
+[Install]
+
+WantedBy=multi-user.target  --name crypto-analyzer-plan \# Open your app
+
+```
 
   --resource-group crypto-analyzer-rg \heroku open
 
-  --sku B1 \```
+### 3. Enable and Start Service
 
-  --is-linux
+```bash  --sku B1 \```
 
-**Files needed:** ✅ Already created
+sudo systemctl daemon-reload
+
+sudo systemctl enable crypto-analyzer  --is-linux
+
+sudo systemctl start crypto-analyzer
+
+sudo systemctl status crypto-analyzer**Files needed:** ✅ Already created
+
+```
 
 # 4. Create web app- `Procfile` - Heroku process configuration
 
+## 🔄 **Easy Update Script**
+
 az webapp create \- `requirements.txt` - Python dependencies
+
+Create an update script for future deployments:
 
   --resource-group crypto-analyzer-rg \- `runtime.txt` - Python version
 
-  --plan crypto-analyzer-plan \
+```bash
+
+nano /var/www/crypto-analyzer/update_app.sh  --plan crypto-analyzer-plan \
+
+```
 
   --name your-crypto-analyzer \---
 
-  --runtime "PYTHON|3.9"
+**Script content:**
 
-### 🐳 **Option 2: Docker + Any Cloud**
+```bash  --runtime "PYTHON|3.9"
 
-# 5. Configure startup command
+#!/bin/bash
 
-az webapp config set \**Build and run locally:**
+echo "🔄 Updating Crypto Analyzer..."### 🐳 **Option 2: Docker + Any Cloud**
+
+
+
+cd /var/www/crypto-analyzer# 5. Configure startup command
+
+
+
+# Pull latest changesaz webapp config set \**Build and run locally:**
+
+git pull origin main
 
   --resource-group crypto-analyzer-rg \```bash
 
-  --name your-crypto-analyzer \# Build image
+# Activate virtual environment
 
-  --startup-file "gunicorn --bind=0.0.0.0 --timeout 600 web_app:app"docker build -t crypto-analyzer .
+source .venv/bin/activate  --name your-crypto-analyzer \# Build image
 
 
 
-# 6. Enable local Git deployment# Run container
+# Update dependencies if needed  --startup-file "gunicorn --bind=0.0.0.0 --timeout 600 web_app:app"docker build -t crypto-analyzer .
 
-az webapp deployment source config-local-git \docker run -p 8080:8080 crypto-analyzer
+pip install -r requirements.txt
+
+
+
+# Restart the service
+
+sudo systemctl restart crypto-analyzer# 6. Enable local Git deployment# Run container
+
+
+
+echo "✅ Update complete!"az webapp deployment source config-local-git \docker run -p 8080:8080 crypto-analyzer
+
+```
 
   --name your-crypto-analyzer \
 
-  --resource-group crypto-analyzer-rg# Or use docker-compose
+```bash
+
+# Make executable  --resource-group crypto-analyzer-rg# Or use docker-compose
+
+chmod +x update_app.sh
 
 docker-compose up
 
-# 7. Deploy your code```
+# Usage: just run this for updates
+
+./update_app.sh# 7. Deploy your code```
+
+```
 
 git remote add azure <git-url-from-step-6>
 
+## 🔧 **Required Files (Minimal)**
+
 git push azure development:master**Deploy to:**
 
-```- **Google Cloud Run**
+Your repository only needs:
 
-- **AWS ECS**
+- ✅ `requirements.txt` - Python dependencies```- **Google Cloud Run**
 
-#### **Environment Variables (Optional)**- **Azure Container Instances**
+- ✅ `web_app.py` - Flask app entry point
 
-```bash- **DigitalOcean Apps**
+- ✅ Your Python source files (`crypto_analyzer.py`, etc.)- **AWS ECS**
 
-# Set environment variables if needed
 
-az webapp config appsettings set \---
 
-  --resource-group crypto-analyzer-rg \
+**Not needed:**#### **Environment Variables (Optional)**- **Azure Container Instances**
 
-  --name your-crypto-analyzer \### ⚡ **Option 3: Vercel (Serverless)**
+- ❌ Docker files
 
-  --settings FLASK_ENV=production
+- ❌ Platform-specific configs (Heroku, Vercel, etc.)```bash- **DigitalOcean Apps**
 
-```**Steps:**
 
-1. Install Vercel CLI: `npm i -g vercel`
+
+## 🌐 **Access Your App**# Set environment variables if needed
+
+
+
+- **URL**: `http://your-vm-ip:8080`az webapp config appsettings set \---
+
+- **Check Status**: `sudo systemctl status crypto-analyzer`
+
+- **View Logs**: `sudo journalctl -u crypto-analyzer -f`  --resource-group crypto-analyzer-rg \
+
+
+
+## 🛠️ **Management Commands**  --name your-crypto-analyzer \### ⚡ **Option 3: Vercel (Serverless)**
+
+
+
+```bash  --settings FLASK_ENV=production
+
+# Check app status
+
+sudo systemctl status crypto-analyzer```**Steps:**
+
+
+
+# Restart app1. Install Vercel CLI: `npm i -g vercel`
+
+sudo systemctl restart crypto-analyzer
 
 ---2. Deploy:
 
+# View real-time logs
+
+sudo journalctl -u crypto-analyzer -f```bash
+
+
+
+# Update app### **Option 2: Azure Container Instances**vercel --prod
+
+cd /var/www/crypto-analyzer && ./update_app.sh
+
+```Use Docker containers for more control over the environment.```
+
+
+
+## 🆘 **Troubleshooting**
+
+
+
+### App Won't Start#### **Build and Deploy Container****Files needed:** ✅ Already created
+
 ```bash
 
-### **Option 2: Azure Container Instances**vercel --prod
+# Check logs```bash- `vercel.json` - Vercel configuration
 
-Use Docker containers for more control over the environment.```
-
-
-
-#### **Build and Deploy Container****Files needed:** ✅ Already created
-
-```bash- `vercel.json` - Vercel configuration
+sudo journalctl -u crypto-analyzer -f
 
 # 1. Build Docker image locally
 
-docker build -t crypto-analyzer .---
+# Test manually
 
+cd /var/www/crypto-analyzerdocker build -t crypto-analyzer .---
 
+source .venv/bin/activate
+
+python3 web_app.py
+
+```
 
 # 2. Create Azure Container Registry### 🌐 **Option 4: Google Cloud Platform**
 
-az acr create \
+### Permission Issues
 
-  --resource-group crypto-analyzer-rg \**Deploy to App Engine:**
+```bashaz acr create \
 
-  --name cryptoanalyzeracr \```bash
+sudo chown -R azureuser:www-data /var/www/crypto-analyzer
 
-  --sku Basic# Install gcloud CLI
+```  --resource-group crypto-analyzer-rg \**Deploy to App Engine:**
+
+
+
+### Port Issues  --name cryptoanalyzeracr \```bash
+
+```bash
+
+# Check if port is in use  --sku Basic# Install gcloud CLI
+
+sudo netstat -tlnp | grep :8080
 
 gcloud app deploy
 
-# 3. Login to registry
+# Make sure Azure NSG allows port 8080
+
+# Azure Portal → VM → Networking → Add inbound rule# 3. Login to registry
+
+```
 
 az acr login --name cryptoanalyzeracr# View app
 
+---
+
 gcloud app browse
 
+**✅ That's it! Simple, direct Python deployment with no container overhead.**
 # 4. Tag and push image```
 
 docker tag crypto-analyzer cryptoanalyzeracr.azurecr.io/crypto-analyzer:latest
