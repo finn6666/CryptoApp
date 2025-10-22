@@ -5,8 +5,8 @@ from rich.text import Text
 from rich.layout import Layout
 from rich.columns import Columns
 from rich import box
-from crypto_analyzer import CryptoAnalyzer, CoinStatus, Coin
-from crypto_visualizer import CryptoVisualizer
+from ..core.crypto_analyzer import CryptoAnalyzer, CoinStatus, Coin
+from ..core.crypto_visualizer import CryptoVisualizer
 from typing import List
 import sys
 
@@ -274,7 +274,7 @@ class CryptoDisplay:
             self.console.print("[yellow]🌐 Fetching live data from CoinGecko...[/yellow]")
             
             # Import here to avoid circular imports
-            from live_data_fetcher import fetch_and_update_data
+            from ..core.live_data_fetcher import fetch_and_update_data
             
             live_data = fetch_and_update_data()
             if live_data:
