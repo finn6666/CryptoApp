@@ -13,6 +13,28 @@ app = Flask(__name__)
 analyzer = None
 last_update_time = 0
 CACHE_DURATION = 300  # 5 minutes cache to avoid excessive API calls
+FAVORITES_FILE = "favorites.json"  # File to store user favorites
+
+def load_favorites():
+    """Load user's favorite coins from JSON file"""
+    try:
+        if os.path.exists(FAVORITES_FILE):
+            with open(FAVORITES_FILE, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        print(f"Error loading favorites: {e}")
+        return []
+
+def save_favorites(favorites):
+    """Save user's favorite coins to JSON file"""
+    try:
+        with open(FAVORITES_FILE, 'w') as f:
+            json.dump(favorites, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving favorites: {e}")
+        return False
 
 def initialize_analyzer():
     """Initialize the crypto analyzer"""
@@ -153,6 +175,112 @@ def health_check():
         'timestamp': datetime.now().isoformat(),
         'analyzer_loaded': analyzer is not None
     })
+
+@app.route('/api/favorites')
+def get_favorites():
+    """Get all favorite coins with their current data"""
+    try:
+        favorites = load_favorites()
+        return jsonify({
+            'status': 'success',
+            'favorites': favorites,
+            'count': len(favorites)
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/favorites/add', methods=['POST'])
+def add_favorite():
+    """Add a coin to favorites"""
+    try:
+        data = request.get_json()
+        coin_id = data.get('coin_id')
+        coin_name = data.get('coin_name', 'Unknown')
+        
+        if not coin_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'coin_id is required'
+            }), 400
+        
+        favorites = load_favorites()
+        
+        # Check if already in favorites
+        for fav in favorites:
+            if fav['id'] == coin_id:
+                return jsonify({
+                    'status': 'info',
+                    'message': 'Coin already in favorites'
+                })
+        
+        # Add to favorites
+        favorites.append({
+            'id': coin_id,
+            'name': coin_name,
+            'added_at': datetime.now().isoformat()
+        })
+        
+        if save_favorites(favorites):
+            return jsonify({
+                'status': 'success',
+                'message': f'{coin_name} added to favorites'
+            })
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to save favorites'
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/favorites/remove', methods=['POST'])
+def remove_favorite():
+    """Remove a coin from favorites"""
+    try:
+        data = request.get_json()
+        coin_id = data.get('coin_id')
+        
+        if not coin_id:
+            return jsonify({
+                'status': 'error',
+                'message': 'coin_id is required'
+            }), 400
+        
+        favorites = load_favorites()
+        original_count = len(favorites)
+        
+        # Remove from favorites
+        favorites = [fav for fav in favorites if fav['id'] != coin_id]
+        
+        if len(favorites) < original_count:
+            if save_favorites(favorites):
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Coin removed from favorites'
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to save favorites'
+                }), 500
+        else:
+            return jsonify({
+                'status': 'info',
+                'message': 'Coin not found in favorites'
+            })
+            
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     # Initialize analyzer first
