@@ -1,55 +1,44 @@
 #!/usr/bin/env python3
 
+"""
+Simplified main entry point for the Crypto Investment Analyzer
+Focuses on low cap cryptocurrency opportunities
+"""
+
 import sys
-import argparse
-from src.cli.crypto_display import CryptoDisplay
 from src.core.live_data_fetcher import fetch_and_update_data
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Crypto Investment Analyzer - Find attractive crypto opportunities"
-    )
-    parser.add_argument(
-        "--mode", 
-        choices=["analysis", "interactive"], 
-        default="analysis",
-        help="Run mode: 'analysis' for full report, 'interactive' for menu-driven interface"
-    )
-    parser.add_argument(
-        "--top", 
-        type=int, 
-        default=5,
-        help="Number of top coins to show (default: 5)"
-    )
-    parser.add_argument(
-        "--live", 
-        action="store_true",
-        help="Fetch live data from CoinGecko API before analysis"
-    )
-    
-    args = parser.parse_args()
-    
+    """Main entry point - fetch live data and start web app"""
     try:
-        # Fetch live data if requested
-        if args.live:
-            print("🌐 Fetching live cryptocurrency data...")
-            live_data = fetch_and_update_data()
-            if not live_data:
-                print("⚠️  Failed to fetch live data, using existing data.")
-            else:
-                print("✅ Live data updated successfully!\n")
+        print("🔍 Crypto Investment Analyzer - Low Cap Focus")
+        print("=" * 50)
         
-        display = CryptoDisplay()
+        # Always fetch fresh data focusing on low cap opportunities
+        print("🌐 Fetching live low cap cryptocurrency data...")
+        live_data = fetch_and_update_data()
         
-        if args.mode == "interactive":
-            display.run_interactive()
+        if not live_data:
+            print("⚠️  Failed to fetch live data, using existing data.")
         else:
-            display.run_full_analysis()
+            print("✅ Live data updated successfully!")
+            # Check if live_data is a dict with coin data
+            if isinstance(live_data, dict) and 'all_coins' in live_data:
+                print(f"📊 Found {len(live_data['all_coins'])} low cap opportunities")
+            else:
+                print("📊 Low cap data fetched and saved to file")
+        
+        print("\n🚀 Starting web application...")
+        print("Visit: http://127.0.0.1:5000")
+        print("Press Ctrl+C to stop\n")
+        
+        # Import and run the web app
+        from app import app
+        app.run(debug=True, host='127.0.0.1', port=5000)
             
     except FileNotFoundError:
-        print("❌ Error: live_api.json file not found!")
-        print("Make sure the live API data file exists in the data directory.")
-        print("Try running the live data fetcher first.")
+        print("❌ Error: Required data files not found!")
+        print("Make sure the data directory exists.")
         sys.exit(1)
     except KeyboardInterrupt:
         print("\n👋 Goodbye!")

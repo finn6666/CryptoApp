@@ -110,37 +110,58 @@ class CryptoAnalyzer:
             coins.append(coin)
         
         return coins
-    
-    def get_top_coins(self, limit: int = 10) -> List[Coin]:
+
+    def get_top_coins(self, limit: int = 10, status: Optional[CoinStatus] = None) -> List[Coin]:
         """Get top coins by attractiveness score"""
-        return sorted(self.coins, key=lambda x: x.attractiveness_score, reverse=True)[:limit]
-    
+        coins = self.coins.copy()
+
+        # Filter by status if specified
+        if status:
+            coins = [coin for coin in coins if coin.status == status]
+            
+        # Sort by attractiveness score (highest first)
+        coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
+        
+        return coins[:limit]
+
+    def get_trending_coins(self) -> List[Coin]:
+        """Get trending coins sorted by attractiveness score"""
+        return sorted(self.coins, key=lambda x: x.attractiveness_score, reverse=True)
+
+    def _parse_market_cap(self, market_cap_str: Optional[str]) -> float:
+        """Helper method to parse market cap string and return numeric value"""
+        if not market_cap_str or not isinstance(market_cap_str, str) or '$' not in market_cap_str:
+            return 0
+            
+        clean_str = market_cap_str.replace('$', '').replace(',', '')
+        try:
+            if 'B' in clean_str:
+                return float(clean_str.replace('B', '')) * 1_000_000_000
+            elif 'M' in clean_str:
+                return float(clean_str.replace('M', '')) * 1_000_000
+            else:
+                return float(clean_str)
+        except:
+            return 0
+
+    def get_low_cap_coins(self, limit: int = 10) -> List[Coin]:
+        """Get low cap coins (under $500M market cap) prioritized by attractiveness score"""
+        low_cap_coins = []
+        
+        for coin in self.coins:
+            market_cap_num = self._parse_market_cap(coin.market_cap)
+            if market_cap_num > 0 and market_cap_num < 500_000_000:  # Under $500M
+                low_cap_coins.append(coin)
+        
+        # Sort by attractiveness score (highest first)
+        low_cap_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
+        
+        return low_cap_coins[:limit]
+
     def filter_by_status(self, status: CoinStatus) -> List[Coin]:
         """Filter coins by their status"""
         return [coin for coin in self.coins if coin.status == status]
-    
-    def filter_by_min_score(self, min_score: float) -> List[Coin]:
-        """Filter coins with attractiveness score above threshold"""
+
+    def get_high_potential_coins(self, min_score: float = 7.0) -> List[Coin]:
+        """Get coins with high potential (attractiveness score above threshold)"""
         return [coin for coin in self.coins if coin.attractiveness_score >= min_score]
-    
-    def get_upcoming_opportunities(self) -> List[Coin]:
-        """Get upcoming coins with presale opportunities"""
-        upcoming = self.filter_by_status(CoinStatus.UPCOMING)
-        return sorted(upcoming, key=lambda x: x.attractiveness_score, reverse=True)
-    
-    def get_trending_coins(self) -> List[Coin]:
-        """Get coins with positive 24h price changes"""
-        trending = [coin for coin in self.coins 
-                   if coin.price_change_24h_usd and coin.price_change_24h_usd > 0]
-        return sorted(trending, key=lambda x: x.price_change_24h_usd or 0, reverse=True)
-    
-    def get_low_risk_coins(self) -> List[Coin]:
-        """Get established coins with lower risk"""
-        return [coin for coin in self.coins 
-                if coin.market_cap_rank and coin.market_cap_rank <= 20]
-    
-    def get_high_potential_coins(self) -> List[Coin]:
-        """Get new/upcoming coins with high growth potential"""
-        return [coin for coin in self.coins 
-                if coin.status in [CoinStatus.NEW, CoinStatus.UPCOMING] 
-                and coin.attractiveness_score >= 8.0]
