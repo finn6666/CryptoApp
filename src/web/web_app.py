@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify, request
 import json
-from crypto_analyzer import CryptoAnalyzer
-from live_data_fetcher import fetch_and_update_data
+from ..core.crypto_analyzer import CryptoAnalyzer, CoinStatus
+from ..core.live_data_fetcher import fetch_and_update_data
 import threading
 import time
 from datetime import datetime
@@ -84,7 +84,7 @@ def get_coins():
         refresh_data_if_needed()
         
         # Get trending coins
-        trending = analyzer.get_trending_coins()[:20]
+        trending = analyzer.get_trending_coins()[:10]
         
         # Convert to JSON-serializable format
         coins_data = []
@@ -148,8 +148,6 @@ def get_stats():
     try:
         if not analyzer:
             return jsonify({'error': 'Analyzer not initialized'}), 500
-        
-        from crypto_analyzer import CoinStatus
         
         total_coins = len(analyzer.coins)
         current_coins = len(analyzer.filter_by_status(CoinStatus.CURRENT))

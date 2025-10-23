@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Flask web application for Crypto Investment Analyzer
+Flask web application for Low Cap Crypto Analyzer
+Focused on discovering hidden gems in small cap cryptocurrencies
 """
 
 from flask import Flask, render_template, jsonify
@@ -47,11 +48,22 @@ def get_stats():
 def get_coins():
     """Get coins data"""
     try:
-        # Get top coins sorted by score
-        top_coins = analyzer.get_top_coins(50)  # Show top 50
+        # Get low cap coins first, then fill with top coins if needed
+        low_cap_coins = analyzer.get_low_cap_coins(10)
+        
+        if len(low_cap_coins) < 10:
+            # Fill remaining slots with top coins
+            remaining_slots = 10 - len(low_cap_coins)
+            top_coins = analyzer.get_top_coins(remaining_slots)
+            # Remove any duplicates
+            for coin in top_coins:
+                if coin not in low_cap_coins:
+                    low_cap_coins.append(coin)
+                    if len(low_cap_coins) >= 10:
+                        break
         
         coins_data = []
-        for coin in top_coins:
+        for coin in low_cap_coins[:10]:
             coins_data.append({
                 'symbol': coin.symbol,
                 'name': coin.name,
