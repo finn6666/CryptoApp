@@ -82,6 +82,7 @@ python3 main.py                            # Run CLI
 python3 app.py                             # Run web app
 git checkout dev                           # Development
 git checkout main && git merge dev         # Deploy
+git reset --hard HEAD~1 # Go back 1 commit and delete all changes after it
 ```
 
 **Happy coding! 🚀**
