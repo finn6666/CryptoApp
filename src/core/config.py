@@ -21,7 +21,7 @@ class Config:
     COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"
     
     # App Settings
-    DEFAULT_COIN_LIMIT = 50
+    DEFAULT_COIN_LIMIT = 10
     CACHE_DURATION = 300  # 5 minutes
     REQUEST_TIMEOUT = 30
     

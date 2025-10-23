@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investment Analyzer</title>
+    <title>Low Cap Crypto Analyzer</title>
     <style>
         * {
             margin: 0;
@@ -291,6 +291,36 @@
             background: #667eea;
         }
 
+        .favorite-btn {
+            background: none;
+            border: none;
+            font-size: 1.2em;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            color: #718096;
+        }
+
+        .favorite-btn:hover {
+            background: rgba(102, 126, 234, 0.2);
+            transform: scale(1.1);
+        }
+
+        .favorite-btn.favorited {
+            color: #ffd700;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
+        }
+
+        .favorites-container {
+            background: rgba(26, 32, 46, 0.95);
+            border: 1px solid #2d3748;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
         @media (max-width: 768px) {
             .coins-table {
                 font-size: 0.9em;
@@ -329,10 +359,10 @@
                     🔄 Refresh Now
                 </button>
             </div>
-            <h1>Investment Analyzer</h1>
-            <p>Low Cap Cryptocurrency Opportunities & Market Analysis</p>
+            <h1>🚀 Low Cap Crypto Analyzer</h1>
+            <p>Discover Hidden Gems in Small Cap Cryptocurrencies</p>
             <p style="margin-top: 10px; font-size: 0.9em; color: #888;">
-                Data powered by CoinGecko API | Updated every 5 minutes
+                Focused on coins under $500M market cap | Updated every 5 minutes
             </p>
         </div>
 
@@ -352,6 +382,16 @@
             <div class="stat-card">
                 <div class="stat-number" id="trendingUp">-</div>
                 <div class="stat-label">Trending Up</div>
+            </div>
+        </div>
+
+        <div class="favorites-container" id="favoritesContainer" style="display: none;">
+            <div class="coins-header">
+                <h2>⭐ Your Favorite Low Cap Coins</h2>
+                <p>Track your selected cryptocurrencies</p>
+            </div>
+            <div id="favoritesContent">
+                <div class="loading">🔄 Loading favorites...</div>
             </div>
         </div>
 
@@ -420,6 +460,7 @@
                 <table class="coins-table">
                     <thead>
                         <tr>
+                            <th>⭐</th>
                             <th>Symbol</th>
                             <th>Name</th>
                             <th>Score</th>
@@ -444,6 +485,7 @@
 
                 html += `
                     <tr>
+                        <td><button class="favorite-btn" onclick="toggleFavorite('${coin.symbol}')" id="fav-${coin.symbol}">⭐</button></td>
                         <td class="coin-symbol">${coin.symbol}</td>
                         <td class="coin-name">${coin.name}</td>
                         <td><span class="score ${scoreClass}">${coin.score.toFixed(1)}</span></td>
@@ -500,6 +542,129 @@
             }
         }
 
+        let userFavorites = [];
+
+        async function loadFavorites() {
+            try {
+                const response = await fetch('/api/favorites');
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const favorites = data.favorites;
+                userFavorites = favorites.map(fav => fav.symbol);
+                
+                if (favorites.length > 0) {
+                    const favoritesHtml = generateFavoritesTable(favorites);
+                    document.getElementById('favoritesContent').innerHTML = favoritesHtml;
+                    document.getElementById('favoritesContainer').style.display = 'block';
+                } else {
+                    document.getElementById('favoritesContainer').style.display = 'none';
+                }
+                
+                // Update favorite button states
+                updateFavoriteButtons();
+                
+            } catch (error) {
+                console.error('Error loading favorites:', error);
+                document.getElementById('favoritesContent').innerHTML = 
+                    `<div class="error">❌ Error loading favorites: ${error.message}</div>`;
+            }
+        }
+
+        function generateFavoritesTable(favorites) {
+            let html = `
+                <table class="coins-table">
+                    <thead>
+                        <tr>
+                            <th>❌</th>
+                            <th>Symbol</th>
+                            <th>Name</th>
+                            <th>Score</th>
+                            <th>Price</th>
+                            <th>24h Change</th>
+                            <th>Market Cap</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            favorites.forEach(coin => {
+                const priceChangeClass = coin.price_change_24h >= 0 ? 'positive' : 'negative';
+                const priceChangeText = coin.price_change_24h >= 0 ? 
+                    `+${coin.price_change_24h.toFixed(1)}%` : 
+                    `${coin.price_change_24h.toFixed(1)}%`;
+
+                let scoreClass = 'score-low';
+                if (coin.score >= 8) scoreClass = 'score-high';
+                else if (coin.score >= 6) scoreClass = 'score-medium';
+
+                const price = coin.price ? `$${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
+
+                html += `
+                    <tr>
+                        <td><button class="favorite-btn" onclick="removeFavorite('${coin.symbol}')" style="color: #fc8181;">❌</button></td>
+                        <td class="coin-symbol">${coin.symbol}</td>
+                        <td class="coin-name">${coin.name}</td>
+                        <td><span class="score ${scoreClass}">${coin.score.toFixed(1)}</span></td>
+                        <td class="price">${price}</td>
+                        <td><span class="price-change ${priceChangeClass}">${priceChangeText}</span></td>
+                        <td>${coin.market_cap || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+            `;
+
+            return html;
+        }
+
+        async function toggleFavorite(symbol) {
+            try {
+                const isFavorited = userFavorites.includes(symbol);
+                const endpoint = isFavorited ? '/api/favorites/remove' : '/api/favorites/add';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ symbol: symbol })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+                
+                // Reload favorites
+                await loadFavorites();
+                
+            } catch (error) {
+                console.error('Error toggling favorite:', error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function removeFavorite(symbol) {
+            await toggleFavorite(symbol);
+        }
+
+        function updateFavoriteButtons() {
+            userFavorites.forEach(symbol => {
+                const btn = document.getElementById(`fav-${symbol}`);
+                if (btn) {
+                    btn.classList.add('favorited');
+                }
+            });
+        }
+
         function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
             const lastUpdatedEl = document.getElementById('lastUpdated');
             const nextRefreshEl = document.getElementById('nextRefresh');
@@ -549,6 +714,7 @@
         window.addEventListener('load', async () => {
             await loadStats();
             await loadCoins();
+            await loadFavorites();
         });
     </script>
 </body>
