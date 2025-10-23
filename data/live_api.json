@@ -1,28 +1,2432 @@
 {
+  "last_updated": "2025-10-22T16:26:54.552755",
+  "sources": [
+    "coinmarketcap",
+    "coingecko"
+  ],
   "coins": [
     {
       "item": {
-        "id": "mantle-staked-ether",
-        "name": "Mantle Staked Ether",
-        "symbol": "METH",
+        "id": "bitcoin",
+        "name": "Bitcoin",
+        "symbol": "BTC",
         "status": "current",
-        "attractiveness_score": 4.5,
+        "attractiveness_score": 7.5,
         "investment_highlights": [
-          "Low liquidity risk",
-          "Decent volume"
+          "Top 10 cryptocurrency",
+          "High liquidity"
         ],
-        "market_cap_rank": 110,
+        "risk_level": "low",
+        "market_cap_rank": 1,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 4123.69,
+          "price": 107869.09491258641,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.77147
+            "usd": -4.47549649
           },
-          "market_cap": "$952,096,073",
-          "total_volume": "$3,130,743",
-          "content": null
+          "market_cap": "$2,150,725,943,619",
+          "total_volume": "$101,101,104,299",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "tether",
+        "name": "Tether USDt",
+        "symbol": "USDT",
+        "status": "current",
+        "attractiveness_score": 7.5,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 3,
+        "price_btc": null,
+        "data": {
+          "price": 0.9999454277191296,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.04289279
+          },
+          "market_cap": "$182,404,133,025",
+          "total_volume": "$188,958,421,859",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "bnb",
+        "name": "BNB",
+        "symbol": "BNB",
+        "status": "current",
+        "attractiveness_score": 7.5,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 4,
+        "price_btc": null,
+        "data": {
+          "price": 1075.2259202238097,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.93046668
+          },
+          "market_cap": "$149,650,228,490",
+          "total_volume": "$4,120,764,632",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "xrp",
+        "name": "XRP",
+        "symbol": "XRP",
+        "status": "current",
+        "attractiveness_score": 7.5,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 5,
+        "price_btc": null,
+        "data": {
+          "price": 2.391660302970943,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.73092776
+          },
+          "market_cap": "$143,440,887,614",
+          "total_volume": "$4,928,169,488",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "usd-coin",
+        "name": "USDC",
+        "symbol": "USDC",
+        "status": "current",
+        "attractiveness_score": 7.5,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 7,
+        "price_btc": null,
+        "data": {
+          "price": 0.9996127975144272,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.04145007
+          },
+          "market_cap": "$76,695,294,513",
+          "total_volume": "$22,348,307,760",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "tron",
+        "name": "TRON",
+        "symbol": "TRX",
+        "status": "current",
+        "attractiveness_score": 7.5,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 8,
+        "price_btc": null,
+        "data": {
+          "price": 0.32110361497306994,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -1.06501068
+          },
+          "market_cap": "$30,397,205,345",
+          "total_volume": "$1,075,420,537",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ethereum",
+        "name": "Ethereum",
+        "symbol": "ETH",
+        "status": "current",
+        "attractiveness_score": 7.0,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 2,
+        "price_btc": null,
+        "data": {
+          "price": 3799.028696417356,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.57350132
+          },
+          "market_cap": "$458,536,530,275",
+          "total_volume": "$49,294,106,877",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "solana",
+        "name": "Solana",
+        "symbol": "SOL",
+        "status": "current",
+        "attractiveness_score": 7.0,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 6,
+        "price_btc": null,
+        "data": {
+          "price": 183.03251480647572,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.70241077
+          },
+          "market_cap": "$100,057,380,046",
+          "total_volume": "$8,203,691,764",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "dogecoin",
+        "name": "Dogecoin",
+        "symbol": "DOGE",
+        "status": "current",
+        "attractiveness_score": 7.0,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 9,
+        "price_btc": null,
+        "data": {
+          "price": 0.19042890911122515,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.29972095
+          },
+          "market_cap": "$28,841,815,354",
+          "total_volume": "$2,857,134,434",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "cardano",
+        "name": "Cardano",
+        "symbol": "ADA",
+        "status": "current",
+        "attractiveness_score": 7.0,
+        "investment_highlights": [
+          "Top 10 cryptocurrency",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 10,
+        "price_btc": null,
+        "data": {
+          "price": 0.6327159366797275,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.10287786
+          },
+          "market_cap": "$22,683,308,984",
+          "total_volume": "$1,167,753,703",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ethena-usde",
+        "name": "Ethena USDe",
+        "symbol": "USDe",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 13,
+        "price_btc": null,
+        "data": {
+          "price": 0.9993770927900255,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.01603317
+          },
+          "market_cap": "$11,064,940,454",
+          "total_volume": "$368,281,270",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "litecoin",
+        "name": "Litecoin",
+        "symbol": "LTC",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 20,
+        "price_btc": null,
+        "data": {
+          "price": 92.47538979205773,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -3.79420431
+          },
+          "market_cap": "$7,068,417,289",
+          "total_volume": "$813,964,549",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "monero",
+        "name": "Monero",
+        "symbol": "XMR",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 22,
+        "price_btc": null,
+        "data": {
+          "price": 309.76852450237186,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.25866991
+          },
+          "market_cap": "$5,714,220,694",
+          "total_volume": "$191,156,105",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "multi-collateral-dai",
+        "name": "Dai",
+        "symbol": "DAI",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 23,
+        "price_btc": null,
+        "data": {
+          "price": 0.9998520074601367,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.02350309
+          },
+          "market_cap": "$5,364,588,666",
+          "total_volume": "$179,574,667",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "paypal-usd",
+        "name": "PayPal USD",
+        "symbol": "PYUSD",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 37,
+        "price_btc": null,
+        "data": {
+          "price": 0.9996124725540975,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.03677794
+          },
+          "market_cap": "$2,745,129,427",
+          "total_volume": "$189,281,819",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "usd1",
+        "name": "World Liberty Financial USD",
+        "symbol": "USD1",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 39,
+        "price_btc": null,
+        "data": {
+          "price": 0.9998947713129719,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.03247337
+          },
+          "market_cap": "$2,630,072,206",
+          "total_volume": "$468,941,979",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "aptos",
+        "name": "Aptos",
+        "symbol": "APT",
+        "status": "current",
+        "attractiveness_score": 6.8,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 41,
+        "price_btc": null,
+        "data": {
+          "price": 3.306155502249892,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -1.40580739
+          },
+          "market_cap": "$2,373,842,756",
+          "total_volume": "$188,586,898",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "chainlink",
+        "name": "Chainlink",
+        "symbol": "LINK",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 12,
+        "price_btc": null,
+        "data": {
+          "price": 17.362943469314914,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.28377546
+          },
+          "market_cap": "$11,773,811,454",
+          "total_volume": "$1,099,181,970",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "sui",
+        "name": "Sui",
+        "symbol": "SUI",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 16,
+        "price_btc": null,
+        "data": {
+          "price": 2.4298654413655782,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.49253315
+          },
+          "market_cap": "$8,810,067,452",
+          "total_volume": "$1,373,607,311",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "unus-sed-leo",
+        "name": "UNUS SED LEO",
+        "symbol": "LEO",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "low",
+        "market_cap_rank": 18,
+        "price_btc": null,
+        "data": {
+          "price": 8.984958216652203,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 0.22187151
+          },
+          "market_cap": "$8,287,758,208",
+          "total_volume": "$669,601",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "bitget-token-new",
+        "name": "Bitget Token",
+        "symbol": "BGB",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 33,
+        "price_btc": null,
+        "data": {
+          "price": 4.542607497995696,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.96257057
+          },
+          "market_cap": "$3,164,292,464",
+          "total_volume": "$71,602,850",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "memecore",
+        "name": "MemeCore",
+        "symbol": "M",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 42,
+        "price_btc": null,
+        "data": {
+          "price": 2.221212222404838,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": 1.74547203
+          },
+          "market_cap": "$2,308,952,473",
+          "total_volume": "$20,327,488",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "kucoin-token",
+        "name": "KuCoin Token",
+        "symbol": "KCS",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 48,
+        "price_btc": null,
+        "data": {
+          "price": 13.226109897259013,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -3.1047442
+          },
+          "market_cap": "$1,716,429,677",
+          "total_volume": "$7,632,862",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pi",
+        "name": "Pi",
+        "symbol": "PI",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 50,
+        "price_btc": null,
+        "data": {
+          "price": 0.20203391092357462,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -3.09779391
+          },
+          "market_cap": "$1,673,571,438",
+          "total_volume": "$17,187,995",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "first-digital-usd",
+        "name": "First Digital USD",
+        "symbol": "FDUSD",
+        "status": "current",
+        "attractiveness_score": 6.5,
+        "investment_highlights": [
+          "Growing market presence",
+          "High liquidity"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 70,
+        "price_btc": null,
+        "data": {
+          "price": 0.9977090595928012,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.09041811
+          },
+          "market_cap": "$1,000,482,734",
+          "total_volume": "$8,562,469,189",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 109,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "hyperliquid",
+        "name": "Hyperliquid",
+        "symbol": "HYPE",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 11,
+        "price_btc": null,
+        "data": {
+          "price": 35.96742216186586,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.51397063
+          },
+          "market_cap": "$12,109,699,407",
+          "total_volume": "$612,276,355",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "stellar",
+        "name": "Stellar",
+        "symbol": "XLM",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 14,
+        "price_btc": null,
+        "data": {
+          "price": 0.31125908322083323,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.63727328
+          },
+          "market_cap": "$9,962,479,070",
+          "total_volume": "$246,010,096",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "bitcoin-cash",
+        "name": "Bitcoin Cash",
+        "symbol": "BCH",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 15,
+        "price_btc": null,
+        "data": {
+          "price": 471.6152216123158,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.78333616
+          },
+          "market_cap": "$9,405,154,133",
+          "total_volume": "$447,901,866",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "avalanche",
+        "name": "Avalanche",
+        "symbol": "AVAX",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 17,
+        "price_btc": null,
+        "data": {
+          "price": 19.455767566677636,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.51518905
+          },
+          "market_cap": "$8,299,092,560",
+          "total_volume": "$629,143,247",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "hedera",
+        "name": "Hedera",
+        "symbol": "HBAR",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 19,
+        "price_btc": null,
+        "data": {
+          "price": 0.16851854354531468,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.84268464
+          },
+          "market_cap": "$7,146,067,586",
+          "total_volume": "$250,058,716",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "shiba-inu",
+        "name": "Shiba Inu",
+        "symbol": "SHIB",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 21,
+        "price_btc": null,
+        "data": {
+          "price": 9.900447987050835e-06,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.11549083
+          },
+          "market_cap": "$5,833,794,616",
+          "total_volume": "$200,646,160",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "toncoin",
+        "name": "Toncoin",
+        "symbol": "TON",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 24,
+        "price_btc": null,
+        "data": {
+          "price": 2.126338054223189,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.82244927
+          },
+          "market_cap": "$5,359,118,648",
+          "total_volume": "$185,626,960",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "polkadot-new",
+        "name": "Polkadot",
+        "symbol": "DOT",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 27,
+        "price_btc": null,
+        "data": {
+          "price": 2.977955393704434,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.9244099
+          },
+          "market_cap": "$4,852,220,678",
+          "total_volume": "$294,303,004",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "zcash",
+        "name": "Zcash",
+        "symbol": "ZEC",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 28,
+        "price_btc": null,
+        "data": {
+          "price": 259.7184480213436,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -9.63435476
+          },
+          "market_cap": "$4,226,846,589",
+          "total_volume": "$887,519,647",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "bittensor",
+        "name": "Bittensor",
+        "symbol": "TAO",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 29,
+        "price_btc": null,
+        "data": {
+          "price": 391.65991851395347,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.69192604
+          },
+          "market_cap": "$3,972,854,344",
+          "total_volume": "$415,479,595",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "uniswap",
+        "name": "Uniswap",
+        "symbol": "UNI",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 30,
+        "price_btc": null,
+        "data": {
+          "price": 6.1179061196443065,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.5845594
+          },
+          "market_cap": "$3,856,302,993",
+          "total_volume": "$256,924,980",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "aave",
+        "name": "Aave",
+        "symbol": "AAVE",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 31,
+        "price_btc": null,
+        "data": {
+          "price": 221.4918946536742,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.60136389
+          },
+          "market_cap": "$3,379,442,647",
+          "total_volume": "$469,378,629",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "world-liberty-financial-wlfi",
+        "name": "World Liberty Financial",
+        "symbol": "WLFI",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 34,
+        "price_btc": null,
+        "data": {
+          "price": 0.1271254877724417,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.26285703
+          },
+          "market_cap": "$3,123,134,593",
+          "total_volume": "$197,696,050",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ethena",
+        "name": "Ethena",
+        "symbol": "ENA",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 35,
+        "price_btc": null,
+        "data": {
+          "price": 0.42725096922355765,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.43633143
+          },
+          "market_cap": "$3,057,514,749",
+          "total_volume": "$593,212,314",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pepe",
+        "name": "Pepe",
+        "symbol": "PEPE",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 36,
+        "price_btc": null,
+        "data": {
+          "price": 6.804579228295355e-06,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.68503324
+          },
+          "market_cap": "$2,862,617,753",
+          "total_volume": "$530,510,460",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "near-protocol",
+        "name": "NEAR Protocol",
+        "symbol": "NEAR",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 38,
+        "price_btc": null,
+        "data": {
+          "price": 2.193662764547417,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.75007014
+          },
+          "market_cap": "$2,741,720,871",
+          "total_volume": "$223,787,798",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ethereum-classic",
+        "name": "Ethereum Classic",
+        "symbol": "ETC",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 40,
+        "price_btc": null,
+        "data": {
+          "price": 15.538533401613082,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.08100846
+          },
+          "market_cap": "$2,393,131,654",
+          "total_volume": "$125,452,721",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ondo-finance",
+        "name": "Ondo",
+        "symbol": "ONDO",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 43,
+        "price_btc": null,
+        "data": {
+          "price": 0.7172161133416133,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.81965183
+          },
+          "market_cap": "$2,265,762,824",
+          "total_volume": "$142,065,901",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "polygon-ecosystem-token",
+        "name": "Polygon (prev. MATIC)",
+        "symbol": "POL",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 44,
+        "price_btc": null,
+        "data": {
+          "price": 0.19207821799453767,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.02239884
+          },
+          "market_cap": "$2,021,569,493",
+          "total_volume": "$138,098,037",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "worldcoin-org",
+        "name": "Worldcoin",
+        "symbol": "WLD",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 46,
+        "price_btc": null,
+        "data": {
+          "price": 0.871594895414759,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -9.18552027
+          },
+          "market_cap": "$1,934,158,306",
+          "total_volume": "$226,612,240",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "arbitrum",
+        "name": "Arbitrum",
+        "symbol": "ARB",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Established market position",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 49,
+        "price_btc": null,
+        "data": {
+          "price": 0.3079562315124019,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.00988178
+          },
+          "market_cap": "$1,696,743,958",
+          "total_volume": "$219,416,293",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pax-gold",
+        "name": "PAX Gold",
+        "symbol": "PAXG",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 57,
+        "price_btc": null,
+        "data": {
+          "price": 4054.415197517002,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.0646975
+          },
+          "market_cap": "$1,338,678,762",
+          "total_volume": "$763,004,644",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "official-trump",
+        "name": "OFFICIAL TRUMP",
+        "symbol": "TRUMP",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 65,
+        "price_btc": null,
+        "data": {
+          "price": 5.806859729480475,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -3.54952997
+          },
+          "market_cap": "$1,161,367,603",
+          "total_volume": "$368,830,166",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "tether-gold",
+        "name": "Tether Gold",
+        "symbol": "XAUt",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 71,
+        "price_btc": null,
+        "data": {
+          "price": 4046.350490746727,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.09452034
+          },
+          "market_cap": "$997,522,508",
+          "total_volume": "$476,095,077",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pancakeswap",
+        "name": "PancakeSwap",
+        "symbol": "CAKE",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 73,
+        "price_btc": null,
+        "data": {
+          "price": 2.770665984568872,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.79272257
+          },
+          "market_cap": "$947,918,239",
+          "total_volume": "$220,702,566",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 111,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ripple-usd",
+        "name": "Ripple USD",
+        "symbol": "RLUSD",
+        "status": "current",
+        "attractiveness_score": 6.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 75,
+        "price_btc": null,
+        "data": {
+          "price": 0.9982931691527751,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.17873207
+          },
+          "market_cap": "$872,505,247",
+          "total_volume": "$104,465,729",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 117,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "cronos",
+        "name": "Cronos",
+        "symbol": "CRO",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 26,
+        "price_btc": null,
+        "data": {
+          "price": 0.14335883952440026,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.62649279
+          },
+          "market_cap": "$5,170,069,301",
+          "total_volume": "$32,147,939",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "okb",
+        "name": "OKB",
+        "symbol": "OKB",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 32,
+        "price_btc": null,
+        "data": {
+          "price": 160.30700182199223,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.82234308
+          },
+          "market_cap": "$3,366,447,038",
+          "total_volume": "$95,352,167",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "story-protocol",
+        "name": "Story",
+        "symbol": "IP",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Established market position"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 47,
+        "price_btc": null,
+        "data": {
+          "price": 5.336183746542985,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.03316036
+          },
+          "market_cap": "$1,717,311,662",
+          "total_volume": "$57,986,106",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "sky",
+        "name": "Sky",
+        "symbol": "SKY",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 56,
+        "price_btc": null,
+        "data": {
+          "price": 0.057608068965733644,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.93933118
+          },
+          "market_cap": "$1,347,386,108",
+          "total_volume": "$20,961,207",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "flare",
+        "name": "Flare",
+        "symbol": "FLR",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 60,
+        "price_btc": null,
+        "data": {
+          "price": 0.017121849208792613,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.80297834
+          },
+          "market_cap": "$1,307,065,436",
+          "total_volume": "$11,264,229",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "gatetoken",
+        "name": "GateToken",
+        "symbol": "GT",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 62,
+        "price_btc": null,
+        "data": {
+          "price": 15.655971114636047,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -1.75684021
+          },
+          "market_cap": "$1,256,744,766",
+          "total_volume": "$6,972,476",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "xdc-network",
+        "name": "XDC Network",
+        "symbol": "XDC",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 67,
+        "price_btc": null,
+        "data": {
+          "price": 0.06166063037769588,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -3.62502804
+          },
+          "market_cap": "$1,094,614,913",
+          "total_volume": "$48,599,082",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "quant",
+        "name": "Quant",
+        "symbol": "QNT",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 72,
+        "price_btc": null,
+        "data": {
+          "price": 80.92042068998444,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.53227858
+          },
+          "market_cap": "$976,931,038",
+          "total_volume": "$17,891,633",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "nexo",
+        "name": "Nexo",
+        "symbol": "NEXO",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 83,
+        "price_btc": null,
+        "data": {
+          "price": 1.1357324290459347,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -2.89376935
+          },
+          "market_cap": "$733,848,784",
+          "total_volume": "$10,746,288",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "kaia",
+        "name": "Kaia",
+        "symbol": "KAIA",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 88,
+        "price_btc": null,
+        "data": {
+          "price": 0.1060055001397871,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -3.2732648
+          },
+          "market_cap": "$651,866,875",
+          "total_volume": "$32,966,163",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "tezos",
+        "name": "Tezos",
+        "symbol": "XTZ",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 91,
+        "price_btc": null,
+        "data": {
+          "price": 0.5896971308677221,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.44361964
+          },
+          "market_cap": "$626,683,197",
+          "total_volume": "$36,403,292",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "newton",
+        "name": "AB",
+        "symbol": "AB",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 93,
+        "price_btc": null,
+        "data": {
+          "price": 0.006909506337780908,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -0.74419692
+          },
+          "market_cap": "$574,657,088",
+          "total_volume": "$16,468,498",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "dexe",
+        "name": "DeXe",
+        "symbol": "DEXE",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 100,
+        "price_btc": null,
+        "data": {
+          "price": 6.599188538677216,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -4.99667085
+          },
+          "market_cap": "$552,574,127",
+          "total_volume": "$18,170,301",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "mantle",
+        "name": "Mantle",
+        "symbol": "MNT",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Established market position",
+          "Potential buying opportunity",
+          "Good trading volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 25,
+        "price_btc": null,
+        "data": {
+          "price": 1.6273896425192433,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -10.24648866
+          },
+          "market_cap": "$5,293,807,464",
+          "total_volume": "$278,126,412",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "aster",
+        "name": "Aster",
+        "symbol": "ASTER",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Established market position",
+          "Potential buying opportunity",
+          "Good trading volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 45,
+        "price_btc": null,
+        "data": {
+          "price": 0.9986663782260743,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -14.11153878
+          },
+          "market_cap": "$2,015,009,151",
+          "total_volume": "$822,029,696",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "algorand",
+        "name": "Algorand",
+        "symbol": "ALGO",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 52,
+        "price_btc": null,
+        "data": {
+          "price": 0.1811255215159507,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.56927164
+          },
+          "market_cap": "$1,596,145,333",
+          "total_volume": "$103,445,600",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "cosmos",
+        "name": "Cosmos",
+        "symbol": "ATOM",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 53,
+        "price_btc": null,
+        "data": {
+          "price": 3.155273439086352,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.09116448
+          },
+          "market_cap": "$1,496,067,222",
+          "total_volume": "$119,637,651",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pump-fun",
+        "name": "Pump.fun",
+        "symbol": "PUMP",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 58,
+        "price_btc": null,
+        "data": {
+          "price": 0.0037424472694031425,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.04309104
+          },
+          "market_cap": "$1,324,826,333",
+          "total_volume": "$286,552,784",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pudgy-penguins",
+        "name": "Pudgy Penguins",
+        "symbol": "PENGU",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 59,
+        "price_btc": null,
+        "data": {
+          "price": 0.020851991551179883,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -9.35545668
+          },
+          "market_cap": "$1,310,764,448",
+          "total_volume": "$304,562,187",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "sei",
+        "name": "Sei",
+        "symbol": "SEI",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 63,
+        "price_btc": null,
+        "data": {
+          "price": 0.18810260690147368,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.43010069
+          },
+          "market_cap": "$1,175,432,290",
+          "total_volume": "$137,918,532",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "bonk1",
+        "name": "Bonk",
+        "symbol": "BONK",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 64,
+        "price_btc": null,
+        "data": {
+          "price": 1.4273950940317896e-05,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.63347299
+          },
+          "market_cap": "$1,167,954,819",
+          "total_volume": "$237,691,692",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "filecoin",
+        "name": "Filecoin",
+        "symbol": "FIL",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 68,
+        "price_btc": null,
+        "data": {
+          "price": 1.5370252542516292,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.95537492
+          },
+          "market_cap": "$1,076,417,878",
+          "total_volume": "$143,876,429",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "injective",
+        "name": "Injective",
+        "symbol": "INJ",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 76,
+        "price_btc": null,
+        "data": {
+          "price": 8.378555598199597,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.66231646
+          },
+          "market_cap": "$837,612,041",
+          "total_volume": "$108,044,700",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 122,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "doublezero",
+        "name": "DoubleZero",
+        "symbol": "2Z",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 77,
+        "price_btc": null,
+        "data": {
+          "price": 0.23694886528914905,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.78306246
+          },
+          "market_cap": "$822,548,438",
+          "total_volume": "$125,521,258",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 121,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "lido-dao",
+        "name": "Lido DAO",
+        "symbol": "LDO",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 79,
+        "price_btc": null,
+        "data": {
+          "price": 0.8824086363548199,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.06387253
+          },
+          "market_cap": "$790,434,128",
+          "total_volume": "$144,911,874",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 123,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "optimism-ethereum",
+        "name": "Optimism",
+        "symbol": "OP",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 81,
+        "price_btc": null,
+        "data": {
+          "price": 0.4303613187806291,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.74602217
+          },
+          "market_cap": "$765,455,442",
+          "total_volume": "$168,129,409",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 127,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "curve-dao-token",
+        "name": "Curve DAO Token",
+        "symbol": "CRV",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 82,
+        "price_btc": null,
+        "data": {
+          "price": 0.5292467855579164,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.15656651
+          },
+          "market_cap": "$743,636,479",
+          "total_volume": "$198,075,988",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 128,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "dash",
+        "name": "Dash",
+        "symbol": "DASH",
+        "status": "current",
+        "attractiveness_score": 5.8,
+        "investment_highlights": [
+          "Growing market presence",
+          "Good trading volume"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 99,
+        "price_btc": null,
+        "data": {
+          "price": 44.50351606108118,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.80194932
+          },
+          "market_cap": "$554,495,197",
+          "total_volume": "$177,180,353",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "internet-computer",
+        "name": "Internet Computer",
+        "symbol": "ICP",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 51,
+        "price_btc": null,
+        "data": {
+          "price": 3.011534505009108,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.36847449
+          },
+          "market_cap": "$1,624,118,323",
+          "total_volume": "$91,480,698",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "vechain",
+        "name": "VeChain",
+        "symbol": "VET",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 54,
+        "price_btc": null,
+        "data": {
+          "price": 0.017065350223003147,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.8402018
+          },
+          "market_cap": "$1,467,364,842",
+          "total_volume": "$41,814,865",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "kaspa",
+        "name": "Kaspa",
+        "symbol": "KAS",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 55,
+        "price_btc": null,
+        "data": {
+          "price": 0.05031510869348951,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.20595315
+          },
+          "market_cap": "$1,350,279,171",
+          "total_volume": "$52,836,080",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "render",
+        "name": "Render",
+        "symbol": "RENDER",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 61,
+        "price_btc": null,
+        "data": {
+          "price": 2.4486947502758323,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.1615046
+          },
+          "market_cap": "$1,269,855,427",
+          "total_volume": "$51,779,813",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "jupiter-ag",
+        "name": "Jupiter",
+        "symbol": "JUP",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 66,
+        "price_btc": null,
+        "data": {
+          "price": 0.3507657349022888,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.22344112
+          },
+          "market_cap": "$1,110,249,550",
+          "total_volume": "$42,513,194",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "immutable-x",
+        "name": "Immutable",
+        "symbol": "IMX",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 69,
+        "price_btc": null,
+        "data": {
+          "price": 0.5197667407113902,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.35893409
+          },
+          "market_cap": "$1,021,058,534",
+          "total_volume": "$51,708,511",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "celestia",
+        "name": "Celestia",
+        "symbol": "TIA",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 78,
+        "price_btc": null,
+        "data": {
+          "price": 0.9977374176096384,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.27503609
+          },
+          "market_cap": "$821,712,283",
+          "total_volume": "$92,139,090",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 120,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "stacks",
+        "name": "Stacks",
+        "symbol": "STX",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 80,
+        "price_btc": null,
+        "data": {
+          "price": 0.42725806480194384,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.35732341
+          },
+          "market_cap": "$771,732,203",
+          "total_volume": "$25,799,536",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 125,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "aerodrome-finance",
+        "name": "Aerodrome Finance",
+        "symbol": "AERO",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 84,
+        "price_btc": null,
+        "data": {
+          "price": 0.7788396628419935,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.9076227
+          },
+          "market_cap": "$702,528,589",
+          "total_volume": "$46,289,091",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 132,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "the-graph",
+        "name": "The Graph",
+        "symbol": "GRT",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 87,
+        "price_btc": null,
+        "data": {
+          "price": 0.06259378952456518,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -8.16049206
+          },
+          "market_cap": "$660,805,434",
+          "total_volume": "$36,857,708",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "pyth-network",
+        "name": "Pyth Network",
+        "symbol": "PYTH",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 89,
+        "price_btc": null,
+        "data": {
+          "price": 0.1118313439960441,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.69939526
+          },
+          "market_cap": "$643,028,333",
+          "total_volume": "$48,213,081",
+          "content": null,
+          "source": "coinmarketcap"
         }
       }
     },
@@ -34,46 +2438,127 @@
         "status": "current",
         "attractiveness_score": 5.5,
         "investment_highlights": [
-          "Good liquidity"
+          "Growing market presence"
         ],
-        "market_cap_rank": 111,
+        "risk_level": "medium",
+        "market_cap_rank": 90,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 1.81,
+          "price": 1.8112003071905158,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -3.46383
+            "usd": -9.09610331
           },
-          "market_cap": "$948,855,389",
-          "total_volume": "$40,118,138",
-          "content": null
+          "market_cap": "$639,940,097",
+          "total_volume": "$51,802,345",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 110,
+          "additional_source": "coingecko"
         }
       }
     },
     {
       "item": {
-        "id": "pancakeswap-token",
-        "name": "PancakeSwap",
-        "symbol": "CAKE",
+        "id": "iota",
+        "name": "IOTA",
+        "symbol": "IOTA",
         "status": "current",
-        "attractiveness_score": 7.0,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
-          "Active trading",
-          "Good liquidity"
+          "Growing market presence"
         ],
-        "market_cap_rank": 112,
+        "risk_level": "medium",
+        "market_cap_rank": 92,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 2.71,
+          "price": 0.14249790842266802,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": 0.60564
+            "usd": -6.22280937
           },
-          "market_cap": "$927,116,387",
-          "total_volume": "$220,812,289",
-          "content": null
+          "market_cap": "$584,167,427",
+          "total_volume": "$23,841,312",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ethereum-name-service",
+        "name": "Ethereum Name Service",
+        "symbol": "ENS",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 95,
+        "price_btc": null,
+        "data": {
+          "price": 15.183468288827967,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.99926868
+          },
+          "market_cap": "$568,516,968",
+          "total_volume": "$81,082,200",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "ether-fi-ethfi",
+        "name": "ether.fi",
+        "symbol": "ETHFI",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 96,
+        "price_btc": null,
+        "data": {
+          "price": 1.003434620522055,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -9.59294316
+          },
+          "market_cap": "$563,982,415",
+          "total_volume": "$98,441,244",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "conflux-network",
+        "name": "Conflux",
+        "symbol": "CFX",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Growing market presence"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": 98,
+        "price_btc": null,
+        "data": {
+          "price": 0.1085448198531447,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -7.36846119
+          },
+          "market_cap": "$558,690,470",
+          "total_volume": "$29,204,594",
+          "content": null,
+          "source": "coinmarketcap"
         }
       }
     },
@@ -87,93 +2572,19 @@
         "investment_highlights": [
           "Good liquidity"
         ],
+        "risk_level": "high",
         "market_cap_rank": 113,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 0.999956,
+          "price": 0.999883,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.00013
+            "usd": -0.00498
           },
-          "market_cap": "$918,556,942",
-          "total_volume": "$26,381,615",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "jupiter-staked-sol",
-        "name": "Jupiter Staked SOL",
-        "symbol": "JUPSOL",
-        "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 114,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 212.06,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.59
-          },
-          "market_cap": "$917,220,490",
-          "total_volume": "$12,928,332",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "spx6900",
-        "name": "SPX6900",
-        "symbol": "SPX",
-        "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 115,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.965496,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -2.03679
-          },
-          "market_cap": "$897,502,718",
-          "total_volume": "$46,132,821",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "ripple-usd",
-        "name": "Ripple USD",
-        "symbol": "RLUSD",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 116,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.999504,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.02335
-          },
-          "market_cap": "$873,536,760",
-          "total_volume": "$97,101,209",
-          "content": null
+          "market_cap": "$918,510,527",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -183,23 +2594,24 @@
         "name": "Arbitrum Bridged WBTC (Arbitrum One)",
         "symbol": "WBTC",
         "status": "current",
-        "attractiveness_score": 6.5,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
           "Active trading",
           "Good liquidity"
         ],
-        "market_cap_rank": 118,
-        "price_btc": null,
         "risk_level": "high",
+        "market_cap_rank": 116,
+        "price_btc": null,
         "data": {
-          "price": 107519,
+          "price": 107902,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.0108
+            "usd": -4.29016
           },
-          "market_cap": "$871,175,796",
-          "total_volume": "$270,597,216",
-          "content": null
+          "market_cap": "$873,932,921",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -213,18 +2625,19 @@
         "investment_highlights": [
           "Good liquidity"
         ],
-        "market_cap_rank": 117,
-        "price_btc": null,
         "risk_level": "high",
+        "market_cap_rank": 118,
+        "price_btc": null,
         "data": {
           "price": 2.01,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.4454
+            "usd": -0.1932
           },
-          "market_cap": "$870,710,069",
-          "total_volume": "$21,758,868",
-          "content": null
+          "market_cap": "$872,044,770",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -234,123 +2647,24 @@
         "name": "clBTC",
         "symbol": "CLBTC",
         "status": "current",
-        "attractiveness_score": 4.5,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
           "Low liquidity risk",
           "Low volume"
         ],
+        "risk_level": "high",
         "market_cap_rank": 119,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 107961,
+          "price": 108073,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.64792
+            "usd": -0.5454
           },
-          "market_cap": "$833,808,721",
-          "total_volume": "$33",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "doublezero",
-        "name": "DoubleZero",
-        "symbol": "2Z",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 120,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.23821,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 3.96431
-          },
-          "market_cap": "$827,852,489",
-          "total_volume": "$98,578,801",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "celestia",
-        "name": "Celestia",
-        "symbol": "TIA",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 121,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.994512,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -1.32722
-          },
-          "market_cap": "$818,908,623",
-          "total_volume": "$92,888,694",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "injective-protocol",
-        "name": "Injective",
-        "symbol": "INJ",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 122,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 8.33,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -1.40686
-          },
-          "market_cap": "$813,954,106",
-          "total_volume": "$107,600,028",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "lido-dao",
-        "name": "Lido DAO",
-        "symbol": "LDO",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 123,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.8933,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.13005
-          },
-          "market_cap": "$800,162,978",
-          "total_volume": "$137,755,166",
-          "content": null
+          "market_cap": "$834,669,051",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -360,14 +2674,14 @@
         "name": "OUSG",
         "symbol": "OUSG",
         "status": "current",
-        "attractiveness_score": 5.0,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
           "Low liquidity risk",
           "Low volume"
         ],
+        "risk_level": "high",
         "market_cap_rank": 124,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
           "price": 113.01,
           "price_btc": null,
@@ -375,33 +2689,9 @@
             "usd": 0.01044
           },
           "market_cap": "$787,436,662",
-          "total_volume": null,
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "msol",
-        "name": "Marinade Staked SOL",
-        "symbol": "MSOL",
-        "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Decent volume"
-        ],
-        "market_cap_rank": 125,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 246.67,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.7446
-          },
-          "market_cap": "$774,293,512",
-          "total_volume": "$9,196,566",
-          "content": null
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -411,100 +2701,24 @@
         "name": "Superstate Short Duration U.S. Government Securities Fund (USTB)",
         "symbol": "USTB",
         "status": "current",
-        "attractiveness_score": 5.0,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
           "Low liquidity risk",
           "Low volume"
         ],
-        "market_cap_rank": 126,
-        "price_btc": null,
         "risk_level": "high",
-        "data": {
-          "price": 10.86,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": 0.03177
-          },
-          "market_cap": "$769,953,512",
-          "total_volume": null,
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "blockstack",
-        "name": "Stacks",
-        "symbol": "STX",
-        "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 127,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.4258,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -1.15835
-          },
-          "market_cap": "$769,299,845",
-          "total_volume": "$23,953,756",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "optimism",
-        "name": "Optimism",
-        "symbol": "OP",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Active trading",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 128,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.43198,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.80758
-          },
-          "market_cap": "$768,444,862",
-          "total_volume": "$160,222,244",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "curve-dao-token",
-        "name": "Curve DAO",
-        "symbol": "CRV",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Active trading",
-          "Good liquidity"
-        ],
         "market_cap_rank": 129,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 0.526075,
+          "price": 10.87,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.70584
+            "usd": 0.01016
           },
-          "market_cap": "$745,259,628",
-          "total_volume": "$187,942,693",
-          "content": null
+          "market_cap": "$744,427,348",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -514,23 +2728,246 @@
         "name": "cgETH Hashkey Cloud",
         "symbol": "CGETH.HASHKEY",
         "status": "current",
-        "attractiveness_score": 4.5,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
           "Low liquidity risk",
           "Low volume"
         ],
+        "risk_level": "high",
         "market_cap_rank": 130,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 3652.41,
+          "price": 3653.03,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.53024
+            "usd": -4.83374
           },
-          "market_cap": "$730,215,578",
-          "total_volume": "$88",
-          "content": null
+          "market_cap": "$730,231,648",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "plasma-xpl",
+        "name": "Plasma",
+        "symbol": "XPL",
+        "status": "current",
+        "attractiveness_score": 5.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Potential buying opportunity",
+          "Good trading volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 85,
+        "price_btc": null,
+        "data": {
+          "price": 0.38352579380634205,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -11.05315486
+          },
+          "market_cap": "$690,346,429",
+          "total_volume": "$377,965,879",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "floki-inu",
+        "name": "FLOKI",
+        "symbol": "FLOKI",
+        "status": "current",
+        "attractiveness_score": 5.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Potential buying opportunity",
+          "Good trading volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 86,
+        "price_btc": null,
+        "data": {
+          "price": 7.22092183906728e-05,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -11.40183841
+          },
+          "market_cap": "$688,913,185",
+          "total_volume": "$178,049,384",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 133,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "artificial-superintelligence-alliance",
+        "name": "Artificial Superintelligence Alliance",
+        "symbol": "FET",
+        "status": "current",
+        "attractiveness_score": 5.3,
+        "investment_highlights": [
+          "Growing market presence",
+          "Potential buying opportunity",
+          "Good trading volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 94,
+        "price_btc": null,
+        "data": {
+          "price": 0.240465917465124,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -11.46766719
+          },
+          "market_cap": "$570,096,663",
+          "total_volume": "$136,188,226",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "spx6900",
+        "name": "SPX6900",
+        "symbol": "SPX",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Growing market presence",
+          "Potential buying opportunity"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 74,
+        "price_btc": null,
+        "data": {
+          "price": 0.9557926047389977,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -10.70154474
+          },
+          "market_cap": "$889,836,311",
+          "total_volume": "$42,822,918",
+          "content": null,
+          "source": "coinmarketcap",
+          "coingecko_rank": 115,
+          "additional_source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "myx-finance",
+        "name": "MYX Finance",
+        "symbol": "MYX",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Growing market presence",
+          "Potential buying opportunity"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 97,
+        "price_btc": null,
+        "data": {
+          "price": 2.714194347332131,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -14.03947535
+          },
+          "market_cap": "$559,410,176",
+          "total_volume": "$50,484,314",
+          "content": null,
+          "source": "coinmarketcap"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "mantle-staked-ether",
+        "name": "Mantle Staked Ether",
+        "symbol": "METH",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Low liquidity risk",
+          "Decent volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 112,
+        "price_btc": null,
+        "data": {
+          "price": 4098.77,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.91371
+          },
+          "market_cap": "$947,900,998",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "jupiter-staked-sol",
+        "name": "Jupiter Staked SOL",
+        "symbol": "JUPSOL",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Low liquidity risk",
+          "Decent volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 114,
+        "price_btc": null,
+        "data": {
+          "price": 210.34,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.01205
+          },
+          "market_cap": "$911,414,625",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "msol",
+        "name": "Marinade Staked SOL",
+        "symbol": "MSOL",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Good liquidity"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 126,
+        "price_btc": null,
+        "data": {
+          "price": 244.26,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.34434
+          },
+          "market_cap": "$767,229,656",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -540,100 +2977,24 @@
         "name": "L2 Standard Bridged WETH (Base)",
         "symbol": "WETH",
         "status": "current",
-        "attractiveness_score": 7.0,
+        "attractiveness_score": 5.0,
         "investment_highlights": [
           "High trading volume",
           "Good liquidity"
         ],
+        "risk_level": "high",
         "market_cap_rank": 131,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 3827.75,
+          "price": 3805.15,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.63145
+            "usd": -6.20042
           },
-          "market_cap": "$708,859,236",
-          "total_volume": "$1,162,112,890",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "aerodrome-finance",
-        "name": "Aerodrome Finance",
-        "symbol": "AERO",
-        "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Good liquidity"
-        ],
-        "market_cap_rank": 132,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.77457,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -4.37022
-          },
-          "market_cap": "$698,853,075",
-          "total_volume": "$49,761,774",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "floki",
-        "name": "FLOKI",
-        "symbol": "FLOKI",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Active trading",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 133,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 7.167e-05,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -3.60181
-          },
-          "market_cap": "$692,179,460",
-          "total_volume": "$172,819,729",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "ondo-us-dollar-yield",
-        "name": "Ondo US Dollar Yield",
-        "symbol": "USDY",
-        "status": "current",
-        "attractiveness_score": 4.5,
-        "investment_highlights": [
-          "Low liquidity risk",
-          "Decent volume"
-        ],
-        "market_cap_rank": 134,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 1.096,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -0.30938
-          },
-          "market_cap": "$683,973,387",
-          "total_volume": "$2,180,030",
-          "content": null
+          "market_cap": "$704,538,632",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -643,76 +3004,24 @@
         "name": "ViciCoin",
         "symbol": "VCNT",
         "status": "new",
-        "attractiveness_score": 5.5,
+        "attractiveness_score": 5.0,
         "investment_highlights": [
           "Low cap opportunity",
           "Low liquidity risk"
         ],
+        "risk_level": "high",
         "market_cap_rank": 496,
         "price_btc": null,
-        "risk_level": "high",
         "data": {
-          "price": 17.48,
+          "price": 17.4,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -0.50078
+            "usd": -1.68593
           },
-          "market_cap": "$99,566,400",
-          "total_volume": "$194,858",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "non-playable-coin",
-        "name": "Non-Playable Coin",
-        "symbol": "NPC",
-        "status": "new",
-        "attractiveness_score": 7.0,
-        "investment_highlights": [
-          "Low cap opportunity",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 497,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.01232178,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -1.47323
-          },
-          "market_cap": "$99,409,071",
-          "total_volume": "$10,621,025",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "kelp-gain",
-        "name": "Kelp Gain",
-        "symbol": "AGETH",
-        "status": "new",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Low cap opportunity",
-          "Low liquidity risk",
-          "Low volume"
-        ],
-        "market_cap_rank": 498,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 3925.18,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "usd": -1.56038
-          },
-          "market_cap": "$99,132,151",
-          "total_volume": "$971",
-          "content": null
+          "market_cap": "$99,128,636",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
@@ -722,51 +3031,135 @@
         "name": "Helder",
         "symbol": "HLDR",
         "status": "new",
-        "attractiveness_score": 5.5,
+        "attractiveness_score": 5.0,
         "investment_highlights": [
           "Low cap opportunity",
           "Low liquidity risk",
           "Low volume"
         ],
-        "market_cap_rank": 499,
-        "price_btc": null,
         "risk_level": "high",
+        "market_cap_rank": 497,
+        "price_btc": null,
         "data": {
-          "price": 0.246556,
+          "price": 0.245539,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -1.41452
+            "usd": -1.83172
           },
-          "market_cap": "$99,119,727",
-          "total_volume": "$2,564",
-          "content": null
+          "market_cap": "$98,708,685",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     },
     {
       "item": {
-        "id": "anoma",
-        "name": "Anoma",
-        "symbol": "XAN",
+        "id": "uma",
+        "name": "UMA",
+        "symbol": "UMA",
         "status": "new",
-        "attractiveness_score": 6.5,
+        "attractiveness_score": 4.5,
         "investment_highlights": [
           "Low cap opportunity",
-          "Active trading",
           "Good liquidity"
         ],
-        "market_cap_rank": 500,
-        "price_btc": null,
         "risk_level": "high",
+        "market_cap_rank": 495,
+        "price_btc": null,
         "data": {
-          "price": 0.03950348,
+          "price": 1.12,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "usd": -6.89785
+            "usd": -8.19543
           },
-          "market_cap": "$98,812,405",
-          "total_volume": "$37,217,870",
-          "content": null
+          "market_cap": "$99,337,094",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "kelp-gain",
+        "name": "Kelp Gain",
+        "symbol": "AGETH",
+        "status": "new",
+        "attractiveness_score": 4.5,
+        "investment_highlights": [
+          "Low cap opportunity",
+          "Low liquidity risk",
+          "Low volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 499,
+        "price_btc": null,
+        "data": {
+          "price": 3879.78,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -5.70085
+          },
+          "market_cap": "$98,174,931",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "chutes",
+        "name": "Chutes",
+        "symbol": "SN64",
+        "status": "new",
+        "attractiveness_score": 4.5,
+        "investment_highlights": [
+          "Low cap opportunity",
+          "Decent volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 500,
+        "price_btc": null,
+        "data": {
+          "price": 30.92,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -6.7222
+          },
+          "market_cap": "$97,863,718",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "non-playable-coin",
+        "name": "Non-Playable Coin",
+        "symbol": "NPC",
+        "status": "new",
+        "attractiveness_score": 4.0,
+        "investment_highlights": [
+          "Low cap opportunity",
+          "Potential buy the dip",
+          "Decent volume"
+        ],
+        "risk_level": "high",
+        "market_cap_rank": 498,
+        "price_btc": null,
+        "data": {
+          "price": 0.01214842,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "usd": -11.19141
+          },
+          "market_cap": "$97,772,521",
+          "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
         }
       }
     }

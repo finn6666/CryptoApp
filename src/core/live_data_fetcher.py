@@ -4,12 +4,18 @@ import time
 from typing import Dict, List, Optional
 from datetime import datetime
 from .crypto_analyzer import Coin, CoinStatus, RiskLevel
+from .config import Config
 
 class LiveDataFetcher:
-    """Fetches live cryptocurrency data from APIs"""
+    """Fetches live cryptocurrency data from APIs with secure authentication"""
     
     def __init__(self):
-        self.coingecko_base_url = "https://api.coingecko.com/api/v3"
+        # Validate configuration on initialization
+        Config.validate()
+        
+        self.coingecko_base_url = Config.COINGECKO_BASE_URL
+        self.coinmarketcap_base_url = Config.COINMARKETCAP_BASE_URL
+        
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'CryptoAnalyzer/1.0'
@@ -61,7 +67,6 @@ class LiveDataFetcher:
             
             all_coins = response.json()
             
-            # Filter for low cap coins (rank 100+ and market cap under $1B)
             low_cap_coins = [
                 coin for coin in all_coins 
                 if coin.get('market_cap_rank') and 
@@ -70,7 +75,7 @@ class LiveDataFetcher:
                 coin.get('market_cap') < 1_000_000_000  # Under $1 billion market cap
             ]
             
-            return low_cap_coins[:limit]
+            return low_cap_coins[:10]
             
         except requests.RequestException as e:
             print(f"Error fetching low cap coins: {e}")
@@ -143,15 +148,15 @@ class LiveDataFetcher:
         
         # Reward smaller market caps more
         if market_cap < 10_000_000:  # Under $10M - micro cap gems
-            score += 2.5
+            score += 3.0
         elif market_cap < 50_000_000:  # Under $50M - small cap potential
-            score += 2.0
+            score += 2.5
         elif market_cap < 100_000_000:  # Under $100M - low cap
-            score += 1.5
+            score += 2.0
         elif market_cap < 500_000_000:  # Under $500M - mid-small cap
-            score += 1.0
+            score += 1.5
         elif market_cap < 1_000_000_000:  # Under $1B - still decent
-            score += 0.5
+            score += 1.0
         
         # Price change bonus/penalty (more aggressive for low caps)
         price_change = coin_data.get('price_change_percentage_24h', 0)
@@ -354,29 +359,303 @@ class LiveDataFetcher:
         except Exception as e:
             print(f"❌ Error saving data: {e}")
 
+    def save_combined_data(self, data: Dict, filename: str = "data/live_api.json") -> None:
+        """Save combined data from multiple sources to JSON file"""
+        try:
+            # Data is already in the correct format
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            
+            print(f"✅ Combined data saved to {filename}")
+            
+        except Exception as e:
+            print(f"❌ Error saving combined data: {e}")
+
+    def fetch_coinmarketcap_data(self, limit: int = 50) -> Optional[List[Dict]]:
+        """Fetch cryptocurrency data from CoinMarketCap Pro API"""
+        try:
+            url = f"{self.coinmarketcap_base_url}/cryptocurrency/listings/latest"
+            
+            params = {
+                'start': 1,
+                'limit': limit,
+                'convert': 'USD',
+                'sort': 'market_cap',
+                'sort_dir': 'desc'
+            }
+            
+            headers = Config.get_coinmarketcap_headers()
+            
+            print(f"🔄 Fetching top {limit} coins from CoinMarketCap...")
+            response = requests.get(
+                url,
+                headers=headers,
+                params=params,
+                timeout=Config.REQUEST_TIMEOUT
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            if data.get('status', {}).get('error_code') != 0:
+                raise Exception(f"CoinMarketCap API Error: {data.get('status', {}).get('error_message')}")
+            
+            coins = []
+            for coin in data.get('data', []):
+                formatted_coin = {
+                    'id': coin['slug'],
+                    'name': coin['name'],
+                    'symbol': coin['symbol'],
+                    'market_cap_rank': coin['cmc_rank'],
+                    'price': coin['quote']['USD']['price'],
+                    'price_change_24h': coin['quote']['USD']['percent_change_24h'],
+                    'market_cap': coin['quote']['USD']['market_cap'],
+                    'volume_24h': coin['quote']['USD']['volume_24h'],
+                    'circulating_supply': coin.get('circulating_supply'),
+                    'max_supply': coin.get('max_supply'),
+                    'last_updated': coin['quote']['USD']['last_updated']
+                }
+                coins.append(formatted_coin)
+            
+            print(f"✅ Successfully fetched {len(coins)} coins from CoinMarketCap")
+            return coins
+            
+        except requests.exceptions.RequestException as e:
+            print(f"❌ CoinMarketCap API request failed: {e}")
+            return None
+        except Exception as e:
+            print(f"❌ CoinMarketCap API error: {e}")
+            return None
+
+
+def calculate_attractiveness_score(coin: Dict) -> float:
+    """Calculate attractiveness score for a coin based on various factors"""
+    score = 5.0  # Base score
+    
+    # Market cap rank factor (lower rank = higher score)
+    rank = coin.get('market_cap_rank', 1000)
+    if rank <= 10:
+        score += 2.0
+    elif rank <= 50:
+        score += 1.5
+    elif rank <= 100:
+        score += 1.0
+    elif rank <= 200:
+        score += 0.5
+    
+    # Price change factor
+    price_change = coin.get('price_change_24h', 0)
+    if price_change > 10:
+        score += 1.0
+    elif price_change > 5:
+        score += 0.5
+    elif price_change < -10:
+        score -= 1.0
+    elif price_change < -5:
+        score -= 0.5
+    
+    # Volume factor (higher volume = more liquid)
+    volume = coin.get('volume_24h', 0)
+    if volume > 1000000000:  # > $1B
+        score += 0.5
+    elif volume > 100000000:  # > $100M
+        score += 0.3
+    
+    return min(10.0, max(1.0, score))
+
+
+def generate_highlights(coin: Dict) -> List[str]:
+    """Generate investment highlights for a coin"""
+    highlights = []
+    
+    rank = coin.get('market_cap_rank', 1000)
+    price_change = coin.get('price_change_24h', 0)
+    volume = coin.get('volume_24h', 0)
+    
+    if rank <= 10:
+        highlights.append("Top 10 cryptocurrency")
+    elif rank <= 50:
+        highlights.append("Established market position")
+    elif rank <= 200:
+        highlights.append("Growing market presence")
+    else:
+        highlights.append("Low cap opportunity")
+    
+    if price_change > 10:
+        highlights.append("Strong 24h momentum")
+    elif price_change > 5:
+        highlights.append("Positive price action")
+    elif price_change < -10:
+        highlights.append("Potential buying opportunity")
+    
+    if volume > 1000000000:
+        highlights.append("High liquidity")
+    elif volume > 100000000:
+        highlights.append("Good trading volume")
+    
+    return highlights
+
+
+def assess_risk_level(coin: Dict) -> str:
+    """Assess risk level based on market cap and volatility"""
+    rank = coin.get('market_cap_rank', 1000)
+    price_change = abs(coin.get('price_change_24h', 0))
+    
+    if rank <= 20 and price_change < 5:
+        return "low"
+    elif rank <= 100 and price_change < 10:
+        return "medium"
+    else:
+        return "high"
+
 
 def fetch_and_update_data():
-    """Main function to fetch live data and update the application"""
+    """Main function to fetch live data from multiple sources and combine them"""
     fetcher = LiveDataFetcher()
     
     try:
-        live_data = fetcher.fetch_live_data()
+        print("🚀 Fetching live cryptocurrency data from multiple sources...")
         
-        print(f"\n📊 Successfully fetched live data:")
-        print(f"• Top Coins: {len(live_data['top_coins'])}")
-        print(f"• Trending: {len(live_data['trending'])}")
-        print(f"• Gainers: {len(live_data['gainers'])}")
-        print(f"• New Coins: {len(live_data['new_coins'])}")
-        print(f"• Total: {len(live_data['all_coins'])}")
+        # Fetch from CoinMarketCap (primary source)
+        cmc_data = fetcher.fetch_coinmarketcap_data(limit=200)
         
-        # Save to live data file
-        fetcher.save_to_json(live_data, "data/live_api.json")
+        # Fetch additional data from CoinGecko
+        coingecko_data = fetcher.fetch_live_data()
         
-        return live_data
+        # Combine and format data
+        formatted_data = {
+            "last_updated": datetime.now().isoformat(),
+            "sources": ["coinmarketcap", "coingecko"],
+            "coins": []
+        }
+        
+        # Process CoinMarketCap data (primary source)
+        cmc_coins = {}
+        if cmc_data:
+            print(f"✅ CoinMarketCap: {len(cmc_data)} coins")
+            for coin in cmc_data:
+                score = calculate_attractiveness_score(coin)
+                
+                formatted_coin = {
+                    "item": {
+                        "id": coin['id'],
+                        "name": coin['name'],
+                        "symbol": coin['symbol'],
+                        "status": "current",
+                        "attractiveness_score": score,
+                        "investment_highlights": generate_highlights(coin),
+                        "risk_level": assess_risk_level(coin),
+                        "market_cap_rank": coin['market_cap_rank'],
+                        "price_btc": None,
+                        "data": {
+                            "price": coin['price'],
+                            "price_btc": None,
+                            "price_change_percentage_24h": {
+                                "usd": coin['price_change_24h']
+                            },
+                            "market_cap": f"${coin['market_cap']:,.0f}",
+                            "total_volume": f"${coin['volume_24h']:,.0f}",
+                            "content": None,
+                            "source": "coinmarketcap"
+                        }
+                    }
+                }
+                cmc_coins[coin['symbol']] = formatted_coin
+                formatted_data["coins"].append(formatted_coin)
+        
+        # Add CoinGecko data for additional coins and enhanced info
+        if coingecko_data and 'all_coins' in coingecko_data:
+            print(f"✅ CoinGecko: {len(coingecko_data['all_coins'])} additional coins")
+            
+            for coin in coingecko_data['all_coins']:
+                symbol = coin.symbol.upper()
+                
+                # If coin already exists from CoinMarketCap, enhance with CoinGecko data
+                if symbol in cmc_coins:
+                    # Add CoinGecko specific data
+                    existing_coin = cmc_coins[symbol]
+                    existing_coin["item"]["data"]["coingecko_rank"] = coin.market_cap_rank
+                    existing_coin["item"]["data"]["additional_source"] = "coingecko"
+                
+                else:
+                    # Add new coin from CoinGecko
+                    score = calculate_attractiveness_score({
+                        'market_cap_rank': coin.market_cap_rank or 1000,
+                        'price_change_24h': coin.price_change_24h_usd or 0,
+                        'volume_24h': 0,  # CoinGecko format may differ
+                        'price': coin.price or 0
+                    })
+                    
+                    formatted_coin = {
+                        "item": {
+                            "id": coin.id,
+                            "name": coin.name,
+                            "symbol": coin.symbol,
+                            "status": getattr(coin.status, 'value', 'current') if hasattr(coin, 'status') and coin.status else "current",
+                            "attractiveness_score": score,
+                            "investment_highlights": coin.investment_highlights or [],
+                            "risk_level": getattr(coin.risk_level, 'value', 'medium') if hasattr(coin, 'risk_level') and coin.risk_level else "medium",
+                            "market_cap_rank": coin.market_cap_rank,
+                            "price_btc": coin.price_btc,
+                            "data": {
+                                "price": coin.price,
+                                "price_btc": coin.price_btc,
+                                "price_change_percentage_24h": {
+                                    "usd": coin.price_change_24h_usd or 0
+                                },
+                                "market_cap": coin.market_cap or "N/A",
+                                "total_volume": "N/A",
+                                "content": None,
+                                "source": "coingecko"
+                            }
+                        }
+                    }
+                    formatted_data["coins"].append(formatted_coin)
+        
+        # Sort by attractiveness score
+        formatted_data["coins"].sort(
+            key=lambda x: x["item"]["attractiveness_score"], 
+            reverse=True
+        )
+        formatted_data["coins"] = formatted_data["coins"][:10]  # Limit to top 10
+        
+        # Save combined data
+        fetcher.save_combined_data(formatted_data, "data/live_api.json")
+        
+        total_coins = len(formatted_data["coins"])
+        cmc_count = len(cmc_data) if cmc_data else 0
+        cg_count = total_coins - cmc_count
+        
+        print(f"🎉 Successfully combined data:")
+        print(f"  • CoinMarketCap: {cmc_count} coins")
+        print(f"  • CoinGecko: {cg_count} additional coins") 
+        print(f"  • Total: {total_coins} coins")
+        print(f"  • Sources: {', '.join(formatted_data['sources'])}")
+        
+        return formatted_data
         
     except Exception as e:
-        print(f"❌ Error fetching live data: {e}")
-        return None
+        print(f"❌ Error fetching combined data: {e}")
+        
+        # Fallback to CoinGecko only
+        try:
+            print("⚠️  Trying CoinGecko fallback...")
+            live_data = fetcher.fetch_live_data()
+            
+            if live_data:
+                print(f"📊 CoinGecko fallback successful:")
+                print(f"• Total: {len(live_data.get('all_coins', []))}")
+                
+                # Save to live data file
+                fetcher.save_to_json(live_data, "data/live_api.json")
+                return live_data
+            else:
+                print("❌ All data sources failed")
+                return None
+                
+        except Exception as fallback_error:
+            print(f"❌ Fallback also failed: {fallback_error}")
+            return None
 
 
 if __name__ == "__main__":

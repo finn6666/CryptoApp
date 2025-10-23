@@ -18,7 +18,7 @@ class CryptoDisplay:
         
     def show_header(self):
         """Display app header"""
-        title = Text("🚀 CRYPTO INVESTMENT ANALYZER 🚀", style="bold magenta")
+        title = Text("INVESTMENT ANALYZER 🚀", style="bold magenta")
         subtitle = Text("Find the most attractive cryptocurrency opportunities", style="cyan")
         
         header_panel = Panel(
@@ -166,7 +166,7 @@ class CryptoDisplay:
         panel = Panel(stats_text.strip(), box=box.ROUNDED, style="blue")
         self.console.print(panel)
         self.console.print()
-        
+
     def show_all_coins(self):
         """Show all coins sorted by score"""
         all_coins = self.analyzer.get_top_coins(len(self.analyzer.coins))

@@ -1,5 +1,13 @@
 # CryptoApp - Git Ignore Rules
 
+## API Keys & Environment Variables
+.env
+.env.*
+*.api
+data/Coinmarketcap.api
+secrets/
+api_keys/
+
 ## Virtual Environment
 .venv/
 __pycache__/
@@ -63,4 +71,6 @@ wheels/
 *.tar.bz2
 
 ## Data Files (add specific patterns if needed)
-# live_api.json  # Remove if you don't want to track live data
+# live_api.json  # Remove if you don't want to track live datadata/Coinmarketcap.api
+*.api
+.env
