@@ -1,13 +1,14 @@
-# 🚀 Crypto Investment Analyzer
+# 🚀 Low Cap Crypto Analyzer
 
-A cryptocurrency analysis tool with **CLI** and **Web interfaces** that identifies investment opportunities using live market data.
+A cryptocurrency analysis tool focused on discovering hidden gems in small cap cryptocurrencies with live market data.
 
 ## 🌟 Features
 
 - **🌐 Web Dashboard**: Dark theme with real-time data refresh
-- **💻 CLI Interface**: Rich terminal displays  
+- **� Low Cap Focus**: Prioritizes coins under $500M market cap
 - **📊 Live Data**: Real-time CoinGecko API integration
-- **🔍 Smart Scoring**: Ranks cryptocurrencies (1-10 attractiveness score)
+- **🔍 Smart Scoring**: Ranks cryptocurrencies with low cap bias
+- **⭐ Favorites**: Save and track your preferred low cap coins
 - **📱 Responsive**: Works on desktop, tablet, mobile
 
 ## 🛠️ Quick Start
@@ -15,9 +16,9 @@ A cryptocurrency analysis tool with **CLI** and **Web interfaces** that identifi
 ```bash
 git clone https://github.com/your-username/CryptoApp.git
 cd CryptoApp
-pip install -r requirements.txt
+uv sync
 
-# Web Interface (Recommended)
+# Start the Web Application
 python app.py
 # Visit: http://localhost:5000
 

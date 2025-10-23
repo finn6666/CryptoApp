@@ -5,10 +5,7 @@ description = "Cryptocurrency Analysis and Investment Recommendation Tool"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "rich>=13.0.0",
-    "tabulate>=0.9.0", 
-    "colorama>=0.4.6",
     "requests>=2.31.0",
     "flask>=2.3.0",
-    "gunicorn>=21.0.0"
+    "python-dotenv>=1.0.0"
 ]

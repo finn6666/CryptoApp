@@ -128,31 +128,29 @@ class CryptoAnalyzer:
         """Get trending coins sorted by attractiveness score"""
         return sorted(self.coins, key=lambda x: x.attractiveness_score, reverse=True)
 
+    def _parse_market_cap(self, market_cap_str: Optional[str]) -> float:
+        """Helper method to parse market cap string and return numeric value"""
+        if not market_cap_str or not isinstance(market_cap_str, str) or '$' not in market_cap_str:
+            return 0
+            
+        clean_str = market_cap_str.replace('$', '').replace(',', '')
+        try:
+            if 'B' in clean_str:
+                return float(clean_str.replace('B', '')) * 1_000_000_000
+            elif 'M' in clean_str:
+                return float(clean_str.replace('M', '')) * 1_000_000
+            else:
+                return float(clean_str)
+        except:
+            return 0
+
     def get_low_cap_coins(self, limit: int = 10) -> List[Coin]:
         """Get low cap coins (under $500M market cap) prioritized by attractiveness score"""
         low_cap_coins = []
         
         for coin in self.coins:
-            market_cap_str = coin.market_cap
-            is_low_cap = False
-            
-            # Extract numeric value from market cap string
-            if isinstance(market_cap_str, str) and '$' in market_cap_str:
-                clean_str = market_cap_str.replace('$', '').replace(',', '')
-                try:
-                    if 'B' in clean_str:
-                        market_cap_num = float(clean_str.replace('B', '')) * 1_000_000_000
-                    elif 'M' in clean_str:
-                        market_cap_num = float(clean_str.replace('M', '')) * 1_000_000
-                    else:
-                        market_cap_num = float(clean_str)
-                        
-                    if market_cap_num < 500_000_000:  # Under $500M
-                        is_low_cap = True
-                except:
-                    pass
-            
-            if is_low_cap:
+            market_cap_num = self._parse_market_cap(coin.market_cap)
+            if market_cap_num > 0 and market_cap_num < 500_000_000:  # Under $500M
                 low_cap_coins.append(coin)
         
         # Sort by attractiveness score (highest first)
