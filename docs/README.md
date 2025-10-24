@@ -48,6 +48,18 @@ CryptoApp/
 
 See `dev-guide.md` for detailed development workflows and Git best practices.
 
+## Disclaimer
+
+**This application is for educational and research purposes only.**
+
+- **Not Financial Advice**: The information provided by this application should not be considered as financial, investment, or trading advice
+- **No Investment Recommendations**: Cryptocurrency investments are highly volatile and risky
+- **Do Your Own Research**: Always conduct thorough research and consult with qualified financial advisors before making investment decisions
+- **No Guarantees**: Past performance does not guarantee future results
+- **Risk Warning**: You may lose some or all of your invested capital
+
+**Use this tool at your own risk. The developers are not responsible for any financial losses.**
+
 ## License
 
 MIT License
