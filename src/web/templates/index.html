@@ -348,13 +348,60 @@
             text-shadow: 0 0 8px rgba(255, 215, 0, 0.6);
         }
 
-        .favorites-container {
+        .favorites-container, .ml-status-container {
             background: rgba(26, 32, 46, 0.95);
             border: 1px solid #2d3748;
             border-radius: 20px;
             padding: 30px;
             margin-bottom: 30px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .ml-status-container {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .ml-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .ml-prediction {
+            text-align: center;
+            font-size: 0.9em;
+        }
+
+        .prediction.positive {
+            color: #68d391;
+        }
+
+        .prediction.negative {
+            color: #fc8181;
+        }
+
+        .prediction.neutral {
+            color: #a0aec0;
+        }
+
+        .ml-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .ml-status-item {
+            background: rgba(45, 55, 72, 0.5);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+        }
+
+        .ml-status-item strong {
+            color: #667eea;
         }
 
         @media (max-width: 768px) {
@@ -411,6 +458,23 @@
             </div>
         </div>
 
+        <div class="ml-status-container" id="mlStatusContainer" style="display: none;">
+            <div class="coins-header">
+                <h2>🧠 ML Analysis Status</h2>
+            </div>
+            <div id="mlStatusContent">
+                <div class="loading">🔄 Loading ML status...</div>
+            </div>
+            <div class="ml-controls">
+                <button class="refresh-btn" onclick="trainMLModel()" id="trainBtn">
+                    🎯 Train Model (Demo)
+                </button>
+                <button class="refresh-btn" onclick="loadMLStatus()">
+                    🔄 Refresh Status
+                </button>
+            </div>
+        </div>
+
         <div class="coins-container">
             <div class="coins-header">
                 <h2>Trending coins</h2>
@@ -445,18 +509,30 @@
 
         async function loadCoins() {
             try {
-                const response = await fetch('/api/coins');
-                const data = await response.json();
+                // Try enhanced ML endpoint first, fallback to regular endpoint
+                let response = await fetch('/api/coins/enhanced');
+                let data = await response.json();
+                
+                if (data.error && !response.ok) {
+                    // Fallback to regular endpoint
+                    response = await fetch('/api/coins');
+                    data = await response.json();
+                }
                 
                 if (data.error) {
                     throw new Error(data.error);
                 }
 
-                const coinsHtml = generateCoinsTable(data.coins);
+                const coinsHtml = generateCoinsTable(data.coins, data.ml_enhanced);
                 document.getElementById('coinsContent').innerHTML = coinsHtml;
                 
                 // Update refresh status
                 updateRefreshStatus(data.last_updated, data.cache_expires_in);
+                
+                // Update ML status if available
+                if (data.ml_enhanced !== undefined) {
+                    updateMLStatus(data.ml_enhanced);
+                }
                 
             } catch (error) {
                 document.getElementById('coinsContent').innerHTML = 
@@ -464,11 +540,14 @@
             }
         }
 
-        function generateCoinsTable(coins) {
+        function generateCoinsTable(coins, mlEnabled = false) {
             if (!coins || coins.length === 0) {
                 return '<div class="error">No cryptocurrency data available</div>';
             }
 
+            // Always show ML column to demonstrate the integration
+            const showMLColumn = true;
+            
             let html = `
                 <table class="coins-table">
                     <thead>
@@ -476,9 +555,10 @@
                             <th>⭐</th>
                             <th>Symbol</th>
                             <th>Name</th>
-                            <th>Score</th>
+                            <th>Score${mlEnabled ? ' 🧠' : ''}</th>
                             <th>Price</th>
                             <th>24h Change</th>
+                            ${showMLColumn ? '<th>🤖 ML Prediction</th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -490,23 +570,44 @@
                     `+${coin.price_change_24h.toFixed(1)}%` : 
                     `${coin.price_change_24h.toFixed(1)}%`;
 
+                // Use enhanced_score if available, otherwise use regular score
+                const displayScore = coin.enhanced_score || coin.score;
                 let scoreClass = 'score-low';
-                if (coin.score >= 8) scoreClass = 'score-high';
-                else if (coin.score >= 6) scoreClass = 'score-medium';
+                if (displayScore >= 8) scoreClass = 'score-high';
+                else if (displayScore >= 6) scoreClass = 'score-medium';
 
                 // Convert USD to GBP (approximate rate: 1 USD = 0.8 GBP)
                 const usdToGbp = 0.8; // You can make this dynamic later
                 const priceInGbp = coin.price ? coin.price * usdToGbp : null;
                 const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
 
+                // ML prediction display - always show to demonstrate integration
+                let mlPredictionHtml = '';
+                if (showMLColumn) {
+                    if (mlEnabled && coin.ml_prediction) {
+                        const pred = coin.ml_prediction;
+                        const predClass = pred.direction === 'bullish' ? 'positive' : pred.direction === 'bearish' ? 'negative' : 'neutral';
+                        const confidenceEmoji = pred.confidence > 0.7 ? '🟢' : pred.confidence > 0.4 ? '🟡' : '🔴';
+                        mlPredictionHtml = `<td class="ml-prediction">
+                            <span class="prediction ${predClass}">${pred.prediction_percentage > 0 ? '+' : ''}${pred.prediction_percentage}%</span><br>
+                            <small>${confidenceEmoji} ${(pred.confidence * 100).toFixed(0)}%</small>
+                        </td>`;
+                    } else {
+                        mlPredictionHtml = `<td class="ml-prediction">
+                            <small style="color: #a0aec0;">🤖 ${mlEnabled ? 'Training Needed' : 'ML Unavailable'}</small>
+                        </td>`;
+                    }
+                }
+
                 html += `
                     <tr>
                         <td><button class="favorite-btn" onclick="toggleFavorite('${coin.symbol}')" id="fav-${coin.symbol}">⭐</button></td>
                         <td class="coin-symbol">${coin.symbol}</td>
                         <td class="coin-name">${coin.name}</td>
-                        <td><span class="score ${scoreClass}">${coin.score.toFixed(1)}</span></td>
+                        <td><span class="score ${scoreClass}">${displayScore.toFixed(1)}</span></td>
                         <td class="price">${price}</td>
                         <td><span class="price-change ${priceChangeClass}">${priceChangeText}</span></td>
+                        ${mlPredictionHtml}
                     </tr>
                 `;
             });
@@ -573,7 +674,8 @@
                 userFavorites = favorites.map(fav => fav.symbol);
                 
                 if (favorites.length > 0) {
-                    const favoritesHtml = generateFavoritesTable(favorites);
+                    // Pass ML enhancement status to favorites table
+                    const favoritesHtml = generateFavoritesTable(favorites, data.ml_enhanced);
                     document.getElementById('favoritesContent').innerHTML = favoritesHtml;
                     document.getElementById('favoritesContainer').style.display = 'block';
                 } else {
@@ -590,7 +692,10 @@
             }
         }
 
-        function generateFavoritesTable(favorites) {
+        function generateFavoritesTable(favorites, mlEnabled = false) {
+            // Always show ML column to demonstrate the integration
+            const showMLColumn = true;
+            
             let html = `
                 <table class="coins-table">
                     <thead>
@@ -598,9 +703,10 @@
                             <th>❌</th>
                             <th>Symbol</th>
                             <th>Name</th>
-                            <th>Score</th>
+                            <th>Score${mlEnabled ? ' 🧠' : ''}</th>
                             <th>Price</th>
                             <th>24h Change</th>
+                            ${showMLColumn ? '<th>🤖 ML Prediction</th>' : ''}
                         </tr>
                     </thead>
                     <tbody>
@@ -612,23 +718,44 @@
                     `+${coin.price_change_24h.toFixed(1)}%` : 
                     `${coin.price_change_24h.toFixed(1)}%`;
 
+                // Use enhanced_score if available, otherwise use regular score
+                const displayScore = coin.enhanced_score || coin.score;
                 let scoreClass = 'score-low';
-                if (coin.score >= 8) scoreClass = 'score-high';
-                else if (coin.score >= 6) scoreClass = 'score-medium';
+                if (displayScore >= 8) scoreClass = 'score-high';
+                else if (displayScore >= 6) scoreClass = 'score-medium';
 
                 // Convert USD to GBP (approximate rate: 1 USD = 0.8 GBP)
                 const usdToGbp = 0.8;
                 const priceInGbp = coin.price ? coin.price * usdToGbp : null;
                 const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
 
+                // ML prediction display for favorites - always show to demonstrate integration
+                let mlPredictionHtml = '';
+                if (showMLColumn) {
+                    if (mlEnabled && coin.ml_prediction) {
+                        const pred = coin.ml_prediction;
+                        const predClass = pred.direction === 'bullish' ? 'positive' : pred.direction === 'bearish' ? 'negative' : 'neutral';
+                        const confidenceEmoji = pred.confidence > 0.7 ? '🟢' : pred.confidence > 0.4 ? '🟡' : '🔴';
+                        mlPredictionHtml = `<td class="ml-prediction">
+                            <span class="prediction ${predClass}">${pred.prediction_percentage > 0 ? '+' : ''}${pred.prediction_percentage}%</span><br>
+                            <small>${confidenceEmoji} ${(pred.confidence * 100).toFixed(0)}%</small>
+                        </td>`;
+                    } else {
+                        mlPredictionHtml = `<td class="ml-prediction">
+                            <small style="color: #a0aec0;">🤖 ${mlEnabled ? 'Training Needed' : 'ML Unavailable'}</small>
+                        </td>`;
+                    }
+                }
+
                 html += `
                     <tr>
                         <td><button class="favorite-btn" onclick="removeFavorite('${coin.symbol}')" style="color: #fc8181;">❌</button></td>
                         <td class="coin-symbol">${coin.symbol}</td>
                         <td class="coin-name">${coin.name}</td>
-                        <td><span class="score ${scoreClass}">${coin.score.toFixed(1)}</span></td>
+                        <td><span class="score ${scoreClass}">${displayScore.toFixed(1)}</span></td>
                         <td class="price">${price}</td>
                         <td><span class="price-change ${priceChangeClass}">${priceChangeText}</span></td>
+                        ${mlPredictionHtml}
                     </tr>
                 `;
             });
@@ -727,11 +854,118 @@
             }
         }, 1000);
 
+        // ML Functions
+        async function loadMLStatus() {
+            try {
+                const response = await fetch('/api/ml/status');
+                const data = await response.json();
+                
+                let statusHtml = '';
+                let showPanel = false;
+                
+                if (data.service_available) {
+                    const status = data.ml_status;
+                    statusHtml = `
+                        <div class="ml-status-grid">
+                            <div class="ml-status-item">
+                                <strong>Model Status:</strong><br>
+                                ${status.model_loaded ? '🟢 Loaded' : '🔴 Not Loaded'}
+                            </div>
+                            <div class="ml-status-item">
+                                <strong>Last Training:</strong><br>
+                                ${status.last_training_time ? new Date(status.last_training_time).toLocaleString() : 'Never'}
+                            </div>
+                            <div class="ml-status-item">
+                                <strong>Model Type:</strong><br>
+                                ${status.model_type || 'RandomForestRegressor (Not Trained)'}
+                            </div>
+                            <div class="ml-status-item">
+                                <strong>Features:</strong><br>
+                                ${status.feature_columns ? status.feature_columns.length : 0} indicators
+                            </div>
+                        </div>
+                        <div style="text-align: center; margin-top: 15px;">
+                            <small><strong>Status:</strong> ${status.training_status}</small>
+                        </div>
+                    `;
+                    showPanel = true;
+                } else {
+                    // Show ML unavailable status
+                    statusHtml = `
+                        <div class="ml-status-grid">
+                            <div class="ml-status-item">
+                                <strong>ML Service:</strong><br>
+                                🔴 Not Available
+                            </div>
+                            <div class="ml-status-item">
+                                <strong>Reason:</strong><br>
+                                ${data.ml_status ? data.ml_status.error : 'Service offline'}
+                            </div>
+                        </div>
+                    `;
+                    showPanel = true;
+                }
+                
+                document.getElementById('mlStatusContent').innerHTML = statusHtml;
+                document.getElementById('mlStatusContainer').style.display = showPanel ? 'block' : 'none';
+                
+            } catch (error) {
+                console.error('Error loading ML status:', error);
+                // Still show ML panel with error status
+                const errorHtml = `
+                    <div class="ml-status-grid">
+                        <div class="ml-status-item">
+                            <strong>ML Service:</strong><br>
+                            🔴 Connection Error
+                        </div>
+                        <div class="ml-status-item">
+                            <strong>Error:</strong><br>
+                            ${error.message}
+                        </div>
+                    </div>
+                `;
+                document.getElementById('mlStatusContent').innerHTML = errorHtml;
+                document.getElementById('mlStatusContainer').style.display = 'block';
+            }
+        }
+
+        async function trainMLModel() {
+            const trainBtn = document.getElementById('trainBtn');
+            trainBtn.disabled = true;
+            trainBtn.innerHTML = '🎯 Training...';
+            
+            try {
+                const response = await fetch('/api/ml/train', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Model trained successfully! 🎉');
+                    await loadMLStatus();
+                    await loadCoins(); // Refresh coins to show enhanced scores
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (error) {
+                console.error('Error training model:', error);
+                alert(`Training failed: ${error.message}`);
+            } finally {
+                trainBtn.disabled = false;
+                trainBtn.innerHTML = '🎯 Train Model (Demo)';
+            }
+        }
+
+        function updateMLStatus(mlEnabled) {
+            if (mlEnabled) {
+                loadMLStatus();
+            }
+        }
+
         // Initial load
         window.addEventListener('load', async () => {
             await loadStats();
             await loadCoins();
             await loadFavorites();
+            await loadMLStatus();
         });
     </script>
 </body>

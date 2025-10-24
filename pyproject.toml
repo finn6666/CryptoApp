@@ -7,5 +7,12 @@ requires-python = ">=3.9"
 dependencies = [
     "requests>=2.31.0",
     "flask>=2.3.0",
-    "python-dotenv>=1.0.0"
+    "python-dotenv>=1.0.0",
+    "scikit-learn>=1.6.1",
+    "pandas>=2.3.3",
+    "numpy>=2.0.2",
+    "joblib>=1.5.2",
+    "onnx>=1.19.1",
+    "skl2onnx>=1.19.1",
+    "scipy>=1.13.1",
 ]
