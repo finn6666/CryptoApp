@@ -359,30 +359,11 @@
                     🔄 Refresh Now
                 </button>
             </div>
-            <h1>🚀 Low Cap Crypto Analyzer</h1>
-            <p>Discover Hidden Gems in Small Cap Cryptocurrencies</p>
+            <h1>Crypto Analysis</h1>
+            <p>Smaller Cap Cryptocurrencies focus</p>
             <p style="margin-top: 10px; font-size: 0.9em; color: #888;">
-                Focused on coins under $500M market cap | Updated every 5 minutes
+                Updated every 5 minutes
             </p>
-        </div>
-
-        <div class="stats-grid" id="statsGrid">
-            <div class="stat-card">
-                <div class="stat-number" id="totalCoins">-</div>
-                <div class="stat-label">Total Coins</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="currentCoins">-</div>
-                <div class="stat-label">Active Coins</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="highPotential">-</div>
-                <div class="stat-label">High Potential</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number" id="trendingUp">-</div>
-                <div class="stat-label">Trending Up</div>
-            </div>
         </div>
 
         <div class="favorites-container" id="favoritesContainer" style="display: none;">
@@ -394,13 +375,6 @@
                 <div class="loading">🔄 Loading favorites...</div>
             </div>
         </div>
-
-        <div class="coins-container">
-            <div class="coins-header">
-                <h2>Low Cap Cryptocurrency Opportunities</h2>
-                <p>Real-time market data and analysis</p>
-            </div>
-
             <div id="coinsContent">
                 <div class="loading">🔄 Loading cryptocurrency data...</div>
             </div>
@@ -481,7 +455,7 @@
                 if (coin.score >= 8) scoreClass = 'score-high';
                 else if (coin.score >= 6) scoreClass = 'score-medium';
 
-                const price = coin.price ? `$${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
+                const price = coin.price ? `£${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
 
                 html += `
                     <tr>
@@ -601,7 +575,7 @@
                 if (coin.score >= 8) scoreClass = 'score-high';
                 else if (coin.score >= 6) scoreClass = 'score-medium';
 
-                const price = coin.price ? `$${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
+                const price = coin.price ? `£${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
 
                 html += `
                     <tr>

@@ -48,7 +48,7 @@ class LiveDataFetcher:
         try:
             url = f"{self.coingecko_base_url}/coins/markets"
             params = {
-                'vs_currency': 'usd',
+                'vs_currency': 'gbp',
                 'order': 'market_cap_desc',
                 'per_page': min(limit * 10, 250),  # Get 10x limit (max 250) to filter from
                 'page': 1,
@@ -108,7 +108,7 @@ class LiveDataFetcher:
             # Get coins and filter by recent addition (approximate)
             url = f"{self.coingecko_base_url}/coins/markets"
             params = {
-                'vs_currency': 'usd',
+                'vs_currency': 'gbp',
                 'order': 'market_cap_desc',
                 'per_page': 50,  # Reduced from 250 to 50
                 'page': 2,  # Get coins from page 2 for smaller caps
@@ -272,9 +272,9 @@ class LiveDataFetcher:
                     market_cap_rank=coin_data.get('market_cap_rank'),
                     price=coin_data.get('current_price'),
                     price_btc=coin_data.get('price_btc'),
-                    price_change_24h_usd=coin_data.get('price_change_percentage_24h'),
-                    market_cap=f"${coin_data.get('market_cap', 0):,.0f}" if coin_data.get('market_cap') else None,
-                    total_volume=f"${coin_data.get('total_volume', 0):,.0f}" if coin_data.get('total_volume') else None,
+                    price_change_24h=coin_data.get('price_change_percentage_24h'),
+                    market_cap=f"£{coin_data.get('market_cap', 0):,.0f}" if coin_data.get('market_cap') else None,
+                    total_volume=f"£{coin_data.get('total_volume', 0):,.0f}" if coin_data.get('total_volume') else None,
                     risk_level=risk_level
                 )
                 coins.append(coin)
@@ -342,8 +342,8 @@ class LiveDataFetcher:
                             "price": coin.price,
                             "price_btc": str(coin.price_btc) if coin.price_btc else None,
                             "price_change_percentage_24h": {
-                                "usd": coin.price_change_24h_usd
-                            } if coin.price_change_24h_usd else None,
+                                "gbp": coin.price_change_24h
+                            } if coin.price_change_24h else None,
                             "market_cap": coin.market_cap,
                             "total_volume": coin.total_volume,
                             "content": None
