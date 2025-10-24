@@ -26,7 +26,7 @@ class Coin:
     market_cap_rank: Optional[int]
     price: Optional[float]
     price_btc: Optional[float]
-    price_change_24h_usd: Optional[float]
+    price_change_24h: Optional[float]
     market_cap: Optional[str]
     total_volume: Optional[str]
     risk_level: Optional[RiskLevel] = None
@@ -79,7 +79,7 @@ class CryptoAnalyzer:
             # Get price change
             price_change = None
             if 'price_change_percentage_24h' in data and data['price_change_percentage_24h']:
-                price_change = data['price_change_percentage_24h'].get('usd')
+                price_change = data['price_change_percentage_24h'].get('gbp')
             
             # Parse risk level
             risk_level = None
@@ -99,7 +99,7 @@ class CryptoAnalyzer:
                 market_cap_rank=item.get('market_cap_rank'),
                 price=price,
                 price_btc=float(item.get('price_btc', 0)) if item.get('price_btc') else None,
-                price_change_24h_usd=price_change,
+                price_change_24h=price_change,
                 market_cap=data.get('market_cap'),
                 total_volume=data.get('total_volume'),
                 risk_level=risk_level,
@@ -130,10 +130,10 @@ class CryptoAnalyzer:
 
     def _parse_market_cap(self, market_cap_str: Optional[str]) -> float:
         """Helper method to parse market cap string and return numeric value"""
-        if not market_cap_str or not isinstance(market_cap_str, str) or '$' not in market_cap_str:
+        if not market_cap_str or not isinstance(market_cap_str, str) or '£' not in market_cap_str:
             return 0
             
-        clean_str = market_cap_str.replace('$', '').replace(',', '')
+        clean_str = market_cap_str.replace('£', '').replace(',', '')
         try:
             if 'B' in clean_str:
                 return float(clean_str.replace('B', '')) * 1_000_000_000
