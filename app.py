@@ -58,7 +58,7 @@ def get_stats():
         total_coins = len(analyzer.coins)
         current_coins = len(analyzer.filter_by_status(CoinStatus.CURRENT))
         high_potential = len(analyzer.get_high_potential_coins())
-        trending_up = len([coin for coin in analyzer.coins if coin.price_change_24h_usd and coin.price_change_24h_usd > 0])
+        trending_up = len([coin for coin in analyzer.coins if coin.price_change_24h and coin.price_change_24h > 0])
         
         return jsonify({
             'total_coins': total_coins,
@@ -94,7 +94,7 @@ def get_coins():
                 'name': coin.name,
                 'score': coin.attractiveness_score,
                 'price': coin.price,
-                'price_change_24h': coin.price_change_24h_usd or 0,
+                'price_change_24h': coin.price_change_24h or 0,
                 'market_cap_rank': coin.market_cap_rank
             })
         
@@ -136,7 +136,7 @@ def get_favorites():
                         'symbol': coin.symbol,
                         'name': coin.name,
                         'price': coin.price,
-                        'price_change_24h': coin.price_change_24h_usd,
+                        'price_change_24h': coin.price_change_24h,
                         'score': coin.attractiveness_score,
                         'market_cap': coin.market_cap,
                         'market_cap_rank': coin.market_cap_rank

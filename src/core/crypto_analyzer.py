@@ -26,7 +26,7 @@ class Coin:
     market_cap_rank: Optional[int]
     price: Optional[float]
     price_btc: Optional[float]
-    price_change_24h_usd: Optional[float]
+    price_change_24h: Optional[float]
     market_cap: Optional[str]
     total_volume: Optional[str]
     risk_level: Optional[RiskLevel] = None
@@ -75,11 +75,19 @@ class CryptoAnalyzer:
                     price = data['price']
             elif 'presale_price' in data:
                 price = data['presale_price']
-            
+        
             # Get price change
             price_change = None
             if 'price_change_percentage_24h' in data and data['price_change_percentage_24h']:
-                price_change = data['price_change_percentage_24h'].get('usd')
+                price_change_data = data['price_change_percentage_24h']
+                if isinstance(price_change_data, dict):
+                    # Try different currency keys
+                    price_change = (price_change_data.get('gbp') or 
+                                price_change_data.get('usd') or 
+                                price_change_data.get('eur'))
+                elif isinstance(price_change_data, (int, float)):
+                    # Direct numeric value
+                    price_change = price_change_data
             
             # Parse risk level
             risk_level = None
@@ -99,7 +107,7 @@ class CryptoAnalyzer:
                 market_cap_rank=item.get('market_cap_rank'),
                 price=price,
                 price_btc=float(item.get('price_btc', 0)) if item.get('price_btc') else None,
-                price_change_24h_usd=price_change,
+                price_change_24h=price_change,
                 market_cap=data.get('market_cap'),
                 total_volume=data.get('total_volume'),
                 risk_level=risk_level,
@@ -121,7 +129,10 @@ class CryptoAnalyzer:
             
         # Sort by attractiveness score (highest first)
         coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
-        
+
+        # Remove coins with price None or price >= 200 as i dont want high price coins
+        coins = [coin for coin in coins if coin.price is not None and coin.price <= 200]
+
         return coins[:limit]
 
     def get_trending_coins(self) -> List[Coin]:
@@ -130,10 +141,10 @@ class CryptoAnalyzer:
 
     def _parse_market_cap(self, market_cap_str: Optional[str]) -> float:
         """Helper method to parse market cap string and return numeric value"""
-        if not market_cap_str or not isinstance(market_cap_str, str) or '$' not in market_cap_str:
+        if not market_cap_str or not isinstance(market_cap_str, str) or '£' not in market_cap_str:
             return 0
             
-        clean_str = market_cap_str.replace('$', '').replace(',', '')
+        clean_str = market_cap_str.replace('£', '').replace(',', '')
         try:
             if 'B' in clean_str:
                 return float(clean_str.replace('B', '')) * 1_000_000_000
@@ -144,13 +155,13 @@ class CryptoAnalyzer:
         except:
             return 0
 
-    def get_low_cap_coins(self, limit: int = 10) -> List[Coin]:
-        """Get low cap coins (under $500M market cap) prioritized by attractiveness score"""
+    def get_low_cap_coins(self, limit: int = 15) -> List[Coin]:
+        """Get low cap coins (under $100M market cap) prioritized by attractiveness score"""
         low_cap_coins = []
         
         for coin in self.coins:
             market_cap_num = self._parse_market_cap(coin.market_cap)
-            if market_cap_num > 0 and market_cap_num < 500_000_000:  # Under $500M
+            if market_cap_num > 0 and market_cap_num < 100_000_000:  # Under $100M
                 low_cap_coins.append(coin)
         
         # Sort by attractiveness score (highest first)
@@ -162,6 +173,6 @@ class CryptoAnalyzer:
         """Filter coins by their status"""
         return [coin for coin in self.coins if coin.status == status]
 
-    def get_high_potential_coins(self, min_score: float = 7.0) -> List[Coin]:
+    def get_high_potential_coins(self, min_score: float = 6.0) -> List[Coin]:
         """Get coins with high potential (attractiveness score above threshold)"""
         return [coin for coin in self.coins if coin.attractiveness_score >= min_score]
