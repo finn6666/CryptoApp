@@ -177,6 +177,42 @@
             border-bottom: 1px solid #2d3748;
         }
 
+        .coins-table th:nth-child(1),
+        .coins-table td:nth-child(1) {
+            text-align: center;
+            width: 50px;
+        }
+
+        .coins-table th:nth-child(2),
+        .coins-table td:nth-child(2) {
+            text-align: left;
+            width: 100px;
+        }
+
+        .coins-table th:nth-child(3),
+        .coins-table td:nth-child(3) {
+            text-align: left;
+            width: 200px;
+        }
+
+        .coins-table th:nth-child(4),
+        .coins-table td:nth-child(4) {
+            text-align: center;
+            width: 80px;
+        }
+
+        .coins-table th:nth-child(5),
+        .coins-table td:nth-child(5) {
+            text-align: right;
+            width: 120px;
+        }
+
+        .coins-table th:nth-child(6),
+        .coins-table td:nth-child(6) {
+            text-align: center;
+            width: 100px;
+        }
+
         .coins-table th {
             background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
             color: #e2e8f0;
@@ -368,13 +404,17 @@
 
         <div class="favorites-container" id="favoritesContainer" style="display: none;">
             <div class="coins-header">
-                <h2>⭐ Your Favorite Low Cap Coins</h2>
-                <p>Track your selected cryptocurrencies</p>
+                <h2>Favorites</h2>
             </div>
             <div id="favoritesContent">
                 <div class="loading">🔄 Loading favorites...</div>
             </div>
         </div>
+
+        <div class="coins-container">
+            <div class="coins-header">
+                <h2>Trending coins</h2>
+            </div>
             <div id="coinsContent">
                 <div class="loading">🔄 Loading cryptocurrency data...</div>
             </div>
@@ -382,7 +422,6 @@
             <div class="last-updated" id="lastUpdated"></div>
         </div>
     </div>
-
     <script>
         let refreshing = false;
 
@@ -559,7 +598,6 @@
                             <th>Score</th>
                             <th>Price</th>
                             <th>24h Change</th>
-                            <th>Market Cap</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -585,7 +623,6 @@
                         <td><span class="score ${scoreClass}">${coin.score.toFixed(1)}</span></td>
                         <td class="price">${price}</td>
                         <td><span class="price-change ${priceChangeClass}">${priceChangeText}</span></td>
-                        <td>${coin.market_cap || 'N/A'}</td>
                     </tr>
                 `;
             });
