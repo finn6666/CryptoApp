@@ -75,8 +75,7 @@ class CryptoAnalyzer:
                     price = data['price']
             elif 'presale_price' in data:
                 price = data['presale_price']
-            
-            # Get price change
+        
             # Get price change
             price_change = None
             if 'price_change_percentage_24h' in data and data['price_change_percentage_24h']:
@@ -156,13 +155,13 @@ class CryptoAnalyzer:
         except:
             return 0
 
-    def get_low_cap_coins(self, limit: int = 12) -> List[Coin]:
-        """Get low cap coins (under $500M market cap) prioritized by attractiveness score"""
+    def get_low_cap_coins(self, limit: int = 15) -> List[Coin]:
+        """Get low cap coins (under $100M market cap) prioritized by attractiveness score"""
         low_cap_coins = []
         
         for coin in self.coins:
             market_cap_num = self._parse_market_cap(coin.market_cap)
-            if market_cap_num > 0 and market_cap_num < 500_000_000:  # Under $500M
+            if market_cap_num > 0 and market_cap_num < 100_000_000:  # Under $100M
                 low_cap_coins.append(coin)
         
         # Sort by attractiveness score (highest first)

@@ -494,7 +494,10 @@
                 if (coin.score >= 8) scoreClass = 'score-high';
                 else if (coin.score >= 6) scoreClass = 'score-medium';
 
-                const price = coin.price ? `£${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
+                // Convert USD to GBP (approximate rate: 1 USD = 0.8 GBP)
+                const usdToGbp = 0.8; // You can make this dynamic later
+                const priceInGbp = coin.price ? coin.price * usdToGbp : null;
+                const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
 
                 html += `
                     <tr>
@@ -613,7 +616,10 @@
                 if (coin.score >= 8) scoreClass = 'score-high';
                 else if (coin.score >= 6) scoreClass = 'score-medium';
 
-                const price = coin.price ? `£${coin.price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 6})}` : 'N/A';
+                // Convert USD to GBP (approximate rate: 1 USD = 0.8 GBP)
+                const usdToGbp = 0.8;
+                const priceInGbp = coin.price ? coin.price * usdToGbp : null;
+                const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
 
                 html += `
                     <tr>
