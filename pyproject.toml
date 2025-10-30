@@ -15,4 +15,5 @@ dependencies = [
     "onnx>=1.19.1",
     "skl2onnx>=1.19.1",
     "scipy>=1.13.1",
+    "aiohttp>=3.13.2",
 ]

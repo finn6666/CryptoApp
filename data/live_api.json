@@ -1,5 +1,5 @@
 {
-  "last_updated": "2025-10-22T16:26:54.552755",
+  "last_updated": "2025-10-30T21:14:07.293109",
   "sources": [
     "coinmarketcap",
     "coingecko"
@@ -3158,6 +3158,58 @@
           },
           "market_cap": "$97,772,521",
           "total_volume": "N/A",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "boss",
+        "name": "Boss",
+        "symbol": "BOSS",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Recently added symbol"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": null,
+        "price_btc": null,
+        "data": {
+          "price": 3.159e-09,
+          "price_btc": 2.9386e-14,
+          "price_change_percentage_24h": {
+            "usd": -4.75199
+          },
+          "market_cap": "N/A",
+          "total_volume": "$1,015.3",
+          "content": null,
+          "source": "coingecko"
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "bifrost-bridged-matic-bifrost",
+        "name": "Bifrost Bridged MATIC (Bifrost)",
+        "symbol": "MATIC",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Recently added symbol"
+        ],
+        "risk_level": "medium",
+        "market_cap_rank": null,
+        "price_btc": null,
+        "data": {
+          "price": 0.185496,
+          "price_btc": 1.73e-06,
+          "price_change_percentage_24h": {
+            "usd": -10.00033
+          },
+          "market_cap": "N/A",
+          "total_volume": "$380.11",
           "content": null,
           "source": "coingecko"
         }

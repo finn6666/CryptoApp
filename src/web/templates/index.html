@@ -369,6 +369,158 @@
             margin-top: 20px;
         }
 
+        .symbol-search-container {
+            background: rgba(26, 32, 46, 0.95);
+            border: 1px solid #2d3748;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .symbol-search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .symbol-search-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #2d3748;
+            border-radius: 10px;
+            background: #1a202c;
+            color: #e2e8f0;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s ease;
+        }
+
+        .symbol-search-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .symbol-search-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .symbol-search-btn:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .symbol-search-btn:disabled {
+            background: #4a5568;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .symbol-results {
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 10px;
+            background: #1a202c;
+            border: 1px solid #2d3748;
+        }
+
+        .symbol-result-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid #2d3748;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .symbol-result-item:hover {
+            background: #2d3748;
+        }
+
+        .symbol-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .symbol-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .symbol-symbol {
+            font-weight: bold;
+            color: #e2e8f0;
+            font-size: 16px;
+        }
+
+        .symbol-name {
+            color: #a0aec0;
+            font-size: 14px;
+            margin-top: 2px;
+        }
+
+        .symbol-add-btn {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .symbol-add-btn:hover {
+            background: linear-gradient(135deg, #38a169 0%, #2f855a 100%);
+            transform: translateY(-1px);
+        }
+
+        .symbol-add-btn:disabled {
+            background: #4a5568;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .symbol-status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .symbol-status.success {
+            background: rgba(72, 187, 120, 0.2);
+            color: #68d391;
+            border: 1px solid rgba(72, 187, 120, 0.3);
+        }
+
+        .symbol-status.error {
+            background: rgba(245, 101, 101, 0.2);
+            color: #fc8181;
+            border: 1px solid rgba(245, 101, 101, 0.3);
+        }
+
+        .symbol-status.info {
+            background: rgba(102, 126, 234, 0.2);
+            color: #90cdf4;
+            border: 1px solid rgba(102, 126, 234, 0.3);
+        }
+
         .ml-prediction {
             text-align: center;
             font-size: 0.9em;
@@ -438,6 +590,9 @@
                     <div>Last updated: <span class="last-updated" id="lastUpdated">Loading...</span></div>
                     <div>Next refresh: <span id="nextRefresh">-</span></div>
                 </div>
+                <button class="refresh-btn" onclick="toggleSymbolSearch()" id="symbolToggleBtn">
+                    🔍 Add Symbol
+                </button>
                 <button class="refresh-btn" onclick="forceRefresh()" id="refreshBtn">
                     🔄 Refresh Now
                 </button>
@@ -472,6 +627,34 @@
                 <button class="refresh-btn" onclick="loadMLStatus()">
                     🔄 Refresh Status
                 </button>
+            </div>
+        </div>
+
+        <div class="symbol-search-container" id="symbolSearchContainer" style="display: none;">
+            <div class="coins-header">
+                <h2>🔍 Add New Symbol</h2>
+                <p>Search and add new cryptocurrency symbols to track</p>
+            </div>
+            
+            <div class="symbol-search-form">
+                <input type="text" 
+                       class="symbol-search-input" 
+                       id="symbolSearchInput" 
+                       placeholder="Search for symbols (e.g., DOGE, LINK, AVAX...)" 
+                       maxlength="20">
+                <button class="symbol-search-btn" onclick="searchSymbols()" id="searchBtn">
+                    🔍 Search
+                </button>
+            </div>
+            
+            <div id="symbolResults" style="display: none;">
+                <div class="symbol-results" id="symbolResultsList">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+            
+            <div id="symbolStatus" class="symbol-status" style="display: none;">
+                <!-- Status messages will appear here -->
             </div>
         </div>
 
@@ -599,10 +782,14 @@
                     }
                 }
 
+                // Check if this coin was recently added
+                const recentlyAddedIndicator = coin.recently_added ? ' 🆕' : '';
+
+                
                 html += `
                     <tr>
                         <td><button class="favorite-btn" onclick="toggleFavorite('${coin.symbol}')" id="fav-${coin.symbol}">⭐</button></td>
-                        <td class="coin-symbol">${coin.symbol}</td>
+                        <td class="coin-symbol">${coin.symbol}${recentlyAddedIndicator}</td>
                         <td class="coin-name">${coin.name}</td>
                         <td><span class="score ${scoreClass}">${displayScore.toFixed(1)}</span></td>
                         <td class="price">${price}</td>
@@ -959,6 +1146,164 @@
                 loadMLStatus();
             }
         }
+
+        // Symbol Search Functions
+        async function searchSymbols() {
+            const searchInput = document.getElementById('symbolSearchInput');
+            const searchBtn = document.getElementById('searchBtn');
+            const resultsContainer = document.getElementById('symbolResults');
+            const resultsList = document.getElementById('symbolResultsList');
+            const statusDiv = document.getElementById('symbolStatus');
+            
+            const query = searchInput.value.trim();
+            if (!query) {
+                showSymbolStatus('Please enter a symbol to search', 'error');
+                return;
+            }
+            
+            searchBtn.disabled = true;
+            searchBtn.innerHTML = '🔄 Searching...';
+            hideSymbolStatus();
+            
+            try {
+                const response = await fetch(`/api/symbols/search?q=${encodeURIComponent(query)}&limit=10`);
+                const data = await response.json();
+                
+                if (data.success && data.results.length > 0) {
+                    displaySymbolResults(data.results);
+                    resultsContainer.style.display = 'block';
+                    showSymbolStatus(`Found ${data.results.length} results for "${query}"`, 'info');
+                } else if (data.success && data.results.length === 0) {
+                    resultsContainer.style.display = 'none';
+                    showSymbolStatus(`No symbols found matching "${query}"`, 'error');
+                } else {
+                    throw new Error(data.error || 'Search failed');
+                }
+            } catch (error) {
+                console.error('Symbol search error:', error);
+                resultsContainer.style.display = 'none';
+                showSymbolStatus(`Search failed: ${error.message}`, 'error');
+            } finally {
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '🔍 Search';
+            }
+        }
+
+        function displaySymbolResults(results) {
+            const resultsList = document.getElementById('symbolResultsList');
+            
+            const resultsHtml = results.map(result => `
+                <div class="symbol-result-item">
+                    <div class="symbol-info">
+                        <div class="symbol-symbol">${result.symbol}</div>
+                        <div class="symbol-name">${result.name}</div>
+                    </div>
+                    <button class="symbol-add-btn" onclick="addSymbol('${result.symbol}')" id="add-${result.symbol}">
+                        + Add
+                    </button>
+                </div>
+            `).join('');
+            
+            resultsList.innerHTML = resultsHtml;
+        }
+
+        async function addSymbol(symbol) {
+            const addBtn = document.getElementById(`add-${symbol}`);
+            const originalText = addBtn.innerHTML;
+            
+            addBtn.disabled = true;
+            addBtn.innerHTML = '⏳ Adding...';
+            
+            try {
+                const response = await fetch('/api/symbols/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ symbol: symbol })
+                });
+                
+                const data = await response.json();
+                console.log('Add symbol response:', data);
+                
+                if (data.success) {
+                    addBtn.innerHTML = '✅ Added';
+                    addBtn.style.background = '#38a169';
+                    
+                    // Check if data was immediately fetched
+                    if (data.data_fetch_error) {
+                        showSymbolStatus(`${symbol} added! Data will be available on next refresh.`, 'info');
+                    } else {
+                        showSymbolStatus(`${symbol} added successfully! Refreshing data...`, 'success');
+                        
+                        // Automatically refresh the coin list to show the new symbol
+                        setTimeout(async () => {
+                            try {
+                                await loadCoins(); // Refresh the coins list
+                                showSymbolStatus(`${symbol} added and data refreshed! Check the coins list below.`, 'success');
+                            } catch (error) {
+                                showSymbolStatus(`${symbol} added successfully. Please refresh manually to see the new data.`, 'info');
+                            }
+                        }, 2000);
+                    }
+                    
+                    // Clear search after successful add
+                    setTimeout(() => {
+                        document.getElementById('symbolSearchInput').value = '';
+                        document.getElementById('symbolResults').style.display = 'none';
+                        hideSymbolStatus();
+                    }, 5000);
+                } else {
+                    throw new Error(data.error || 'Failed to add symbol');
+                }
+            } catch (error) {
+                console.error('Add symbol error:', error);
+                showSymbolStatus(`Failed to add ${symbol}: ${error.message}`, 'error');
+                addBtn.disabled = false;
+                addBtn.innerHTML = originalText;
+            }
+        }
+
+        function showSymbolStatus(message, type) {
+            const statusDiv = document.getElementById('symbolStatus');
+            statusDiv.className = `symbol-status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        function hideSymbolStatus() {
+            const statusDiv = document.getElementById('symbolStatus');
+            statusDiv.style.display = 'none';
+        }
+
+        function toggleSymbolSearch() {
+            const container = document.getElementById('symbolSearchContainer');
+            const toggleBtn = document.getElementById('symbolToggleBtn');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                toggleBtn.innerHTML = '❌ Close';
+                // Clear any previous search results
+                document.getElementById('symbolSearchInput').value = '';
+                document.getElementById('symbolResults').style.display = 'none';
+                hideSymbolStatus();
+            } else {
+                container.style.display = 'none';
+                toggleBtn.innerHTML = '🔍 Add Symbol';
+            }
+        }
+
+        // Add Enter key support for symbol search
+        document.addEventListener('DOMContentLoaded', function() {
+            const symbolSearchInput = document.getElementById('symbolSearchInput');
+            if (symbolSearchInput) {
+                symbolSearchInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        searchSymbols();
+                    }
+                });
+            }
+        });
 
         // Initial load
         window.addEventListener('load', async () => {
