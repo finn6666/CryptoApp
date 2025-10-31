@@ -320,7 +320,7 @@ class LiveDataFetcher:
             'all_coins': all_low_caps  # Focus on low cap opportunities
         }
     
-    def save_to_json(self, data: Dict[str, List[Coin]], filename: str = "live_api.json") -> None:
+    def save_to_json(self, data: Dict[str, List[Coin]], filename: str = "data/live_api.json") -> None:
         """Save fetched data to JSON file"""
         try:
             # Convert Coin objects to dictionaries
@@ -367,8 +367,8 @@ def fetch_and_update_data(force_refresh: bool = False):
     from datetime import datetime, timedelta
     
     # Check if data is recent (less than 5 minutes old) unless force refresh
-    if not force_refresh and os.path.exists("live_api.json"):
-        file_time = datetime.fromtimestamp(os.path.getmtime("live_api.json"))
+    if not force_refresh and os.path.exists("data/live_api.json"):
+        file_time = datetime.fromtimestamp(os.path.getmtime("data/live_api.json"))
         if datetime.now() - file_time < timedelta(minutes=5):
             print("📊 Using cached data (less than 5 minutes old)")
             return True
@@ -385,7 +385,7 @@ def fetch_and_update_data(force_refresh: bool = False):
         print(f"• New Coins: {len(live_data['new_coins'])}")
         print(f"• Total: {len(live_data['all_coins'])}")
         
-        fetcher.save_to_json(live_data, "live_api.json")  # Update main data file
+        fetcher.save_to_json(live_data, "data/live_api.json")  # Update main data file
         
         return live_data
         

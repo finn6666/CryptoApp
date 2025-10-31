@@ -13,8 +13,8 @@ sys.path.insert(0, os.path.join(project_root, 'src'))
 sys.path.insert(0, os.path.join(project_root, 'ml'))
 sys.path.insert(0, os.path.join(project_root, 'services'))
 
-from core.crypto_analyzer import CryptoAnalyzer, CoinStatus
-from core.live_data_fetcher import fetch_and_update_data
+from src.core.crypto_analyzer import CryptoAnalyzer, CoinStatus
+from src.core.live_data_fetcher import fetch_and_update_data
 from datetime import datetime
 
 # Initialize ML components as None by default
@@ -31,8 +31,8 @@ def initialize_ml():
     global ml_pipeline, ml_service, ML_AVAILABLE
     print("🔧 Attempting to initialize ML components...")
     try:
-        from training_pipeline import CryptoMLPipeline
-        from ml_service import MLService
+        from ml.training_pipeline import CryptoMLPipeline
+        from services.ml_service import MLService
         
         print("📦 ML imports successful")
         ml_pipeline = CryptoMLPipeline()
@@ -64,7 +64,7 @@ def initialize_data_pipeline():
     global data_pipeline, SYMBOLS_AVAILABLE
     print("🔧 Attempting to initialize data pipeline...")
     try:
-        from data_pipeline import CryptoDataPipeline
+        from ml.data_pipeline import CryptoDataPipeline
         
         print("📦 Data pipeline imports successful")
         data_pipeline = CryptoDataPipeline()
