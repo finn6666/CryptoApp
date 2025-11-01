@@ -312,8 +312,8 @@ print(f"🤖 rl_detector: {rl_detector}")
 
 @app.route('/')
 def index():
-    """Serve the main page with clean, modular design"""
-    return render_template('index_clean.html')
+    """Serve the main page with dashboard improvements"""
+    return render_template('index.html')
 
 @app.route('/legacy')
 def legacy():
