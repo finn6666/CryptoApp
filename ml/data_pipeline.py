@@ -1,8 +1,7 @@
 import pandas as pd
-import requests
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict
 import asyncio
 import aiohttp
