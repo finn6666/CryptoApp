@@ -29,12 +29,12 @@ def main():
                 print("📊 Low cap data fetched and saved to file")
         
         print("\n🚀 Starting web application...")
-        print("Visit: http://127.0.0.1:5000")
+        print("Visit: http://127.0.0.1:5001")
         print("Press Ctrl+C to stop\n")
         
         # Import and run the web app
         from app import app
-        app.run(debug=True, host='127.0.0.1', port=5000)
+        app.run(debug=True, host='127.0.0.1', port=5001)
             
     except FileNotFoundError:
         print("❌ Error: Required data files not found!")

@@ -5,10 +5,23 @@
 CryptoApp/
 ├── main.py                    # CLI entry point
 ├── app.py                     # Web app entry point
-├── src/core/                  # Core business logic
-├── src/cli/                   # Command line interface
-├── src/web/templates/         # Web interface
+├── src/
+│   ├── core/                  # Core business logic
+│   │   ├── crypto_analyzer.py # Main analysis engine
+│   │   ├── live_data_fetcher.py # API data fetching
+│   │   └── config.py          # App configuration
+│   └── web/templates/         # Web interface
+├── ml/                        # Machine learning components
+│   ├── data_pipeline.py       # Data processing
+│   ├── training_pipeline.py   # ML model training
+│   └── monitoring.py          # ML monitoring
+├── services/                  # External services
+│   └── ml_service.py          # ML prediction service
+├── config/                    # Configuration files
+│   └── ml_config.py           # ML-specific config
 ├── data/live_api.json         # Live crypto data
+├── azure_functions/           # Azure deployment
+├── requirements-ml.txt        # ML dependencies
 └── tests/                     # Test files
 ```
 
