@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoApp - Low Cap Analyzer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <!-- Status Notification System -->
+    <div class="status-container" id="statusContainer">
+        <div class="status-toast" id="statusToast">
+            <span id="statusMessage"></span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header Section -->
+        <div class="header">
+            <h1>🚀 Crypto Analysis Dashboard</h1>
+            <p>AI-powered cryptocurrency analysis with hidden gem detection</p>
+            
+            <div class="refresh-controls">
+                <div class="refresh-status">
+                    <div>Last Update: <span id="lastUpdated">Loading...</span></div>
+                    <div>Next Refresh: <span id="nextRefresh">Loading...</span></div>
+                </div>
+                <button class="refresh-btn" onclick="forceRefresh()" id="refreshBtn">
+                    🔄 Refresh Now
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Main Coins Container -->
+            <div class="coins-container">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="icon">💰</span>
+                        <h2>Live Cryptocurrency Analysis</h2>
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <button class="btn btn-gold" onclick="scanForHiddenGems()" id="gemScanBtn">
+                            💎 Find Hidden Gems
+                        </button>
+                    </div>
+                </div>
+                <div id="coinsContent">
+                    <div class="loading">Loading cryptocurrency data...</div>
+                </div>
+            </div>
+
+            <!-- Favorites Container -->
+            <div class="favorites-container" id="favoritesContainer" style="display: none;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="icon">⭐</span>
+                        <h2>Your Favorites</h2>
+                    </div>
+                </div>
+                <div id="favoritesContent"></div>
+            </div>
+
+            <!-- ML Status Container -->
+            <div class="ml-status-container" id="mlStatusContainer" style="display: none;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="icon">🤖</span>
+                        <h2>AI/ML Status</h2>
+                    </div>
+                </div>
+                <div id="mlStatusContent"></div>
+                <div class="ml-controls">
+                    <button class="refresh-btn" onclick="trainMLModel()" id="trainBtn">
+                        🎯 Train Model (Demo)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hidden Gems Analysis Container -->
+            <div class="hidden-gems-container" id="hiddenGemsContainer" style="display: none;">
+                <div class="card-header">
+                    <div class="card-title">
+                        <span class="icon">💎</span>
+                        <h2>Hidden Gem Analysis</h2>
+                    </div>
+                </div>
+                <div id="hiddenGemsContent">
+                    <div class="loading">Click "Find Hidden Gems" to scan for opportunities...</div>
+                </div>
+                <div class="gem-controls">
+                    <button class="refresh-btn" onclick="trainGemDetector()" id="trainGemBtn">
+                        🏋️ Train Model
+                    </button>
+                    <button class="refresh-btn" onclick="getTopHiddenGems(10)">
+                        🏆 Top 10 Gems
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

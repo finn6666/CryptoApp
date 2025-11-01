@@ -1,8 +1,7 @@
 import requests
 import json
 import time
-from typing import Dict, List, Optional
-from datetime import datetime
+from typing import Dict, List
 from .crypto_analyzer import Coin, CoinStatus, RiskLevel
 
 class LiveDataFetcher:
