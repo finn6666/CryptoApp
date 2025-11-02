@@ -1,52 +1,55 @@
 # CryptoApp
 
-A Python-based cryptocurrency analyzer that tracks trending coins, analyzes market data, and provides investment insights.
+An intelligent cryptocurrency analysis platform that combines real-time market data with advanced machine learning and reinforcement learning techniques to provide actionable trading insights.
 
-## Features
+## What It Does
 
-- **Real-time Data**: Fetches live cryptocurrency data from APIs
-- **Smart Analysis**: Calculates attractiveness scores based on multiple factors
-- **Favorites System**: Save and track your preferred coins
-- **Price Conversion**: USD to GBP conversion with proper formatting
-- **Responsive Web UI**: Clean, dark-themed interface
-- **Risk Assessment**: Evaluates coin risk levels
+CryptoApp analyzes cryptocurrency markets using multiple data sources and AI-powered algorithms to identify opportunities that traditional analysis might miss. The platform learns from market outcomes and continuously improves its recommendations over time.
+
+## Core Capabilities
+
+- **Intelligent Analysis**: AI-powered market analysis using ML and RL techniques
+- **Real-time Data**: Live market data integration and processing
+- **Web Interface**: Clean, responsive dashboard for analysis and insights
+- **Continuous Learning**: System improves through reinforcement learning from outcomes
+
+> **📚 Detailed Documentation**: See [ML_SYSTEM_COMPLETE.md](ML_SYSTEM_COMPLETE.md) for technical system details
 
 ## Quick Start
 
 ```bash
-# Clone the repository
-git clone https://github.com/finn6666/PythonApp.git
+# Clone and setup
+git clone https://github.com/finn6666/CryptoApp.git
 cd CryptoApp
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Run the application
-python src/main.py
+# Start the application
+python app.py
 ```
 
-## Tech Stack
+Visit `http://localhost:5001` to access the dashboard.
 
-- **Backend**: Python, Flask
-- **Frontend**: HTML, CSS, JavaScript
-- **Data**: JSON API integration
-- **Analysis**: Custom scoring algorithms
+## Technology
 
-## Project Structure
+Built with **Python** and **Flask**, featuring machine learning pipelines, reinforcement learning agents, and a responsive web interface for cryptocurrency market analysis.
+
+## Architecture
 
 ```
 CryptoApp/
-├── src/
-│   ├── core/           # Core analysis logic
-│   ├── web/            # Web interface
-│   └── main.py         # Application entry point
-├── data/               # Data files
-└── requirements.txt    # Dependencies
+├── app.py              # Main application entry point
+├── src/                # Core analysis and web modules
+├── ml/                 # AI/ML systems and pipelines
+├── data/               # Configuration and user data
+├── docs/               # Documentation
+└── models/             # Generated models and training data
 ```
 
 ## Development
 
-See `dev-guide.md` for detailed development workflows and Git best practices.
+See [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md) for development setup and workflows.
 
 ## Disclaimer
 

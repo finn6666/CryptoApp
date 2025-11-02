@@ -245,7 +245,7 @@ app = Flask(__name__,
            static_folder='src/web/static')
 
 # Favorites functionality
-FAVORITES_FILE = "favorites.json"
+FAVORITES_FILE = "data/favorites.json"
 
 def load_favorites():
     """Load user's favorite coins from JSON file"""
@@ -261,6 +261,8 @@ def load_favorites():
 def save_favorites(favorites):
     """Save user's favorite coins to JSON file"""
     try:
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(FAVORITES_FILE), exist_ok=True)
         with open(FAVORITES_FILE, 'w') as f:
             json.dump(favorites, f, indent=2)
         return True
@@ -1503,17 +1505,21 @@ def rl_train():
     
     try:
         from ml.rl_integration import RLCryptoTrainer
+        from ml.training_pipeline import CryptoMLPipeline
         
         trainer = RLCryptoTrainer()
         
-        # Use sample training data
+        # Generate sample training data if it doesn't exist
         csv_path = os.path.join(project_root, 'models', 'sample_training_data.csv')
         
         if not os.path.exists(csv_path):
-            return jsonify({
-                'error': 'Training data not found',
-                'message': f'Please ensure {csv_path} exists'
-            }), 404
+            if not os.path.exists('models'):
+                os.makedirs('models')
+            
+            # Generate sample data dynamically
+            ml_pipeline = CryptoMLPipeline()
+            sample_df = ml_pipeline.create_sample_data(symbol="BTC", days=30)
+            sample_df.to_csv(csv_path, index=False)
         
         results = trainer.train_from_csv(csv_path)
         
