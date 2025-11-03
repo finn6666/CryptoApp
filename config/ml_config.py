@@ -28,14 +28,14 @@ class MLConfig:
     azure_function_url: Optional[str] = None
     crypto_api_base: Optional[str] = None
     
-    # Training schedule
-    retrain_schedule: str = "0 2 * * 0"  # Every Sunday at 2 AM
+    # Training schedule  
+    retrain_schedule: str = "0 2 * * 0"  # Every Sunday at 2 AM - weekly retraining
     
     # Model storage
     model_dir: str = "/Users/finnbryant/Dev/CryptoApp/models"
     data_dir: str = "/Users/finnbryant/Dev/CryptoApp/data"
     
-    # Monitoring
+    # Monitoring (optional - for production deployments)
     alert_email: Optional[str] = None
     slack_webhook: Optional[str] = None
     

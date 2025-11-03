@@ -32,8 +32,8 @@ git pull origin main
 
 # Test & develop
 python3 tests/test_basic_functionality.py
-python3 main.py              # CLI version
-python3 app.py               # Web version (localhost:5000)
+python3 main.py              # Data fetcher & simplified entry point
+python3 app.py               # Full web application (localhost:5001)
 
 # Commit changes
 git add . && git commit -m "Description"

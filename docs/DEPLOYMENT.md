@@ -10,4 +10,10 @@ cd ~/crypto-app && git pull && sudo pkill gunicorn && nohup gunicorn --bind 0.0.
 ```bash
 # Check if app is running
 ps aux | grep gunicorn
+
+# Check app is accessible
+curl http://localhost:8080
+
+# Check logs
+tail -f nohup.out
 ```

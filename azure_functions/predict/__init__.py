@@ -166,7 +166,7 @@ def fetch_from_fallback_apis(symbol):
         coingecko_id = get_coingecko_id(symbol)
         response = requests.get(
             f"https://api.coingecko.com/api/v3/coins/{coingecko_id}/market_chart",
-            params={"vs_currency": "usd", "days": "30", "interval": "hourly"},
+            params={"vs_currency": "gbp", "days": "30", "interval": "hourly"},
             timeout=10
         )
         response.raise_for_status()
@@ -187,13 +187,13 @@ def fetch_from_fallback_apis(symbol):
         return None
 
 def get_coingecko_id(symbol):
-    """Map symbol to CoinGecko ID"""
+    """Map symbol to CoinGecko ID - common mappings for faster lookup"""
     mapping = {
         'BTC': 'bitcoin',
-        'ETH': 'ethereum',
+        'ETH': 'ethereum', 
         'ADA': 'cardano',
         'SOL': 'solana'
-        # Add more mappings as needed
+        # Add more common mappings as needed
     }
     return mapping.get(symbol.upper(), symbol.lower())
 
