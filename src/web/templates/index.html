@@ -437,6 +437,9 @@
         .score.good {
             background: linear-gradient(135deg, var(--accent-gold), #d69e2e);
             color: #1a1a1a;
+            box-shadow: 0 4px 15px rgba(246, 213, 92, 0.3);
+            border: 1px solid rgba(246, 213, 92, 0.5);
+            font-weight: 600;
         }
 
         .score.fair {
@@ -1364,7 +1367,21 @@
                 // Convert USD to GBP (approximate rate: 1 USD = 0.8 GBP)
                 const usdToGbp = 0.8;
                 const priceInGbp = coin.price ? coin.price * usdToGbp : null;
-                const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
+                
+                // Enhanced price formatting: show more decimals for very small prices
+                let price = 'N/A';
+                if (priceInGbp) {
+                    if (priceInGbp < 0.01) {
+                        // For very small prices, show 6 decimal places
+                        price = `£${priceInGbp.toFixed(6)}`;
+                    } else if (priceInGbp < 1) {
+                        // For prices under £1, show 4 decimal places
+                        price = `£${priceInGbp.toFixed(4)}`;
+                    } else {
+                        // For prices £1 and above, show standard formatting
+                        price = `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
+                    }
+                }
 
                 // Prepare badges
                 const badges = [];
@@ -1989,7 +2006,7 @@
                         <div class="gem-details">
                             <div class="gem-metric">
                                 <div style="color: #a0aec0; font-size: 0.9em;">Current Price</div>
-                                <div style="font-weight: bold;">$${gem.price?.toFixed(8) || 'N/A'}</div>
+                                <div style="font-weight: bold;">${gem.price ? (gem.price * 0.8 < 0.01 ? `£${(gem.price * 0.8).toFixed(6)}` : `£${(gem.price * 0.8).toFixed(4)}`) : 'N/A'}</div>
                             </div>
                             <div class="gem-metric">
                                 <div style="color: #a0aec0; font-size: 0.9em;">Market Cap Rank</div>
@@ -2141,7 +2158,7 @@
                         <div class="gem-details">
                             <div class="gem-metric">
                                 <div style="color: #a0aec0; font-size: 0.9em;">Current Price</div>
-                                <div style="font-weight: bold;">$${gem.price?.toFixed(8) || 'N/A'}</div>
+                                <div style="font-weight: bold;">${gem.price ? (gem.price * 0.8 < 0.01 ? `£${(gem.price * 0.8).toFixed(6)}` : `£${(gem.price * 0.8).toFixed(4)}`) : 'N/A'}</div>
                             </div>
                             <div class="gem-metric">
                                 <div style="color: #a0aec0; font-size: 0.9em;">Market Cap Rank</div>

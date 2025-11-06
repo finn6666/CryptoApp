@@ -55,13 +55,11 @@ class MLScheduler:
     def send_alert(self, message):
         """Send alert for failed operations"""
         logging.error(f"ALERT: {message}")
-        # Implement your preferred alerting method
-        # Email, Slack webhook, etc.
     
     def start_scheduler(self):
         """Start the weekly retraining scheduler"""
         # Schedule retraining every Sunday at 2 AM
-        schedule.every().sunday.at("02:00").do(self.weekly_retrain)
+        schedule.every().sunday.at("02:00").do(self.weekly_retrain) #Same point on comment relating to retrain timing
         
         # For testing, you can also add daily retraining
         # schedule.every().day.at("03:00").do(self.weekly_retrain)
