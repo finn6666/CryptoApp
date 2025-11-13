@@ -424,12 +424,21 @@ body::before {
 }
 
 .gem-score {
-    background: linear-gradient(135deg, var(--accent-gold), var(--accent-secondary));
+    background: linear-gradient(135deg, var(--accent-gold), #FFD700, var(--accent-secondary));
     color: var(--primary-bg);
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-weight: bold;
-    font-size: 1.1em;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-weight: 800;
+    font-size: 1.2em;
+    box-shadow: 0 4px 15px rgba(246, 213, 92, 0.4);
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.gem-score:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(246, 213, 92, 0.6);
 }
 
 /* ===== UTILITIES ===== */

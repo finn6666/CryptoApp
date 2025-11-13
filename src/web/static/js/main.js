@@ -114,7 +114,15 @@ function generateCoinsTable(coins, mlEnabled = false) {
 
         const usdToGbp = 0.8;
         const priceInGbp = coin.price ? coin.price * usdToGbp : null;
-        const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
+        let price = 'N/A';
+        if (priceInGbp) {
+            // For very small prices, show 2 significant digits
+            if (priceInGbp < 0.01) {
+                price = `£${priceInGbp.toPrecision(2)}`;
+            } else {
+                price = `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
+            }
+        }
 
         let mlPredictionHtml = '';
         if (showMLColumn) {
@@ -218,7 +226,15 @@ function generateFavoritesTable(favorites, mlEnabled = false) {
 
         const usdToGbp = 0.8;
         const priceInGbp = coin.price ? coin.price * usdToGbp : null;
-        const price = priceInGbp ? `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}` : 'N/A';
+        let price = 'N/A';
+        if (priceInGbp) {
+            // For very small prices, show 2 significant digits
+            if (priceInGbp < 0.01) {
+                price = `£${priceInGbp.toPrecision(2)}`;
+            } else {
+                price = `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
+            }
+        }
 
         let mlPredictionHtml = '';
         if (showMLColumn) {
