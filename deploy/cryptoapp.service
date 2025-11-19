@@ -1,0 +1,20 @@
+# Systemd unit template for CryptoApp
+# Copy to /etc/systemd/system/cryptoapp.service and adjust USER and WORKDIR
+
+[Unit]
+Description=CryptoApp Flask (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=USER_REPLACE
+WorkingDirectory=WORKDIR_REPLACE
+Environment=PYTHONUNBUFFERED=1
+# Using uv to ensure deps from pyproject/uv.lock; remove `uv sync` if you manage venv separately
+ExecStart=/usr/bin/env bash -lc 'cd WORKDIR_REPLACE && uv sync && uv run gunicorn -c gunicorn.conf.py wsgi:app'
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target

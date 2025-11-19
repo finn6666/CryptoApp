@@ -1556,6 +1556,11 @@ def rl_train():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/health')
+def health():
+    """Simple health check endpoint for load balancers and smoke tests"""
+    return jsonify({'status': 'ok', 'time': datetime.now().isoformat()}), 200
+
 if __name__ == '__main__':
     # Simple, configurable runner
     # Defaults: host 0.0.0.0 so it can be reached externally on a VM,

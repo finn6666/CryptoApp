@@ -16,6 +16,7 @@ dependencies = [
     "skl2onnx>=1.19.1",
     "scipy>=1.13.1",
     "aiohttp>=3.13.2",
+    "gunicorn>=21.2",
 ]
 
 [project.optional-dependencies]
