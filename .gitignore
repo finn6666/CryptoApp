@@ -78,3 +78,4 @@ wheels/
 # live_api.json  # Remove if you don't want to track live datadata/Coinmarketcap.api
 *.api
 .env
+DEPLOYMENT_CHECKLIST.md
