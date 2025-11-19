@@ -25,6 +25,10 @@ pip-delete-this-directory.txt
 *.swp
 *.swo
 *~
+*.bak
+*.backup
+*.old
+*.tmp
 
 ## OS
 .DS_Store
