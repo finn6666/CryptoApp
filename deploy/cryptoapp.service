@@ -1,5 +1,11 @@
-# Systemd unit template for CryptoApp
-# Copy to /etc/systemd/system/cryptoapp.service and adjust USER and WORKDIR
+# Systemd unit file for CryptoApp
+# Instructions:
+# 1. Copy to /etc/systemd/system/cryptoapp.service
+# 2. Replace YOUR_USERNAME with your Azure VM username (e.g., azureuser)
+# 3. Replace /path/to/CryptoApp with your actual deployment path (e.g., /home/azureuser/CryptoApp)
+# 4. Run: sudo systemctl daemon-reload
+# 5. Run: sudo systemctl enable cryptoapp
+# 6. Run: sudo systemctl start cryptoapp
 
 [Unit]
 Description=CryptoApp Flask (Gunicorn)
@@ -7,11 +13,11 @@ After=network.target
 
 [Service]
 Type=simple
-User=USER_REPLACE
-WorkingDirectory=WORKDIR_REPLACE
+User=YOUR_USERNAME
+WorkingDirectory=/path/to/CryptoApp
 Environment=PYTHONUNBUFFERED=1
 # Using uv to ensure deps from pyproject/uv.lock; remove `uv sync` if you manage venv separately
-ExecStart=/usr/bin/env bash -lc 'cd WORKDIR_REPLACE && uv sync && uv run gunicorn -c gunicorn.conf.py wsgi:app'
+ExecStart=/usr/bin/env bash -lc 'cd /path/to/CryptoApp && uv sync && uv run gunicorn -c gunicorn.conf.py wsgi:app'
 Restart=always
 RestartSec=5
 KillSignal=SIGINT

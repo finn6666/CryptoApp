@@ -12,8 +12,11 @@ class MLScheduler:
     def __init__(self):
         self.pipeline = CryptoMLPipeline()
         self.weekly_reporter = WeeklyReportGenerator()
-        self.data_dir = "/Users/finnbryant/Dev/CryptoApp/data"
-        self.model_dir = "/Users/finnbryant/Dev/CryptoApp/models"
+        
+        # Use relative paths that work anywhere
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.data_dir = os.path.join(project_root, "data")
+        self.model_dir = os.path.join(project_root, "models")
         
         # These will be set when scheduler is integrated with main app
         self.gem_detector = None

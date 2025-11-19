@@ -654,8 +654,6 @@ class HiddenGemDetector:
             
         except Exception as e:
             print(f"❌ Error training model: {e}")
-            import traceback
-            traceback.print_exc()
             return None
     
     def predict_hidden_gem(self, coin_data: Dict, market_context: Optional[Dict] = None) -> Optional[Dict]:

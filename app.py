@@ -7,6 +7,13 @@ import json
 import asyncio
 import logging
 
+# Configure logging for production
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 # Add the project root to Python path
 project_root = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(project_root, 'src'))
@@ -37,30 +44,28 @@ SYMBOLS_AVAILABLE = False
 def initialize_ml():
     """Try to initialize ML components in a separate function"""
     global ml_pipeline, ml_service, ML_AVAILABLE
-    print("🔧 Attempting to initialize ML components...")
+    logger.info("Attempting to initialize ML components...")
     try:
         from ml.training_pipeline import CryptoMLPipeline
         
-        print("📦 ML imports successful")
+        logger.info("ML imports successful")
         ml_pipeline = CryptoMLPipeline()
         ml_service = None  # ml_service removed - not needed
         ML_AVAILABLE = True
         
-        print("🤖 ML objects created")
+        logger.info("ML objects created")
         
         # Try to load existing model
         try:
             ml_pipeline.load_existing_model()
-            print("✅ ML model loaded successfully")
+            logger.info("ML model loaded successfully")
         except Exception as e:
-            print(f"⚠️ ML model not available: {e}")
+            logger.warning(f"ML model not available: {e}")
         
-        print("🎉 ML components initialized successfully")
+        logger.info("ML components initialized successfully")
         return True
     except Exception as e:
-        print(f"❌ ML components not available: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"ML components not available: {e}")
         ML_AVAILABLE = False
         ml_pipeline = None
         ml_service = None
@@ -69,73 +74,71 @@ def initialize_ml():
 def initialize_data_pipeline():
     """Try to initialize data pipeline for symbol management"""
     global data_pipeline, SYMBOLS_AVAILABLE
-    print("🔧 Attempting to initialize data pipeline...")
+    logger.info("Attempting to initialize data pipeline...")
     try:
         from ml.data_pipeline import CryptoDataPipeline
         
-        print("📦 Data pipeline imports successful")
+        logger.info("Data pipeline imports successful")
         data_pipeline = CryptoDataPipeline()
         SYMBOLS_AVAILABLE = True
         
-        print("🎉 Data pipeline initialized successfully")
+        logger.info("Data pipeline initialized successfully")
         return True
     except Exception as e:
-        print(f"❌ Data pipeline not available: {e}")
+        logger.error(f"Data pipeline not available: {e}")
         SYMBOLS_AVAILABLE = False
         return False
 
 def initialize_gem_detector():
     """Initialize the enhanced hidden gem detector"""
     global gem_detector, GEM_DETECTOR_AVAILABLE
-    print("🔧 Attempting to initialize Enhanced Hidden Gem Detector...")
+    logger.info("Attempting to initialize Enhanced Hidden Gem Detector...")
     try:
         from ml.enhanced_gem_detector import HiddenGemDetector
         
-        print("📦 Hidden Gem Detector imports successful")
+        logger.info("Hidden Gem Detector imports successful")
         gem_detector = HiddenGemDetector()
         
         # Try to load existing model
         if gem_detector.load_model():
-            print("✅ Hidden Gem Detector model loaded successfully")
+            logger.info("Hidden Gem Detector model loaded successfully")
             GEM_DETECTOR_AVAILABLE = True
         else:
-            print("🏋️ No existing model found, will train on first use...")
+            logger.info("No existing model found, will train on first use...")
             GEM_DETECTOR_AVAILABLE = True  # Available for training
         
-        print("🎉 Enhanced Hidden Gem Detector initialized successfully")
+        logger.info("Enhanced Hidden Gem Detector initialized successfully")
         return True
         
     except Exception as e:
-        print(f"❌ Hidden Gem Detector not available: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Hidden Gem Detector not available: {e}")
         GEM_DETECTOR_AVAILABLE = False
         return False
 
 def initialize_rl_detector():
     """Initialize the RL-enhanced gem detector"""
     global rl_detector, RL_DETECTOR_AVAILABLE
-    print("🔧 Attempting to initialize RL Detector...")
+    logger.info("Attempting to initialize RL Detector...")
     try:
         from ml.rl_integration import RLLiveTrading
         
-        print("📦 RL Detector imports successful")
+        logger.info("RL Detector imports successful")
         
         # Try to load existing RL model
         model_path = os.path.join(project_root, 'models', 'rl_model.pkl')
         if os.path.exists(model_path):
             rl_detector = RLLiveTrading(model_filepath=model_path)
-            print("✅ RL model loaded successfully")
+            logger.info("RL model loaded successfully")
         else:
             rl_detector = RLLiveTrading()  # Start fresh
-            print("🧠 Starting with new RL agent")
+            logger.info("Starting with new RL agent")
         
         RL_DETECTOR_AVAILABLE = True
-        print("🎉 RL Detector initialized successfully")
+        logger.info("RL Detector initialized successfully")
         return True
         
     except Exception as e:
-        print(f"❌ RL Detector not available: {e}")
+        logger.error(f"RL Detector not available: {e}")
         RL_DETECTOR_AVAILABLE = False
         return False
         gem_detector = None
@@ -148,7 +151,7 @@ def fetch_and_add_new_symbol_data(symbol: str):
         import json
         from datetime import datetime
         
-        print(f"🔄 Fetching data for new symbol: {symbol}")
+        logger.info(f"Fetching data for new symbol: {symbol}")
         
         # First, get the CoinGecko ID for the symbol
         if not data_pipeline:
@@ -231,12 +234,12 @@ def fetch_and_add_new_symbol_data(symbol: str):
             # Reload analyzer with new data
             analyzer.load_data()
             
-            print(f"✅ Successfully added {symbol} data to live data file")
+            logger.info(f"Successfully added {symbol} data to live data file")
         else:
-            print(f"ℹ️ Symbol {symbol} already exists in live data")
+            logger.info(f"Symbol {symbol} already exists in live data")
             
     except Exception as e:
-        print(f"❌ Error fetching data for {symbol}: {e}")
+        logger.error(f"Error fetching data for {symbol}: {e}")
         raise
 
 app = Flask(__name__, 
