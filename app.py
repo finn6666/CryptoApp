@@ -40,11 +40,10 @@ def initialize_ml():
     print("🔧 Attempting to initialize ML components...")
     try:
         from ml.training_pipeline import CryptoMLPipeline
-        from services.ml_service import MLService
         
         print("📦 ML imports successful")
         ml_pipeline = CryptoMLPipeline()
-        ml_service = MLService()
+        ml_service = None  # ml_service removed - not needed
         ML_AVAILABLE = True
         
         print("🤖 ML objects created")
@@ -344,6 +343,10 @@ def get_stats():
 def get_coins():
     """Get coins data"""
     try:
+        # List of stablecoins to exclude
+        STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
+        MIN_PRICE = 0.00000001  # Minimum price threshold (1 satoshi equivalent)
+        
         # Get recently added symbols from data pipeline
         recently_added_coins = []
         if SYMBOLS_AVAILABLE and data_pipeline:
@@ -359,23 +362,29 @@ def get_coins():
         # Combine recently added coins with low cap coins (prioritize recently added)
         selected_coins = []
         
-        # First, add recently added coins under £100
+        # First, add recently added coins under £1, excluding stablecoins and very low prices
         for coin in recently_added_coins:
             if (coin not in selected_coins and 
-                (not coin.price or coin.price <= 125.0)):  # Under £100 equivalent
+                coin.symbol not in STABLECOINS and
+                coin.price and coin.price >= MIN_PRICE and
+                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
-        # Then add low cap coins under £100 (avoiding duplicates)
+        # Then add low cap coins under £1 (avoiding duplicates, stablecoins, and very low prices)
         for coin in low_cap_coins:
             if (coin not in selected_coins and len(selected_coins) < 25 and
-                (not coin.price or coin.price <= 125.0)):  # Under £100 equivalent
+                coin.symbol not in STABLECOINS and
+                coin.price and coin.price >= MIN_PRICE and
+                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
         # If still need more coins, get affordable top coins by score
         if len(selected_coins) < 15:
             # Get all coins sorted by attractiveness score
             all_affordable_coins = [coin for coin in analyzer.coins 
-                                  if not coin.price or coin.price <= 125.0]
+                                  if (coin.symbol not in STABLECOINS and
+                                      coin.price and coin.price >= MIN_PRICE and 
+                                      coin.price <= 1.25)]
             all_affordable_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
             
             for coin in all_affordable_coins:
@@ -667,6 +676,10 @@ def get_ml_prediction(symbol):
 def get_enhanced_coins():
     """Get coins data enhanced with ML predictions"""
     try:
+        # List of stablecoins to exclude
+        STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
+        MIN_PRICE = 0.00000001  # Minimum price threshold (1 satoshi equivalent)
+        
         # Get recently added symbols from data pipeline (same logic as /api/coins)
         recently_added_coins = []
         if SYMBOLS_AVAILABLE and data_pipeline:
@@ -682,23 +695,29 @@ def get_enhanced_coins():
         # Combine recently added coins with low cap coins (prioritize recently added)
         selected_coins = []
         
-        # First, add recently added coins under £100
+        # First, add recently added coins under £1, excluding stablecoins and very low prices
         for coin in recently_added_coins:
             if (coin not in selected_coins and 
-                (not coin.price or coin.price <= 125.0)):  # Under £100 equivalent
+                coin.symbol not in STABLECOINS and
+                coin.price and coin.price >= MIN_PRICE and
+                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
-        # Then add low cap coins under £100 (avoiding duplicates)
+        # Then add low cap coins under £1 (avoiding duplicates, stablecoins, and very low prices)
         for coin in low_cap_coins:
             if (coin not in selected_coins and len(selected_coins) < 25 and
-                (not coin.price or coin.price <= 125.0)):  # Under £100 equivalent
+                coin.symbol not in STABLECOINS and
+                coin.price and coin.price >= MIN_PRICE and
+                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
         # If still need more coins, get affordable top coins by score
         if len(selected_coins) < 15:
             # Get all coins sorted by attractiveness score
             all_affordable_coins = [coin for coin in analyzer.coins 
-                                  if not coin.price or coin.price <= 125.0]
+                                  if (coin.symbol not in STABLECOINS and
+                                      coin.price and coin.price >= MIN_PRICE and 
+                                      coin.price <= 1.25)]
             all_affordable_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
             
             for coin in all_affordable_coins:

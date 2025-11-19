@@ -42,14 +42,19 @@ class LiveDataFetcher:
             print(f"Error fetching trending coins: {e}")
             return []
     
-    def get_top_coins_by_market_cap(self, limit: int = 5) -> List[Dict]:
-        """Get top coins by market capitalization"""
+    def get_top_coins_by_market_cap(self, limit: int = 15) -> List[Dict]:
+        """Get top coins by market capitalization - filtered for low price and low cap"""
         try:
+            # List of stablecoins to exclude
+            STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 
+                          'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 
+                          'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
+            
             url = f"{self.coingecko_base_url}/coins/markets"
             params = {
                 'vs_currency': 'gbp',
                 'order': 'market_cap_desc',
-                'per_page': min(limit * 10, 250),  # Get 10x limit (max 250) to filter from
+                'per_page': 250,  # Get more coins to filter from
                 'page': 1,
                 'sparkline': False,
                 'price_change_percentage': '24h'
@@ -60,14 +65,31 @@ class LiveDataFetcher:
             
             all_coins = response.json()
             
-            # Filter for low cap coins (rank 50+ and market cap under $500M for better opportunities)
+            # Filter for TRUE low cap coins under £1 price - exclude stablecoins
+            # Looking for coins ranked 100+ with market cap under $100M and price under £1
             low_cap_coins = [
                 coin for coin in all_coins 
                 if coin.get('market_cap_rank') and 
-                coin.get('market_cap_rank') >= 50 and
+                coin.get('market_cap_rank') >= 100 and
                 coin.get('market_cap') and 
-                coin.get('market_cap') < 500_000_000  # Under $500 million market cap for better low cap focus
+                coin.get('market_cap') < 100_000_000 and  # Under $100M market cap - true low caps
+                coin.get('current_price') and
+                coin.get('current_price') <= 1.0 and  # Under £1
+                coin.get('symbol', '').upper() not in STABLECOINS  # Exclude stablecoins
             ]
+            
+            # If we don't have enough, gradually relax market cap but keep price and stablecoin filters
+            if len(low_cap_coins) < limit:
+                low_cap_coins = [
+                    coin for coin in all_coins 
+                    if coin.get('market_cap_rank') and 
+                    coin.get('market_cap_rank') >= 80 and
+                    coin.get('market_cap') and 
+                    coin.get('market_cap') < 250_000_000 and  # Under $250M
+                    coin.get('current_price') and
+                    coin.get('current_price') <= 1.0 and
+                    coin.get('symbol', '').upper() not in STABLECOINS
+                ]
             
             return low_cap_coins[:limit]
             
@@ -76,10 +98,10 @@ class LiveDataFetcher:
             return []
     
     def get_gainers_and_losers(self, limit: int = 10) -> Dict[str, List[Dict]]:
-        """Get biggest gainers and losers in 24h"""
+        """Get biggest gainers and losers in 24h under £1"""
         try:
-            # Get a smaller set of coins to find gainers/losers
-            coins = self.get_top_coins_by_market_cap(20)  # Reduced from 100 to 20
+            # Get low cap coins which are already filtered to under £1
+            coins = self.get_top_coins_by_market_cap(30)  # Get more to have a better selection
             
             # Filter and sort (handle None values)
             valid_coins = [coin for coin in coins 
@@ -102,15 +124,20 @@ class LiveDataFetcher:
             return {'gainers': [], 'losers': []}
     
     def get_new_listings(self) -> List[Dict]:
-        """Get recently listed coins with low market caps"""
+        """Get recently listed coins with low market caps under £1"""
         try:
+            # List of stablecoins to exclude
+            STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 
+                          'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 
+                          'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
+            
             # Get coins and filter by recent addition (approximate)
             url = f"{self.coingecko_base_url}/coins/markets"
             params = {
                 'vs_currency': 'gbp',
                 'order': 'market_cap_desc',
-                'per_page': 50,  # Reduced from 250 to 50
-                'page': 2,  # Get coins from page 2 for smaller caps
+                'per_page': 250,
+                'page': 1,
                 'sparkline': False
             }
             
@@ -119,14 +146,18 @@ class LiveDataFetcher:
             
             coins = response.json()
             
-            # Filter for very small market caps (potential gems) - more aggressive low cap focus
+            # Filter for small market caps (potential gems) under £1 - exclude stablecoins
+            # Looking for coins ranked 150+ with market cap under $50M and price under £1
             small_cap_coins = [coin for coin in coins 
                              if coin.get('market_cap_rank') and 
-                             coin.get('market_cap_rank') > 200 and
+                             coin.get('market_cap_rank') >= 150 and
                              coin.get('market_cap') and
-                             coin.get('market_cap') < 50_000_000]  # Under $50M market cap for true gems
+                             coin.get('market_cap') < 50_000_000 and  # Under $50M market cap - micro caps
+                             coin.get('current_price') and
+                             coin.get('current_price') <= 1.0 and  # Under £1
+                             coin.get('symbol', '').upper() not in STABLECOINS]
             
-            return small_cap_coins[:10]  # Increased to get more low cap opportunities
+            return small_cap_coins[:15]
             
         except requests.RequestException as e:
             print(f"Error fetching small cap coins: {e}")
@@ -138,7 +169,7 @@ class LiveDataFetcher:
         
         # Market cap ranking bonus (heavily weighted for low cap preference)
         rank = coin_data.get('market_cap_rank')
-        market_cap = coin_data.get('market_cap', 0)
+        market_cap = coin_data.get('market_cap', 0) or 0
         
         # Heavily reward smaller market caps (this is our main focus)
         if market_cap < 5_000_000:  # Under $5M - true micro cap gems
@@ -159,7 +190,7 @@ class LiveDataFetcher:
             score -= 1.0  # Penalize larger caps as we want low cap focus
         
         # Price change bonus/penalty (more aggressive for low caps)
-        price_change = coin_data.get('price_change_percentage_24h', 0)
+        price_change = coin_data.get('price_change_percentage_24h', 0) or 0
         if price_change > 20:
             score += 2.0  # Major pump
         elif price_change > 10:
@@ -177,7 +208,7 @@ class LiveDataFetcher:
         
         # Volume/Market cap ratio (liquidity indicator) - crucial for low caps
         if market_cap > 0:
-            volume = coin_data.get('total_volume', 0)
+            volume = coin_data.get('total_volume', 0) or 0
             volume_ratio = volume / market_cap
             if volume_ratio > 0.5:  # Very high trading activity
                 score += 1.5
@@ -196,7 +227,7 @@ class LiveDataFetcher:
         highlights = []
         
         # Market cap analysis
-        market_cap = coin_data.get('market_cap', 0)
+        market_cap = coin_data.get('market_cap', 0) or 0
         if market_cap < 10_000_000:  # Under $10M
             highlights.append("Micro cap gem")
         elif market_cap < 50_000_000:  # Under $50M
@@ -207,7 +238,7 @@ class LiveDataFetcher:
             highlights.append("Mid-small cap")
         
         # Price performance
-        price_change = coin_data.get('price_change_percentage_24h', 0)
+        price_change = coin_data.get('price_change_percentage_24h', 0) or 0
         if price_change > 50:
             highlights.append("Explosive growth")
         elif price_change > 20:
@@ -222,7 +253,7 @@ class LiveDataFetcher:
             highlights.append("Potential buy the dip")
         
         # Volume analysis
-        volume = coin_data.get('total_volume', 0)
+        volume = coin_data.get('total_volume', 0) or 0
         if market_cap > 0:
             volume_ratio = volume / market_cap
             if volume_ratio > 0.5:
@@ -290,14 +321,14 @@ class LiveDataFetcher:
         # Add small delays to respect API rate limits
         time.sleep(0.5)
         
-        # Get different categories of low cap coins
-        low_cap_coins_data = self.get_top_coins_by_market_cap(5)
+        # Get different categories of low cap coins (increased limits)
+        low_cap_coins_data = self.get_top_coins_by_market_cap(15)
         time.sleep(1)
         
-        trending_data = self.get_trending_coins(3)  # Reduced from 10 to 3
+        trending_data = self.get_trending_coins(5)
         time.sleep(1)
         
-        gainers_losers = self.get_gainers_and_losers(3)  # Reduced from 10 to 3
+        gainers_losers = self.get_gainers_and_losers(5)
         time.sleep(1)
         
         small_cap_data = self.get_new_listings()
@@ -308,8 +339,8 @@ class LiveDataFetcher:
         gainers = self.convert_to_coin_objects(gainers_losers['gainers'], CoinStatus.CURRENT)
         small_caps = self.convert_to_coin_objects(small_cap_data, CoinStatus.NEW)
         
-        # Combine all low cap coins (limit total)
-        all_low_caps = (low_cap_coins + small_caps)[:10]  # Limit total to 10
+        # Combine all low cap coins under £1 (increased limit)
+        all_low_caps = (low_cap_coins + small_caps + gainers + trending_coins)[:25]
         
         return {
             'top_coins': low_cap_coins,
