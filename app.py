@@ -1557,5 +1557,15 @@ def rl_train():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    # Run the Flask app on port 5001 to avoid macOS Control Center conflict
-    app.run(debug=True, host='127.0.0.1', port=5001)
+    # Simple, configurable runner
+    # Defaults: host 0.0.0.0 so it can be reached externally on a VM,
+    #           port 5001 (avoids macOS Control Center conflict),
+    #           debug False (safer for public exposure)
+    host = os.environ.get('HOST', '0.0.0.0')
+    try:
+        port = int(os.environ.get('PORT', '5001'))
+    except ValueError:
+        port = 5001
+    debug = os.environ.get('DEBUG', 'false').lower() in ('1', 'true', 'yes')
+
+    app.run(host=host, port=port, debug=debug)
