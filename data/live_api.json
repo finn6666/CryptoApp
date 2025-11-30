@@ -2,11 +2,143 @@
   "coins": [
     {
       "item": {
-        "id": "concordium",
-        "name": "Concordium",
-        "symbol": "CCD",
+        "id": "zksync",
+        "name": "ZKsync",
+        "symbol": "ZK",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 207,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.02871162,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -1.62945
+          },
+          "market_cap": "\u00a3246,639,328",
+          "total_volume": "\u00a313,110,486",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "usx",
+        "name": "USX",
+        "symbol": "USX",
         "status": "current",
         "attractiveness_score": 4.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Low liquidity risk",
+          "Decent volume"
+        ],
+        "market_cap_rank": 209,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.754874,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -0.09003
+          },
+          "market_cap": "\u00a3243,317,995",
+          "total_volume": "\u00a31,784,085",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "vaulta",
+        "name": "Vaulta",
+        "symbol": "A",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 210,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.151312,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -1.05132
+          },
+          "market_cap": "\u00a3242,953,336",
+          "total_volume": "\u00a315,470,147",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "monad",
+        "name": "Monad",
+        "symbol": "MON",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Potential buy the dip",
+          "High trading volume"
+        ],
+        "market_cap_rank": 212,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.02198977,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -13.66177
+          },
+          "market_cap": "\u00a3239,713,059",
+          "total_volume": "\u00a3354,531,466",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "decentraland",
+        "name": "Decentraland",
+        "symbol": "MANA",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 213,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.124211,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -1.09087
+          },
+          "market_cap": "\u00a3238,440,099",
+          "total_volume": "\u00a313,064,061",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "swissborg",
+        "name": "SwissBorg",
+        "symbol": "BORG",
+        "status": "current",
+        "attractiveness_score": 5.0,
         "investment_highlights": [
           "Mid-small cap",
           "Low liquidity risk"
@@ -15,66 +147,13 @@
         "price_btc": null,
         "risk_level": "high",
         "data": {
-          "price": 0.02122071,
+          "price": 0.242043,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "gbp": -4.82319
+            "gbp": 3.75068
           },
-          "market_cap": "\u00a3248,997,722",
-          "total_volume": "\u00a3910,392",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "apecoin",
-        "name": "ApeCoin",
-        "symbol": "APE",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 216,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.271769,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -1.03359
-          },
-          "market_cap": "\u00a3247,592,168",
-          "total_volume": "\u00a336,418,038",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "falcon-finance-ff",
-        "name": "Falcon Finance",
-        "symbol": "FF",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Active trading",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 218,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.103759,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -0.09921
-          },
-          "market_cap": "\u00a3242,665,873",
-          "total_volume": "\u00a367,995,289",
+          "market_cap": "\u00a3237,674,813",
+          "total_volume": "\u00a3377,814",
           "content": null
         }
       }
@@ -90,17 +169,176 @@
           "Mid-small cap",
           "Good liquidity"
         ],
+        "market_cap_rank": 217,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.023208,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -0.9354
+          },
+          "market_cap": "\u00a3235,097,221",
+          "total_volume": "\u00a325,803,928",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "vision-3",
+        "name": "Vision",
+        "symbol": "VSN",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Low liquidity risk",
+          "Decent volume"
+        ],
+        "market_cap_rank": 218,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.068203,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 0.56759
+          },
+          "market_cap": "\u00a3234,498,399",
+          "total_volume": "\u00a31,085,873",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "syrup",
+        "name": "Maple Finance",
+        "symbol": "SYRUP",
+        "status": "current",
+        "attractiveness_score": 5.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
         "market_cap_rank": 220,
         "price_btc": null,
         "risk_level": "high",
         "data": {
-          "price": 0.02371841,
+          "price": 0.202143,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "gbp": -1.00716
+            "gbp": -1.46758
           },
-          "market_cap": "\u00a3239,782,839",
-          "total_volume": "\u00a334,478,722",
+          "market_cap": "\u00a3230,054,888",
+          "total_volume": "\u00a312,463,327",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "hajimi",
+        "name": "Hajimi",
+        "symbol": "\u54c8\u57fa\u7c73",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Low liquidity risk",
+          "Decent volume"
+        ],
+        "market_cap_rank": 221,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.227701,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 2.08889
+          },
+          "market_cap": "\u00a3228,931,865",
+          "total_volume": "\u00a31,792,901",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "raydium",
+        "name": "Raydium",
+        "symbol": "RAY",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 223,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.843152,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 0.82233
+          },
+          "market_cap": "\u00a3226,189,542",
+          "total_volume": "\u00a318,935,296",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "janus-henderson-anemoy-treasury-fund",
+        "name": "Janus Henderson Anemoy Treasury Fund",
+        "symbol": "JTRSY",
+        "status": "current",
+        "attractiveness_score": 4.5,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Low liquidity risk",
+          "Low volume"
+        ],
+        "market_cap_rank": 225,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.819967,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": -0.07257
+          },
+          "market_cap": "\u00a3223,300,768",
+          "total_volume": null,
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "zebec-network",
+        "name": "Zebec Network",
+        "symbol": "ZBCN",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 228,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.00228694,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 0.19975
+          },
+          "market_cap": "\u00a3219,260,502",
+          "total_volume": "\u00a310,528,848",
           "content": null
         }
       }
@@ -111,60 +349,7 @@
         "name": "EigenCloud (prev. EigenLayer)",
         "symbol": "EIGEN",
         "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Active trading",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 226,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.535646,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -2.6998
-          },
-          "market_cap": "\u00a3235,236,359",
-          "total_volume": "\u00a362,557,617",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "humanity",
-        "name": "Humanity",
-        "symbol": "H",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 228,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.125597,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 0.16353
-          },
-          "market_cap": "\u00a3229,813,001",
-          "total_volume": "\u00a325,355,359",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "zebec-network",
-        "name": "Zebec Network",
-        "symbol": "ZBCN",
-        "status": "current",
-        "attractiveness_score": 6.0,
+        "attractiveness_score": 5.5,
         "investment_highlights": [
           "Mid-small cap",
           "Good liquidity"
@@ -173,77 +358,24 @@
         "price_btc": null,
         "risk_level": "high",
         "data": {
-          "price": 0.00242028,
+          "price": 0.449187,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "gbp": 2.60299
+            "gbp": -0.15578
           },
-          "market_cap": "\u00a3229,582,010",
-          "total_volume": "\u00a317,450,249",
+          "market_cap": "\u00a3217,707,401",
+          "total_volume": "\u00a319,920,887",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "walrus-2",
-        "name": "Walrus",
-        "symbol": "WAL",
+        "id": "falcon-finance-ff",
+        "name": "Falcon Finance",
+        "symbol": "FF",
         "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 230,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.151443,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -4.0414
-          },
-          "market_cap": "\u00a3228,994,789",
-          "total_volume": "\u00a317,320,023",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "janus-henderson-anemoy-treasury-fund",
-        "name": "Janus Henderson Anemoy Treasury Fund",
-        "symbol": "JTRSY",
-        "status": "current",
-        "attractiveness_score": 5.0,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Low liquidity risk",
-          "Low volume"
-        ],
-        "market_cap_rank": 232,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.824777,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 0.45193
-          },
-          "market_cap": "\u00a3225,015,732",
-          "total_volume": null,
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "ribbita-by-virtuals",
-        "name": "Ribbita by Virtuals",
-        "symbol": "TIBBIR",
-        "status": "current",
-        "attractiveness_score": 4.5,
+        "attractiveness_score": 6.0,
         "investment_highlights": [
           "Mid-small cap",
           "Good liquidity"
@@ -252,65 +384,13 @@
         "price_btc": null,
         "risk_level": "high",
         "data": {
-          "price": 0.224619,
+          "price": 0.089807,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "gbp": -5.38565
+            "gbp": 2.32322
           },
-          "market_cap": "\u00a3222,921,615",
-          "total_volume": "\u00a311,736,987",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "usx",
-        "name": "USX",
-        "symbol": "USX",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 234,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.760102,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 0.39965
-          },
-          "market_cap": "\u00a3222,007,090",
-          "total_volume": "\u00a320,815,746",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "origintrail",
-        "name": "OriginTrail",
-        "symbol": "TRAC",
-        "status": "current",
-        "attractiveness_score": 5.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Decent volume"
-        ],
-        "market_cap_rank": 235,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.433661,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -3.91932
-          },
-          "market_cap": "\u00a3217,116,674",
-          "total_volume": "\u00a35,233,001",
+          "market_cap": "\u00a3209,964,931",
+          "total_volume": "\u00a320,112,052",
           "content": null
         }
       }
@@ -321,127 +401,151 @@
         "name": "SwissBorg",
         "symbol": "BORG",
         "status": "current",
-        "attractiveness_score": 4.5,
+        "attractiveness_score": 5.0,
         "investment_highlights": [
           "Mid-small cap",
-          "Decent volume"
+          "Low liquidity risk"
         ],
-        "market_cap_rank": 238,
+        "market_cap_rank": 215,
         "price_btc": null,
         "risk_level": "high",
         "data": {
-          "price": 0.217151,
+          "price": 0.242043,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "gbp": -6.04039
+            "gbp": 3.75068
           },
-          "market_cap": "\u00a3213,390,955",
-          "total_volume": "\u00a32,877,963",
+          "market_cap": "\u00a3237,674,813",
+          "total_volume": "\u00a3377,814",
           "content": null
         }
       }
     },
     {
       "item": {
-        "id": "ethena-staked-ena",
-        "name": "Ethena Staked ENA",
-        "symbol": "SENA",
-        "status": "current",
-        "attractiveness_score": 3.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Low liquidity risk",
-          "Decent volume"
-        ],
-        "market_cap_rank": 239,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.221352,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -5.5678
-          },
-          "market_cap": "\u00a3211,686,806",
-          "total_volume": "\u00a31,355,336",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "wormhole",
-        "name": "Wormhole",
-        "symbol": "W",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 240,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.04229084,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": -4.66058
-          },
-          "market_cap": "\u00a3209,907,826",
-          "total_volume": "\u00a341,014,820",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "zebec-network",
-        "name": "Zebec Network",
-        "symbol": "ZBCN",
-        "status": "current",
-        "attractiveness_score": 6.0,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 229,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.00242028,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 2.60299
-          },
-          "market_cap": "\u00a3229,582,010",
-          "total_volume": "\u00a317,450,249",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "janus-henderson-anemoy-treasury-fund",
-        "name": "Janus Henderson Anemoy Treasury Fund",
-        "symbol": "JTRSY",
+        "id": "cheems-token",
+        "name": "Cheems Token",
+        "symbol": "CHEEMS",
         "status": "current",
         "attractiveness_score": 5.0,
         "investment_highlights": [
           "Mid-small cap",
           "Low liquidity risk",
-          "Low volume"
+          "Decent volume"
         ],
-        "market_cap_rank": 232,
+        "market_cap_rank": 244,
         "price_btc": null,
         "risk_level": "high",
         "data": {
-          "price": 0.824777,
+          "price": 9.46772e-07,
           "price_btc": null,
           "price_change_percentage_24h": {
-            "gbp": 0.45193
+            "gbp": 3.34761
           },
-          "market_cap": "\u00a3225,015,732",
+          "market_cap": "\u00a3192,831,785",
+          "total_volume": "\u00a31,124,629",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "walrus-2",
+        "name": "Walrus",
+        "symbol": "WAL",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 249,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.122829,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 2.89646
+          },
+          "market_cap": "\u00a3185,600,504",
+          "total_volume": "\u00a313,067,439",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "falcon-finance-ff",
+        "name": "Falcon Finance",
+        "symbol": "FF",
+        "status": "current",
+        "attractiveness_score": 6.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Good liquidity"
+        ],
+        "market_cap_rank": 233,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.089807,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 2.32322
+          },
+          "market_cap": "\u00a3209,964,931",
+          "total_volume": "\u00a320,112,052",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "hajimi",
+        "name": "Hajimi",
+        "symbol": "\u54c8\u57fa\u7c73",
+        "status": "current",
+        "attractiveness_score": 5.0,
+        "investment_highlights": [
+          "Mid-small cap",
+          "Low liquidity risk",
+          "Decent volume"
+        ],
+        "market_cap_rank": 221,
+        "price_btc": null,
+        "risk_level": "high",
+        "data": {
+          "price": 0.227701,
+          "price_btc": null,
+          "price_change_percentage_24h": {
+            "gbp": 2.08889
+          },
+          "market_cap": "\u00a3228,931,865",
+          "total_volume": "\u00a31,792,901",
+          "content": null
+        }
+      }
+    },
+    {
+      "item": {
+        "id": "monad",
+        "name": "Monad",
+        "symbol": "MON",
+        "status": "current",
+        "attractiveness_score": 8.0,
+        "investment_highlights": [
+          "Micro cap gem",
+          "Low volume"
+        ],
+        "market_cap_rank": 214,
+        "price_btc": 3.1859837388992493e-07,
+        "risk_level": "high",
+        "data": {
+          "price": null,
+          "price_btc": "3.1859837388992493e-07",
+          "price_change_percentage_24h": null,
+          "market_cap": null,
           "total_volume": null,
           "content": null
         }
@@ -449,78 +553,24 @@
     },
     {
       "item": {
-        "id": "usx",
-        "name": "USX",
-        "symbol": "USX",
+        "id": "pippin",
+        "name": "pippin",
+        "symbol": "PIPPIN",
         "status": "current",
-        "attractiveness_score": 6.0,
+        "attractiveness_score": 8.0,
         "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
+          "Micro cap gem",
+          "Low volume"
         ],
-        "market_cap_rank": 234,
-        "price_btc": null,
+        "market_cap_rank": 368,
+        "price_btc": 1.3148728714153247e-06,
         "risk_level": "high",
         "data": {
-          "price": 0.760102,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 0.39965
-          },
-          "market_cap": "\u00a3222,007,090",
-          "total_volume": "\u00a320,815,746",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "satoshi-stablecoin",
-        "name": "Satoshi Stablecoin",
-        "symbol": "SATUSD",
-        "status": "current",
-        "attractiveness_score": 5.0,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Low liquidity risk"
-        ],
-        "market_cap_rank": 250,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.755833,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 0.3618
-          },
-          "market_cap": "\u00a3194,978,752",
-          "total_volume": "\u00a3130,493",
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "humanity",
-        "name": "Humanity",
-        "symbol": "H",
-        "status": "current",
-        "attractiveness_score": 6.5,
-        "investment_highlights": [
-          "Mid-small cap",
-          "Good liquidity"
-        ],
-        "market_cap_rank": 228,
-        "price_btc": null,
-        "risk_level": "high",
-        "data": {
-          "price": 0.125597,
-          "price_btc": null,
-          "price_change_percentage_24h": {
-            "gbp": 0.16353
-          },
-          "market_cap": "\u00a3229,813,001",
-          "total_volume": "\u00a325,355,359",
+          "price": null,
+          "price_btc": "1.3148728714153247e-06",
+          "price_change_percentage_24h": null,
+          "market_cap": null,
+          "total_volume": null,
           "content": null
         }
       }
@@ -536,12 +586,12 @@
           "Micro cap gem",
           "Low volume"
         ],
-        "market_cap_rank": 20,
-        "price_btc": 0.005925858833598671,
-        "risk_level": "low",
+        "market_cap_rank": 27,
+        "price_btc": 0.004837967253936788,
+        "risk_level": "medium",
         "data": {
           "price": null,
-          "price_btc": "0.005925858833598671",
+          "price_btc": "0.004837967253936788",
           "price_change_percentage_24h": null,
           "market_cap": null,
           "total_volume": null,
@@ -575,69 +625,21 @@
     },
     {
       "item": {
-        "id": "starknet",
-        "name": "Starknet",
-        "symbol": "STRK",
+        "id": "pi-network",
+        "name": "Pi Network",
+        "symbol": "PI",
         "status": "current",
         "attractiveness_score": 8.0,
         "investment_highlights": [
           "Micro cap gem",
           "Low volume"
         ],
-        "market_cap_rank": 122,
-        "price_btc": 1.8053592496339197e-06,
-        "risk_level": "high",
-        "data": {
-          "price": null,
-          "price_btc": "1.8053592496339197e-06",
-          "price_change_percentage_24h": null,
-          "market_cap": null,
-          "total_volume": null,
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "aerodrome-finance",
-        "name": "Aerodrome Finance",
-        "symbol": "AERO",
-        "status": "current",
-        "attractiveness_score": 8.0,
-        "investment_highlights": [
-          "Micro cap gem",
-          "Low volume"
-        ],
-        "market_cap_rank": 123,
-        "price_btc": 8.97426847461667e-06,
-        "risk_level": "high",
-        "data": {
-          "price": null,
-          "price_btc": "8.97426847461667e-06",
-          "price_change_percentage_24h": null,
-          "market_cap": null,
-          "total_volume": null,
-          "content": null
-        }
-      }
-    },
-    {
-      "item": {
-        "id": "aster-2",
-        "name": "Aster",
-        "symbol": "ASTER",
-        "status": "current",
-        "attractiveness_score": 8.0,
-        "investment_highlights": [
-          "Micro cap gem",
-          "Low volume"
-        ],
-        "market_cap_rank": 59,
-        "price_btc": 1.1526066079003564e-05,
+        "market_cap_rank": 60,
+        "price_btc": 2.6896847096421837e-06,
         "risk_level": "medium",
         "data": {
           "price": null,
-          "price_btc": "1.1526066079003564e-05",
+          "price_btc": "2.6896847096421837e-06",
           "price_change_percentage_24h": null,
           "market_cap": null,
           "total_volume": null,

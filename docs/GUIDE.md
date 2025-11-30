@@ -27,11 +27,29 @@ export SMTP_PASSWORD="your-gmail-app-password"
 
 **Gmail App Password**: Google Account → Security → 2-Step Verification → App Passwords
 
-## Azure Deployment
+## DeepSeek AI Integration (Optional)
 
-### Recommended VM
-- **B2s** (2 vCPU, 4GB RAM) - $40/month - Best balance
-- **B1ms** (1 vCPU, 2GB RAM) - $15/month - Budget option
+Enhance gem detection with AI-powered sentiment analysis.
+
+**Setup:**
+1. Get API key from https://platform.deepseek.com/
+2. Add to `.env`: `DEEPSEEK_API_KEY=your-key-here`
+3. Restart application
+
+**Features:**
+- Market sentiment scoring (-1 to 1)
+- Technology assessment
+- Risk evaluation
+- 24-hour caching (reduces API calls)
+
+**Cost:** ~$0.60/month with caching
+
+**Usage:**
+- Automatically enhances gem scores when API key is configured
+- Adds up to ±20 points to gem score based on sentiment
+- Falls back gracefully if API unavailable
+
+## Azure Deployment
 
 ### Resource Usage
 - **ML Training**: 5-15 minutes, only runs on-demand
@@ -84,7 +102,7 @@ A: Yes! Weekly training is sufficient. Models learn from historical data.
 A: Optional for personal use, but recommended for safety before deployments.
 
 **Q: Can I use other AI models (DeepSeek)?**  
-A: Yes! DeepSeek API costs ~$0.60/month. Add to `ml/` for sentiment analysis.
+A: Yes! DeepSeek is now integrated. Get API key from https://platform.deepseek.com/ (~$0.60/month). See "DeepSeek AI Integration" section above.
 
 **Q: How do model files work?**  
 A: `.pkl` files save trained models to disk. Load once, predict many times.

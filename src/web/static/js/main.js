@@ -498,9 +498,13 @@ function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
 
 // ===== ML FUNCTIONS =====
 async function loadMLStatus() {
+    console.log('🔄 loadMLStatus() called');
     try {
+        console.log('📡 Fetching /api/ml/status...');
         const response = await fetch('/api/ml/status');
+        console.log('📊 Response received:', response.status, response.ok);
         const data = await response.json();
+        console.log('📦 Data:', data);
         
         let statusHtml = '';
         let showPanel = false;
@@ -560,19 +564,67 @@ async function loadMLStatus() {
         }
 
         const container = document.getElementById('mlStatusContent');
+        if (!container) {
+            console.error('❌ mlStatusContent element not found!');
+            return;
+        }
         container.innerHTML = statusHtml;
         document.getElementById('mlStatusContainer').style.display = showPanel ? 'block' : 'none';
+        console.log('✅ ML Status updated successfully');
         
     } catch (error) {
-        console.error('Error loading ML status:', error);
+        console.error('❌ Error loading ML status:', error);
+        console.error('Error details:', error.stack);
         const errorHtml = `
             <div class="ml-status-summary-row">
-                <span class="ml-chip bad">ML Error</span>
+                <span class="ml-chip bad">🔴 ML Error</span>
                 <span class="ml-chip">${error.message}</span>
             </div>
         `;
-        document.getElementById('mlStatusContent').innerHTML = errorHtml;
+        const container = document.getElementById('mlStatusContent');
+        if (container) {
+            container.innerHTML = errorHtml;
+        }
         document.getElementById('mlStatusContainer').style.display = 'block';
+        
+        // Show user-friendly notification
+        showStatus(`Failed to refresh ML status: ${error.message}`, 'error');
+    }
+}
+
+async function refreshMLStatus() {
+    console.log('🔄 refreshMLStatus() wrapper called');
+    const btn = document.getElementById('refreshMLBtn');
+    if (!btn) {
+        console.error('❌ refreshMLBtn button not found!');
+        return;
+    }
+    
+    // Disable button and show loading state
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '🔄 Refreshing...';
+    
+    try {
+        await loadMLStatus();
+        btn.innerHTML = '✅ Refreshed!';
+        showStatus('ML status refreshed successfully', 'success');
+        
+        // Reset button after 2 seconds
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
+    } catch (error) {
+        console.error('Error in refreshMLStatus wrapper:', error);
+        btn.innerHTML = '❌ Failed';
+        showStatus('Failed to refresh ML status', 'error');
+        
+        // Reset button after 2 seconds
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }, 2000);
     }
 }
 

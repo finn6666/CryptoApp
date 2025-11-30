@@ -155,6 +155,11 @@ class WeeklyReportGenerator:
                 price = opp.get('price', 'N/A')
                 risk = opp.get('risk_level', 'Unknown')
                 
+                # AI sentiment data
+                ai_sentiment = opp.get('ai_sentiment')
+                sentiment_boost = opp.get('sentiment_boost', 0)
+                ai_enabled = opp.get('ai_enabled', False)
+                
                 # Calculate estimated valuation
                 current_market_cap = opp.get('market_cap', 0)
                 estimated_potential = gem_score / 100  # Simple estimation
@@ -163,7 +168,7 @@ class WeeklyReportGenerator:
                 html += f"""
                 <div class="opportunity">
                     <div class="symbol">#{i} {opp['symbol']} - {opp['name']}</div>
-                    <div class="score">💎 Gem Score: {gem_score}%</div>
+                    <div class="score">💎 Gem Score: {gem_score}%{f' (+{round(sentiment_boost)} AI boost)' if ai_enabled and sentiment_boost > 0 else ''}</div>
                     
                     <div class="metric">
                         <span class="label">Current Price:</span> ${price if isinstance(price, str) else f'{price:.8f}'}
@@ -179,6 +184,8 @@ class WeeklyReportGenerator:
                     </div>
                     
                     {f'<div class="metric"><span class="label">Estimated Price Potential:</span> ${estimated_price:.8f} ({int(estimated_potential * 100)}% increase potential)</div>' if estimated_price else ''}
+                    
+                    {f'<div style="background-color: #f0f8ff; padding: 10px; border-radius: 5px; margin: 10px 0;"><strong>🤖 AI Sentiment:</strong> {ai_sentiment.get("reasoning", "")}<br><small>Confidence: {int(ai_sentiment.get("confidence", 0) * 100)}%</small></div>' if ai_enabled and ai_sentiment else ''}
                     
                     <div class="recommendation">
                         <strong>Analysis:</strong><br>

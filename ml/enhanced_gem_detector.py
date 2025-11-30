@@ -21,17 +21,21 @@ warnings.filterwarnings('ignore')
 # Import our advanced alpha features
 from .advanced_alpha_features import AdvancedAlphaFeatures
 
+# Import DeepSeek AI sentiment analyzer
+from .deepseek_analyzer import deepseek_analyzer
+
 class HiddenGemDetector:
     """
     Enhanced ML model specifically designed to identify hidden gems
     
-    Key Innovation: Uses advanced alpha features that detect opportunities
-    others miss by analyzing:
+    Key Innovation: Uses advanced alpha features + AI sentiment analysis to detect
+    opportunities others miss by analyzing:
     - Market psychology patterns (fear/greed contrarian signals)
     - Timing anomalies (market inefficiency windows)  
     - Cross-asset relationships (network effects)
     - Smart money vs crowd behavior patterns
     - Asymmetric risk-reward opportunities
+    - AI-powered sentiment analysis (DeepSeek integration)
     """
     
     def __init__(self, model_dir='models'):
@@ -45,6 +49,13 @@ class HiddenGemDetector:
         
         # Initialize advanced alpha feature extractor
         self.alpha_features = AdvancedAlphaFeatures()
+        
+        # Check AI sentiment availability
+        self.ai_enabled = deepseek_analyzer.is_available()
+        if self.ai_enabled:
+            print("✨ AI Sentiment Analysis: ENABLED (DeepSeek)")
+        else:
+            print("ℹ️  AI Sentiment Analysis: Disabled (using ML scores only)")
         
         # Create models directory if it doesn't exist
         os.makedirs(model_dir, exist_ok=True)
@@ -688,11 +699,20 @@ class HiddenGemDetector:
             top_features = self._get_top_contributing_features(features)
             risk_assessment = self._assess_investment_risk(features)
             
-            return {
+            # Base gem score from ML model
+            base_gem_score = float(probability[1] * 100)
+            
+            # Enhance with AI sentiment analysis
+            enhanced_data = deepseek_analyzer.enhance_gem_score(base_gem_score, coin_data)
+            
+            # Build result with both ML and AI insights
+            result = {
                 'is_hidden_gem': bool(prediction),
                 'gem_probability': float(probability[1]),
                 'confidence': float(max(probability)),
-                'gem_score': float(probability[1] * 100),  # 0-100 score
+                'gem_score': enhanced_data['enhanced_score'],  # AI-enhanced score
+                'base_gem_score': base_gem_score,  # Original ML score
+                'sentiment_boost': enhanced_data.get('sentiment_boost', 0),  # AI contribution
                 'risk_level': risk_assessment['level'],
                 'risk_score': risk_assessment['score'],
                 'key_strengths': feature_analysis['strengths'],
@@ -705,8 +725,12 @@ class HiddenGemDetector:
                     'technical_setup': features['breakout_potential'],
                     'innovation_score': features['technology_score'],
                     'community_strength': features['community_growth']
-                }
+                },
+                'ai_sentiment': enhanced_data.get('sentiment_analysis'),  # AI insights
+                'ai_enabled': enhanced_data.get('ai_enabled', False)
             }
+            
+            return result
             
         except Exception as e:
             print(f"❌ Error making prediction: {e}")
