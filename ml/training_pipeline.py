@@ -74,9 +74,13 @@ class CryptoMLPipeline:
             "model_type": "RandomForestRegressor" if self.model else None
         }
     
-    def load_existing_model(self, model_dir="/Users/finnbryant/Dev/CryptoApp/models"):
+    def load_existing_model(self, model_dir=None):
         """Load previously trained model"""
         try:
+            if model_dir is None:
+                project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                model_dir = os.path.join(project_root, 'models')
+            
             model_path = f"{model_dir}/crypto_model.pkl"
             scaler_path = f"{model_dir}/scaler.pkl"
             
@@ -260,8 +264,12 @@ class CryptoMLPipeline:
             logging.error(f"Failed to create sample data: {e}")
             raise
     
-    def export_model(self, model_dir="/Users/finnbryant/Dev/CryptoApp/models"):
+    def export_model(self, model_dir=None):
         """Export model to ONNX and joblib formats"""
+        if model_dir is None:
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            model_dir = os.path.join(project_root, 'models')
+        
         os.makedirs(model_dir, exist_ok=True)
         
         # Save scikit-learn model
@@ -363,7 +371,8 @@ class CryptoMLPipeline:
     def _check_model_files(self):
         """Check if model files exist and are accessible"""
         try:
-            model_dir = "/Users/finnbryant/Dev/CryptoApp/models"
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            model_dir = os.path.join(project_root, 'models')
             model_path = f"{model_dir}/crypto_model.pkl"
             scaler_path = f"{model_dir}/scaler.pkl"
             

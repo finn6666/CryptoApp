@@ -8,7 +8,9 @@ import aiohttp
 
 class CryptoDataPipeline:
     def __init__(self):
-        self.data_dir = "/Users/finnbryant/Dev/CryptoApp/data"
+        # Get project root dynamically
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.data_dir = os.path.join(project_root, 'data')
         self.supported_symbols = ["BTC", "ETH", "ADA", "SOL", "MATIC", "DOT", "BOSS"]
         self.coingecko_base = "https://api.coingecko.com/api/v3"
         self._coins_cache = None

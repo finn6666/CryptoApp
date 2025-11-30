@@ -70,9 +70,9 @@ class MLConfig:
     # Training schedule  
     retrain_schedule: str = "0 2 * * 0"  # Every Sunday at 2 AM - weekly retraining
     
-    # Model storage
-    model_dir: str = "/Users/finnbryant/Dev/CryptoApp/models"
-    data_dir: str = "/Users/finnbryant/Dev/CryptoApp/data"
+    # Model storage (default paths - will be resolved at runtime)
+    model_dir: str = "models"  # Relative to project root
+    data_dir: str = "data"     # Relative to project root
     
     # Monitoring (optional - for production deployments)
     alert_email: Optional[str] = None

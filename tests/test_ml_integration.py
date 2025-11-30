@@ -5,7 +5,10 @@ import tempfile
 import os
 from unittest.mock import Mock, patch
 import sys
-sys.path.append('/Users/finnbryant/Dev/CryptoApp')
+
+# Add project root to path dynamically
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
 from ml.training_pipeline import CryptoMLPipeline
 from services.ml_service import MLService

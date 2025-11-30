@@ -13,7 +13,12 @@ from typing import List, Dict, Optional
 import logging
 
 class WeeklyReportGenerator:
-    def __init__(self, data_dir="/Users/finnbryant/Dev/CryptoApp/data"):
+    def __init__(self, data_dir=None):
+        # Get project root dynamically
+        if data_dir is None:
+            project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            data_dir = os.path.join(project_root, 'data')
+        
         self.data_dir = data_dir
         self.history_file = os.path.join(data_dir, "weekly_report_history.json")
         self.logger = logging.getLogger(__name__)
