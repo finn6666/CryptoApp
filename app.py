@@ -433,6 +433,8 @@ def get_coins():
                         if gem_result:
                             coin_data['is_hidden_gem'] = gem_result.get('prediction', 0) > 0.6
                             coin_data['gem_probability'] = gem_result.get('prediction', 0)
+                            coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')  # Add AI sentiment
+                            coin_data['sentiment_boost'] = gem_result.get('sentiment_boost', 0)
                             if coin_data['is_hidden_gem']:
                                 coin_data['gem_reason'] = gem_result.get('recommendation', 'High potential detected')
                 except Exception as e:

@@ -12,22 +12,18 @@
         <div class="header">
             <div class="refresh-controls">
                 <div class="refresh-status">
-                    <div>Last updated: <span class="last-updated" id="lastUpdated">Loading...</span></div>
-                    <div>Next refresh: <span id="nextRefresh">-</span></div>
+                    <div>Last: <span class="last-updated" id="lastUpdated">Loading...</span></div>
+                    <div>Next: <span id="nextRefresh">-</span></div>
                 </div>
                 <button class="btn" onclick="toggleSymbolSearch()" id="symbolToggleBtn">
                     🔍 Add Symbol
                 </button>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">
-                    🔄 Refresh Now
+                    🔄 Refresh
                 </button>
             </div>
             <h1>🚀 Crypto Investment Dashboard</h1>
-            <p>AI-powered cryptocurrency analysis and hidden gem detection</p>
-            <p>Smaller Cap Cryptocurrencies focus</p>
-            <p style="margin-top: 10px; font-size: 0.9em; color: #888;">
-                Updated every 5 minutes
-            </p>
+            <p>AI-powered analysis • Hidden gems • Low-cap focus • Auto-updates every 5 min</p>
         </div>
 
         <!-- Status Toast Container -->
@@ -56,7 +52,7 @@
                 </div>
                 <div class="ml-controls">
                     <button class="refresh-btn" onclick="trainMLModel()" id="trainBtn">
-                        🎯 Train Model (Demo)
+                        🎯 Train ML Model
                     </button>
                     <button class="refresh-btn" onclick="refreshMLStatus()" id="refreshMLBtn">
                         🔄 Refresh ML Status
@@ -105,6 +101,13 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=5"></script>
+    <!-- Modular JavaScript -->
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/main-new.js') }}?v=6"></script>
 </body>
 </html>
