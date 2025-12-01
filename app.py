@@ -507,12 +507,17 @@ def get_coins():
                 # Remove currency symbols and commas
                 market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', ''))
             
+            # Convert volume from string if needed
+            volume_value = getattr(matching_coin, 'total_volume', 0)
+            if isinstance(volume_value, str):
+                volume_value = float(volume_value.replace('£', '').replace('$', '').replace(',', ''))
+            
             coin_dict = {
                 'symbol': matching_coin.symbol,
                 'name': matching_coin.name,
                 'price': matching_coin.price or 0,
                 'market_cap': market_cap_value or 0,
-                'volume_24h': getattr(matching_coin, 'total_volume', 0),
+                'volume_24h': volume_value or 0,
                 'price_change_24h': matching_coin.price_change_24h or 0,
                 'market_cap_rank': matching_coin.market_cap_rank
             }
@@ -693,12 +698,17 @@ def get_favorites():
                         # Remove currency symbols and commas
                         market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', ''))
                     
+                    # Convert volume from string if needed
+                    volume_value = getattr(coin, 'total_volume', 0)
+                    if isinstance(volume_value, str):
+                        volume_value = float(volume_value.replace('£', '').replace('$', '').replace(',', ''))
+                    
                     coin_dict = {
                         'symbol': coin.symbol,
                         'name': coin.name,
                         'price': coin.price or 0,
                         'market_cap': market_cap_value or 0,
-                        'volume_24h': getattr(coin, 'total_volume', 0),
+                        'volume_24h': volume_value or 0,
                         'price_change_24h': coin.price_change_24h or 0,
                         'market_cap_rank': coin.market_cap_rank
                     }
@@ -707,8 +717,14 @@ def get_favorites():
                     analysis_done = False
                     if RL_DETECTOR_AVAILABLE and rl_detector and not analysis_done:
                         try:
+                            # Calculate total market cap with string handling
+                            def safe_float(val):
+                                if isinstance(val, str):
+                                    return float(val.replace('£', '').replace('$', '').replace(',', ''))
+                                return float(val or 0)
+                            
                             market_context = {
-                                'total_market_cap': sum(float(c.market_cap or 0) for c in analyzer.coins if c.market_cap),
+                                'total_market_cap': sum(safe_float(c.market_cap) for c in analyzer.coins if c.market_cap),
                                 'market_sentiment': 'neutral',
                                 'btc_dominance': 45.0
                             }
