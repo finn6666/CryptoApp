@@ -852,6 +852,45 @@ def initialize_ml_endpoint():
 
 # Symbol Management API Endpoints
 
+@app.route('/api/search', methods=['POST'])
+def search_coins():
+    """Simple search endpoint for frontend - searches for coins by symbol/name"""
+    if not SYMBOLS_AVAILABLE or not data_pipeline:
+        return jsonify({
+            'success': False,
+            'error': 'Search service not available. Please try again later.'
+        })
+    
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip()
+        
+        if not query:
+            return jsonify({
+                'success': False,
+                'error': 'Please enter a search term'
+            })
+        
+        # Use asyncio to run the async search function
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            results = loop.run_until_complete(data_pipeline.search_symbols(query, limit=20))
+        finally:
+            loop.close()
+        
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Search error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Search failed: {str(e)}'
+        })
+
 @app.route('/api/symbols/search', methods=['GET'])
 def search_symbols():
     """Search for symbols matching a query"""
