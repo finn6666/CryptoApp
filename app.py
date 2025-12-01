@@ -414,8 +414,12 @@ def get_stats():
 
 @app.route('/api/coins')
 def get_coins():
-    """Get coins data"""
+    """Get coins data (excluding favorites)"""
     try:
+        # Get favorites to exclude from live list
+        favorites = load_favorites()
+        favorites_upper = [f.upper() for f in favorites]
+        
         # List of stablecoins to exclude
         STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
         MIN_PRICE = 0.00000001  # Minimum price threshold (1 satoshi equivalent)
@@ -435,27 +439,30 @@ def get_coins():
         # Combine recently added coins with low cap coins (prioritize recently added)
         selected_coins = []
         
-        # First, add recently added coins under £1, excluding stablecoins and very low prices
+        # First, add recently added coins under £1, excluding stablecoins, favorites, and very low prices
         for coin in recently_added_coins:
             if (coin not in selected_coins and 
+                coin.symbol.upper() not in favorites_upper and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
                 coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
-        # Then add low cap coins under £1 (avoiding duplicates, stablecoins, and very low prices)
+        # Then add low cap coins under £1 (avoiding duplicates, favorites, stablecoins, and very low prices)
         for coin in low_cap_coins:
             if (coin not in selected_coins and len(selected_coins) < 25 and
+                coin.symbol.upper() not in favorites_upper and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
                 coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
-        # If still need more coins, get affordable top coins by score
+        # If still need more coins, get affordable top coins by score (excluding favorites)
         if len(selected_coins) < 15:
             # Get all coins sorted by attractiveness score
             all_affordable_coins = [coin for coin in analyzer.coins 
-                                  if (coin.symbol not in STABLECOINS and
+                                  if (coin.symbol.upper() not in favorites_upper and
+                                      coin.symbol not in STABLECOINS and
                                       coin.price and coin.price >= MIN_PRICE and 
                                       coin.price <= 1.25)]
             all_affordable_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
@@ -838,26 +845,42 @@ def remove_favorite():
 def get_ml_status():
     """Get ML model status and information"""
     try:
-        print(f"🔍 ML Status Check - ML_AVAILABLE: {ML_AVAILABLE}, ml_pipeline: {ml_pipeline}")
+        logger.info(f"🔍 ML Status Check - ML_AVAILABLE: {ML_AVAILABLE}, ml_pipeline: {ml_pipeline}")
         
         if not ML_AVAILABLE or ml_pipeline is None:
+            # Try to provide helpful error info
+            error_details = {
+                'error': 'ML components not available',
+                'ML_AVAILABLE': ML_AVAILABLE,
+                'ml_pipeline_exists': ml_pipeline is not None,
+                'suggestion': 'Click "Train ML Model" to initialize and train the model',
+                'gem_detector_available': GEM_DETECTOR_AVAILABLE,
+                'rl_detector_available': RL_DETECTOR_AVAILABLE
+            }
+            
+            # Check if ML dependencies might be missing
+            try:
+                import sklearn
+                import pandas as pd
+                import numpy as np
+                error_details['dependencies_ok'] = True
+            except ImportError as ie:
+                error_details['dependencies_ok'] = False
+                error_details['missing_dependency'] = str(ie)
+            
             return jsonify({
-                'ml_status': {
-                    'error': 'ML components not available',
-                    'ML_AVAILABLE': ML_AVAILABLE,
-                    'ml_pipeline_exists': ml_pipeline is not None
-                },
+                'ml_status': error_details,
                 'service_available': False
             })
             
         status = ml_pipeline.get_status()
-        print(f"📊 ML Status: {status}")
+        logger.info(f"📊 ML Status: {status}")
         return jsonify({
             'ml_status': status,
             'service_available': True
         })
     except Exception as e:
-        print(f"❌ ML Status Error: {e}")
+        logger.error(f"❌ ML Status Error: {e}", exc_info=True)
         return jsonify({
             'ml_status': {'error': str(e)},
             'service_available': False
@@ -1038,12 +1061,17 @@ def train_ml_model():
     try:
         logger.info("🎯 ML Training requested")
         
+        # Try to initialize ML if not available
         if not ML_AVAILABLE or ml_pipeline is None:
-            logger.error("ML components not available")
-            return jsonify({
-                'success': False,
-                'error': 'ML components not available. Please restart the service.'
-            }), 503
+            logger.warning("ML not initialized on startup, attempting to initialize now...")
+            init_success = initialize_ml()
+            if not init_success:
+                logger.error("ML initialization failed")
+                return jsonify({
+                    'success': False,
+                    'error': 'ML components not available. Please check server logs or restart the service.'
+                }), 503
+            logger.info("ML components initialized successfully")
             
         if not os.path.exists('models'):
             os.makedirs('models')
