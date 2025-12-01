@@ -6,6 +6,9 @@ import os
 import json
 import asyncio
 import logging
+import threading
+import time
+import signal
 
 # Configure logging for production
 logging.basicConfig(
@@ -140,8 +143,6 @@ def initialize_rl_detector():
     except Exception as e:
         logger.error(f"RL Detector not available: {e}")
         RL_DETECTOR_AVAILABLE = False
-        return False
-        gem_detector = None
         return False
 
 def fetch_and_add_new_symbol_data(symbol: str):
@@ -278,6 +279,42 @@ def fetch_and_add_new_symbol_data(symbol: str):
 app = Flask(__name__, 
            template_folder='src/web/templates',
            static_folder='src/web/static')
+
+# Auto-shutdown after idle time
+IDLE_TIMEOUT = 300  # 5 minutes in seconds
+last_request_time = time.time()
+shutdown_enabled = os.environ.get('AUTO_SHUTDOWN', 'true').lower() in ('1', 'true', 'yes')
+
+def idle_monitor():
+    """Monitor for idle time and shutdown if no activity"""
+    global last_request_time
+    if not shutdown_enabled:
+        return
+    
+    while True:
+        time.sleep(30)  # Check every 30 seconds
+        idle_time = time.time() - last_request_time
+        
+        if idle_time > IDLE_TIMEOUT:
+            logger.info(f"🛑 No activity for {int(idle_time)}s. Shutting down to save resources...")
+            os.kill(os.getpid(), signal.SIGTERM)
+            break
+
+def update_activity():
+    """Update last activity time"""
+    global last_request_time
+    last_request_time = time.time()
+
+# Start idle monitor in background thread
+if shutdown_enabled:
+    monitor_thread = threading.Thread(target=idle_monitor, daemon=True)
+    monitor_thread.start()
+    logger.info(f"⏰ Auto-shutdown enabled: will stop after {IDLE_TIMEOUT}s ({IDLE_TIMEOUT//60} min) of idle time")
+
+@app.before_request
+def track_activity():
+    """Track all requests to reset idle timer"""
+    update_activity()
 
 # Favorites functionality
 FAVORITES_FILE = "data/favorites.json"
@@ -1646,6 +1683,22 @@ def rl_train():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/status/idle')
+def get_idle_status():
+    """Get current idle time and auto-shutdown status"""
+    idle_time = time.time() - last_request_time
+    return jsonify({
+        'auto_shutdown_enabled': shutdown_enabled,
+        'idle_timeout_seconds': IDLE_TIMEOUT,
+        'idle_timeout_minutes': IDLE_TIMEOUT // 60,
+        'current_idle_seconds': int(idle_time),
+        'current_idle_minutes': round(idle_time / 60, 1),
+        'time_until_shutdown_seconds': max(0, int(IDLE_TIMEOUT - idle_time)),
+        'time_until_shutdown_minutes': max(0, round((IDLE_TIMEOUT - idle_time) / 60, 1)),
+        'will_shutdown_in': f"{max(0, int(IDLE_TIMEOUT - idle_time))}s" if idle_time < IDLE_TIMEOUT else "imminent",
+        'last_activity': time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(last_request_time))
+    })
 
 @app.route('/health')
 def health():
