@@ -1095,12 +1095,100 @@ def get_enhanced_coins():
                 'price': coin.price,
                 'price_change_24h': coin.price_change_24h or 0,
                 'market_cap_rank': coin.market_cap_rank,
-                'recently_added': coin.symbol in [c.symbol for c in recently_added_coins],  # Add this flag
-                'ml_prediction': None
+                'recently_added': coin.symbol in [c.symbol for c in recently_added_coins],
+                'ai_analysis': None,
+                'enhanced_score': coin.attractiveness_score
             }
             
-            # Add ML prediction if model is available
-            if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded:
+            # Prepare coin dict for AI analysis (same as favorites)
+            market_cap_value = getattr(coin, 'market_cap', 0)
+            if isinstance(market_cap_value, str):
+                market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', ''))
+            
+            volume_value = getattr(coin, 'total_volume', 0)
+            if isinstance(volume_value, str):
+                volume_value = float(volume_value.replace('£', '').replace('$', '').replace(',', ''))
+            
+            coin_dict = {
+                'symbol': coin.symbol,
+                'name': coin.name,
+                'price': coin.price or 0,
+                'market_cap': market_cap_value or 0,
+                'volume_24h': volume_value or 0,
+                'price_change_24h': coin.price_change_24h or 0,
+                'market_cap_rank': coin.market_cap_rank
+            }
+            
+            # Try the three-tier AI analysis system (same as favorites)
+            analysis_done = False
+            
+            # Try RL analysis first
+            if RL_DETECTOR_AVAILABLE and rl_detector and not analysis_done:
+                try:
+                    def safe_float(val):
+                        if isinstance(val, str):
+                            return float(val.replace('£', '').replace('$', '').replace(',', ''))
+                        return float(val or 0)
+                    
+                    market_context = {
+                        'total_market_cap': sum(safe_float(c.market_cap) for c in analyzer.coins if c.market_cap),
+                        'market_sentiment': 'neutral',
+                        'btc_dominance': 45.0
+                    }
+                    rl_analysis = rl_detector.analyze_live_coin(coin_dict, market_context)
+                    
+                    recommendation = rl_analysis.get('rl_recommendation', 'hold').upper()
+                    confidence = rl_analysis.get('rl_confidence', 0) * 100
+                    reasoning = rl_analysis.get('rl_reasoning', '')
+                    
+                    coin_data['ai_analysis'] = {
+                        'recommendation': recommendation,
+                        'confidence': f"{confidence:.0f}%",
+                        'summary': reasoning,
+                        'risk_level': rl_analysis.get('risk_assessment', {}).get('risk_level', 'Medium'),
+                        'position_size': f"{rl_analysis.get('position_size_percent', 0):.1f}%",
+                        'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
+                        'analysis_type': 'RL Enhanced'
+                    }
+                    coin_data['enhanced_score'] = rl_analysis.get('gem_score', coin.attractiveness_score)
+                    analysis_done = True
+                except Exception as e:
+                    logger.warning(f"RL analysis failed for {coin.symbol}: {e}")
+            
+            # Try Gem Detector (fallback)
+            if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
+                try:
+                    gem_result = gem_detector.predict_hidden_gem(coin_dict)
+                    if gem_result:
+                        gem_prob = gem_result.get('gem_probability', 0)
+                        is_gem = gem_prob > 0.6
+                        
+                        strengths = gem_result.get('key_strengths', [])
+                        weaknesses = gem_result.get('key_weaknesses', [])
+                        
+                        summary_parts = []
+                        if is_gem:
+                            summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
+                        if strengths:
+                            summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
+                        if weaknesses:
+                            summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
+                        
+                        coin_data['ai_analysis'] = {
+                            'recommendation': 'BUY' if is_gem else 'WATCH',
+                            'confidence': f"{gem_prob*100:.0f}%",
+                            'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
+                            'risk_level': gem_result.get('risk_level', 'Medium'),
+                            'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                            'analysis_type': 'Gem Detector'
+                        }
+                        coin_data['enhanced_score'] = gem_result.get('gem_score', coin.attractiveness_score)
+                        analysis_done = True
+                except Exception as e:
+                    logger.warning(f"Gem detection failed for {coin.symbol}: {e}")
+            
+            # Basic ML prediction (last fallback)
+            if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded and not analysis_done:
                 try:
                     features = {
                         'price_change_1h': coin.price_change_24h or 0,
@@ -1114,29 +1202,30 @@ def get_enhanced_coins():
                     }
                     
                     ml_result = ml_pipeline.predict_with_validation(features)
-                    coin_data['ml_prediction'] = {
-                        'prediction_percentage': ml_result['prediction_percentage'],
-                        'confidence': ml_result['confidence'],
-                        'direction': 'bullish' if ml_result['prediction'] > 0 else 'bearish' if ml_result['prediction'] < 0 else 'stable'
+                    pred_pct = ml_result.get('prediction_percentage', 0)
+                    
+                    direction = 'bullish' if pred_pct > 2 else 'bearish' if pred_pct < -2 else 'neutral'
+                    recommendation = 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID'
+                    
+                    coin_data['ai_analysis'] = {
+                        'recommendation': recommendation,
+                        'confidence': f"{ml_result.get('confidence', 0)*100:.0f}%",
+                        'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
+                        'prediction': f"{pred_pct:+.1f}%",
+                        'analysis_type': 'ML Model'
                     }
                     
-                    # Enhance attractiveness score with ML prediction
-                    ml_weight = 0.3  # 30% weight for ML prediction
-                    original_weight = 0.7  # 70% weight for original score
-                    
-                    # Normalize ML prediction to 0-10 scale
-                    ml_contribution = min(10, max(0, 5 + ml_result['prediction_percentage'] / 2))
-                    
+                    # Enhance score with ML prediction
+                    ml_weight = 0.3
+                    original_weight = 0.7
+                    ml_contribution = min(10, max(0, 5 + pred_pct / 2))
                     coin_data['enhanced_score'] = (
                         original_weight * coin.attractiveness_score + 
                         ml_weight * ml_contribution
                     )
-                    
+                    analysis_done = True
                 except Exception as ml_error:
-                    logging.warning(f"ML prediction failed for {coin.symbol}: {ml_error}")
-                    coin_data['enhanced_score'] = coin.attractiveness_score
-            else:
-                coin_data['enhanced_score'] = coin.attractiveness_score
+                    logger.warning(f"ML prediction failed for {coin.symbol}: {ml_error}")
             
             coins_data.append(coin_data)
         
