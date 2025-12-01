@@ -1124,10 +1124,10 @@ def train_ml_model():
         training_result = ml_pipeline.train_model(sample_data_path)
         logger.info(f"Training complete: {training_result}")
         
-        # Save the trained model
-        model_save_path = os.path.join(project_root, 'models', 'ml_model.pkl')
-        ml_pipeline.save_model(model_save_path)
-        logger.info(f"Model saved to {model_save_path}")
+        # Export the trained model
+        models_dir = os.path.join(project_root, 'models')
+        ml_pipeline.export_model(models_dir)
+        logger.info(f"Model exported to {models_dir}")
         
         return jsonify({
             'success': True,
