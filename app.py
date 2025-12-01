@@ -442,8 +442,10 @@ def get_coins():
         
         # First, add recently added coins under £1, excluding stablecoins, favorites, and very low prices
         for coin in recently_added_coins:
+            if coin.symbol.upper() in favorites_upper:
+                logger.debug(f"Skipping {coin.symbol} - in favorites")
+                continue
             if (coin not in selected_coins and 
-                coin.symbol.upper() not in favorites_upper and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
                 coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
@@ -451,8 +453,10 @@ def get_coins():
         
         # Then add low cap coins under £1 (avoiding duplicates, favorites, stablecoins, and very low prices)
         for coin in low_cap_coins:
+            if coin.symbol.upper() in favorites_upper:
+                logger.debug(f"Skipping {coin.symbol} - in favorites")
+                continue
             if (coin not in selected_coins and len(selected_coins) < 25 and
-                coin.symbol.upper() not in favorites_upper and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
                 coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
@@ -939,8 +943,13 @@ def get_ml_prediction(symbol):
 
 @app.route('/api/coins/enhanced')
 def get_enhanced_coins():
-    """Get coins data enhanced with ML predictions"""
+    """Get coins data enhanced with ML predictions (excluding favorites)"""
     try:
+        # Get favorites to exclude from live list
+        favorites = load_favorites()
+        favorites_upper = [f.upper() for f in favorites]
+        logger.info(f"[Enhanced] Excluding favorites from live coins: {favorites_upper}")
+        
         # List of stablecoins to exclude
         STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
         MIN_PRICE = 0.00000001  # Minimum price threshold (1 satoshi equivalent)
@@ -960,27 +969,34 @@ def get_enhanced_coins():
         # Combine recently added coins with low cap coins (prioritize recently added)
         selected_coins = []
         
-        # First, add recently added coins under £1, excluding stablecoins and very low prices
+        # First, add recently added coins under £1, excluding stablecoins, favorites, and very low prices
         for coin in recently_added_coins:
+            if coin.symbol.upper() in favorites_upper:
+                logger.debug(f"[Enhanced] Skipping {coin.symbol} - in favorites")
+                continue
             if (coin not in selected_coins and 
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
                 coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
-        # Then add low cap coins under £1 (avoiding duplicates, stablecoins, and very low prices)
+        # Then add low cap coins under £1 (avoiding duplicates, favorites, stablecoins, and very low prices)
         for coin in low_cap_coins:
+            if coin.symbol.upper() in favorites_upper:
+                logger.debug(f"[Enhanced] Skipping {coin.symbol} - in favorites")
+                continue
             if (coin not in selected_coins and len(selected_coins) < 25 and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
                 coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
-        # If still need more coins, get affordable top coins by score
+        # If still need more coins, get affordable top coins by score (excluding favorites)
         if len(selected_coins) < 15:
             # Get all coins sorted by attractiveness score
             all_affordable_coins = [coin for coin in analyzer.coins 
-                                  if (coin.symbol not in STABLECOINS and
+                                  if (coin.symbol.upper() not in favorites_upper and
+                                      coin.symbol not in STABLECOINS and
                                       coin.price and coin.price >= MIN_PRICE and 
                                       coin.price <= 1.25)]
             all_affordable_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
@@ -1047,6 +1063,9 @@ def get_enhanced_coins():
         
         # Sort by enhanced score
         coins_data.sort(key=lambda x: x['enhanced_score'], reverse=True)
+        
+        returned_symbols = [c['symbol'] for c in coins_data]
+        logger.info(f"[Enhanced] Returning {len(coins_data)} live coins (excluded {len(favorites)} favorites): {returned_symbols}")
         
         return jsonify({
             'coins': coins_data,
