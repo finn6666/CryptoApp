@@ -176,24 +176,39 @@ async function trainMLModel() {
     btn.textContent = '🎯 Training...';
     btn.disabled = true;
     
-    showStatus('🎯 Starting ML model training...', 'info', 6000);
+    showStatus('🎯 Starting ML model training (this may take 30-60 seconds)...', 'info', 60000);
     
     try {
-        const response = await fetch('/api/ml/train', { method: 'POST' });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+        
+        const response = await fetch('/api/ml/train', { 
+            method: 'POST',
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         const data = await response.json();
         
-        if (!data.success) {
+        if (!response.ok || !data.success) {
             throw new Error(data.error || 'Training failed');
         }
         
-        showStatus(`✅ ${data.message}`, 'success', 5000);
+        showStatus(`✅ ${data.message} (Trained on ${data.rows_trained || 'multiple'} data points)`, 'success', 8000);
+        console.log('Training result:', data.training_result);
         
+        // Reload data to show ML predictions
         await loadMLStatus();
         await loadCoins();
         await loadFavorites();
         
     } catch (error) {
-        showStatus(`❌ Training failed: ${error.message}`, 'error', 6000);
+        if (error.name === 'AbortError') {
+            showStatus('⏱️ Training timed out. The model may still be training in the background.', 'warning', 8000);
+        } else {
+            showStatus(`❌ Training failed: ${error.message}`, 'error', 8000);
+        }
+        console.error('Training error:', error);
     } finally {
         btn.textContent = originalText;
         btn.disabled = false;

@@ -1036,34 +1036,44 @@ def get_enhanced_coins():
 def train_ml_model():
     """Trigger ML model training (for demo purposes)"""
     try:
+        logger.info("🎯 ML Training requested")
+        
         if not ML_AVAILABLE or ml_pipeline is None:
+            logger.error("ML components not available")
             return jsonify({
                 'success': False,
-                'error': 'ML components not available'
+                'error': 'ML components not available. Please restart the service.'
             }), 503
             
         if not os.path.exists('models'):
             os.makedirs('models')
+            logger.info("Created models directory")
         
+        logger.info("Creating sample training data...")
         # Create sample data for training
         sample_data_path = 'models/sample_training_data.csv'
         sample_df = ml_pipeline.create_sample_data(symbol="BTC", days=30)
         sample_df.to_csv(sample_data_path, index=False)
+        logger.info(f"Sample data created: {len(sample_df)} rows")
         
+        logger.info("Training model... (this may take 30-60 seconds)")
         # Train the model
         training_result = ml_pipeline.train_model(sample_data_path)
+        logger.info(f"Training complete: {training_result}")
         
         return jsonify({
             'success': True,
-            'message': 'Model trained successfully',
+            'message': 'Model trained successfully! Predictions are now available.',
             'training_result': training_result,
-            'status': ml_pipeline.get_status()
+            'status': ml_pipeline.get_status(),
+            'rows_trained': len(sample_df)
         })
         
     except Exception as e:
+        logger.error(f"ML training failed: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'Training failed: {str(e)}'
         }), 500
 
 @app.route('/api/ml/initialize', methods=['POST'])
