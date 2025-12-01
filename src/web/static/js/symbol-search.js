@@ -10,7 +10,7 @@ function toggleSymbolSearch() {
         document.getElementById('symbolSearchInput').focus();
     } else {
         container.style.display = 'none';
-        btn.textContent = '🔍 Add Symbol';
+        btn.textContent = '⭐ Add Favorite';
         document.getElementById('searchResults').innerHTML = '';
         document.getElementById('symbolSearchInput').value = '';
     }
@@ -76,21 +76,35 @@ async function searchSymbols() {
 
 async function addSymbol(symbol, name) {
     try {
-        showStatus(`Adding ${symbol}...`, 'info');
+        showStatus(`Adding ${symbol} to favorites...`, 'info');
         
-        const response = await fetch('/api/symbols/add', {
+        // Step 1: Add symbol to supported symbols (if not already tracked)
+        const addResponse = await fetch('/api/symbols/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ symbol: symbol })
         });
         
-        const data = await response.json();
+        const addData = await addResponse.json();
         
-        if (!data.success) {
-            throw new Error(data.error || 'Failed to add symbol');
+        if (!addData.success) {
+            throw new Error(addData.error || 'Failed to add symbol');
         }
         
-        showStatus(`✅ Added ${symbol} successfully!`, 'success');
+        // Step 2: Add to favorites
+        const favResponse = await fetch('/api/favorites/add', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbol: symbol })
+        });
+        
+        const favData = await favResponse.json();
+        
+        if (!favData.success) {
+            throw new Error(favData.error || 'Failed to add to favorites');
+        }
+        
+        showStatus(`✅ Added ${symbol} to favorites!`, 'success');
         
         toggleSymbolSearch();
         await refreshData();
