@@ -489,11 +489,14 @@ def get_favorites():
     try:
         favorites = load_favorites()
         favorite_coins = []
+        missing_coins = []
         
         for symbol in favorites:
             # Find the coin in our current data
+            found = False
             for coin in analyzer.coins:
                 if coin.symbol.upper() == symbol.upper():
+                    found = True
                     coin_data = {
                         'symbol': coin.symbol,
                         'name': coin.name,
@@ -546,15 +549,24 @@ def get_favorites():
                     
                     favorite_coins.append(coin_data)
                     break
+            
+            if not found:
+                missing_coins.append(symbol)
+                logger.warning(f"Favorite coin {symbol} not found in analyzer.coins - may need refresh")
+        
+        if missing_coins:
+            logger.info(f"Missing favorite coins (need refresh): {', '.join(missing_coins)}")
         
         ml_status = ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded
-        print(f"🔍 Favorites API - ML Enhanced: {ml_status}, Favorite coins count: {len(favorite_coins)}")
+        logger.info(f"🔍 Favorites API - ML Enhanced: {ml_status}, Favorite coins: {len(favorite_coins)}, Missing: {len(missing_coins)}")
         
         return jsonify({
             'favorites': favorite_coins,
-            'ml_enhanced': ml_status
+            'ml_enhanced': ml_status,
+            'missing_count': len(missing_coins)
         })
     except Exception as e:
+        logger.error(f"Error in get_favorites: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/favorites/add', methods=['POST'])

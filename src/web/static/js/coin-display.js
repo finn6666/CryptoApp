@@ -10,7 +10,7 @@ function generateCoinsTable(coins, mlEnabled = false) {
     coins.forEach((coin, index) => {
         const priceChange = coin.price_change_24h || 0;
         const priceChangeClass = priceChange >= 0 ? 'positive' : 'negative';
-        const priceChangeText = priceChange >= 0 ? `+${priceChange.toFixed(1)}%` : `${priceChange.toFixed(1)}%`;
+        const priceChangeText = priceChange >= 0 ? `+${priceChange.toFixed(1)}% (24h)` : `${priceChange.toFixed(1)}% (24h)`;
 
         const { displayScore, scorePercentage, scoreClass, scoreLabel } = getScoreInfo(coin.enhanced_score || coin.score);
         const price = formatPrice(coin.price);
@@ -75,7 +75,7 @@ function generateFavoritesTable(favorites, mlEnabled = false) {
     favorites.forEach((coin, index) => {
         const priceChange = coin.price_change_24h || 0;
         const priceChangeClass = priceChange >= 0 ? 'positive' : 'negative';
-        const priceChangeText = priceChange >= 0 ? `+${priceChange.toFixed(1)}%` : `${priceChange.toFixed(1)}%`;
+        const priceChangeText = priceChange >= 0 ? `+${priceChange.toFixed(1)}% (24h)` : `${priceChange.toFixed(1)}% (24h)`;
 
         const { displayScore, scorePercentage, scoreClass, scoreLabel } = getScoreInfo(coin.enhanced_score || coin.score);
         const price = formatPrice(coin.price);
