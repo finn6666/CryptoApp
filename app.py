@@ -891,9 +891,22 @@ def search_coins():
         finally:
             loop.close()
         
+        # Filter out coins that exist in analyzer but have no price data
+        # This prevents users from adding broken/migrated coins like old MATIC
+        filtered_results = []
+        for result in results:
+            symbol = result.get('symbol', '').upper()
+            # Check if coin is loaded and has valid price
+            coin = next((c for c in analyzer.coins if c.symbol == symbol), None)
+            if coin and (coin.price is None or coin.price == 0):
+                # Skip coins with no price data
+                logger.info(f"Filtering out {symbol} from search (no price data)")
+                continue
+            filtered_results.append(result)
+        
         return jsonify({
             'success': True,
-            'results': results
+            'results': filtered_results
         })
         
     except Exception as e:
