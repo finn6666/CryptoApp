@@ -501,11 +501,17 @@ def get_coins():
                 continue
             
             # Prepare coin dict for analysis
+            # Convert market_cap from string if needed (e.g. '£243,445,620' -> 243445620)
+            market_cap_value = getattr(matching_coin, 'market_cap', 0)
+            if isinstance(market_cap_value, str):
+                # Remove currency symbols and commas
+                market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', ''))
+            
             coin_dict = {
                 'symbol': matching_coin.symbol,
                 'name': matching_coin.name,
                 'price': matching_coin.price or 0,
-                'market_cap': getattr(matching_coin, 'market_cap', 0),
+                'market_cap': market_cap_value or 0,
                 'volume_24h': getattr(matching_coin, 'total_volume', 0),
                 'price_change_24h': matching_coin.price_change_24h or 0,
                 'market_cap_rank': matching_coin.market_cap_rank
@@ -681,11 +687,17 @@ def get_favorites():
                     }
                     
                     # Prepare coin dict for analysis
+                    # Convert market_cap from string if needed (e.g. '£243,445,620' -> 243445620)
+                    market_cap_value = getattr(coin, 'market_cap', 0)
+                    if isinstance(market_cap_value, str):
+                        # Remove currency symbols and commas
+                        market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', ''))
+                    
                     coin_dict = {
                         'symbol': coin.symbol,
                         'name': coin.name,
                         'price': coin.price or 0,
-                        'market_cap': getattr(coin, 'market_cap', 0),
+                        'market_cap': market_cap_value or 0,
                         'volume_24h': getattr(coin, 'total_volume', 0),
                         'price_change_24h': coin.price_change_24h or 0,
                         'market_cap_rank': coin.market_cap_rank
@@ -1111,6 +1123,11 @@ def train_ml_model():
         # Train the model
         training_result = ml_pipeline.train_model(sample_data_path)
         logger.info(f"Training complete: {training_result}")
+        
+        # Save the trained model
+        model_save_path = os.path.join(project_root, 'models', 'ml_model.pkl')
+        ml_pipeline.save_model(model_save_path)
+        logger.info(f"Model saved to {model_save_path}")
         
         return jsonify({
             'success': True,
