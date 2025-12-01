@@ -1,7 +1,72 @@
 // UI Components and HTML Generators
 
-// Generate AI sentiment HTML section
+// Generate AI analysis HTML section
 function generateAISentimentHTML(coin, coinId) {
+    // Check for new ai_analysis format
+    if (coin.ai_analysis) {
+        const analysis = coin.ai_analysis;
+        const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
+                                   analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
+        
+        return `
+            <div class="ai-sentiment-section">
+                <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}')">
+                    <span>🤖 ${analysis.analysis_type || 'AI Analysis'}</span>
+                    <span class="arrow">▼</span>
+                </button>
+                <div id="ai-sentiment-${coinId}" class="ml-reasoning-content" style="display: none;">
+                    <div class="ml-prediction-detail">
+                        <div class="prediction-row">
+                            <span class="label">Recommendation:</span>
+                            <span class="value ${recommendationClass}"><strong>${analysis.recommendation}</strong></span>
+                        </div>
+                        <div class="prediction-row">
+                            <span class="label">Confidence:</span>
+                            <span class="value">${analysis.confidence}</span>
+                        </div>
+                        ${analysis.summary ? `
+                            <div class="sentiment-reasoning">
+                                <strong>Analysis:</strong>
+                                <p>${analysis.summary}</p>
+                            </div>
+                        ` : ''}
+                        ${analysis.risk_level ? `
+                            <div class="prediction-row">
+                                <span class="label">Risk Level:</span>
+                                <span class="value">${analysis.risk_level}</span>
+                            </div>
+                        ` : ''}
+                        ${analysis.timing_score ? `
+                            <div class="prediction-row">
+                                <span class="label">Timing:</span>
+                                <span class="value">${analysis.timing_score}</span>
+                            </div>
+                        ` : ''}
+                        ${analysis.position_size ? `
+                            <div class="prediction-row">
+                                <span class="label">Position Size:</span>
+                                <span class="value">${analysis.position_size}</span>
+                            </div>
+                        ` : ''}
+                        ${analysis.gem_score ? `
+                            <div class="prediction-row">
+                                <span class="label">Gem Score:</span>
+                                <span class="value">${analysis.gem_score}</span>
+                            </div>
+                        ` : ''}
+                        ${analysis.prediction ? `
+                            <div class="prediction-row">
+                                <span class="label">Prediction:</span>
+                                <span class="value">${analysis.prediction}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Fallback to old ai_sentiment format
     if (!coin.ai_sentiment || !coin.ai_sentiment.key_points || coin.ai_sentiment.key_points.length === 0) {
         return '';
     }
@@ -55,55 +120,8 @@ function generateAISentimentHTML(coin, coinId) {
 
 // Generate ML reasoning HTML section
 function generateMLReasoningHTML(coin, coinId, mlEnabled) {
-    if (!mlEnabled) {
-        return '';
-    }
-
-    if (!coin.ml_prediction) {
-        return `
-            <div class="ml-reasoning-section">
-                <div class="ml-unavailable">
-                    <span>🤖 ML prediction not available</span>
-                    <small>Model needs training data</small>
-                </div>
-            </div>
-        `;
-    }
-
-    const pred = coin.ml_prediction;
-    const predClass = pred.direction === 'bullish' ? 'positive' : pred.direction === 'bearish' ? 'negative' : 'neutral';
-    const confidencePercent = (pred.confidence * 100).toFixed(0);
-    const confidenceClass = pred.confidence > 0.7 ? 'high' : pred.confidence > 0.4 ? 'medium' : 'low';
-    
-    return `
-        <div class="ml-reasoning-section">
-            <button class="ml-reasoning-toggle" onclick="toggleMLReasoning('${coinId}')">
-                <span>🤖 ML Analysis</span>
-                <span class="arrow">▼</span>
-            </button>
-            <div id="ml-reasoning-${coinId}" class="ml-reasoning-content" style="display: none;">
-                <div class="ml-prediction-detail">
-                    <div class="prediction-row">
-                        <span class="label">Prediction:</span>
-                        <span class="value ${predClass}">${pred.prediction_percentage > 0 ? '+' : ''}${pred.prediction_percentage}% (${pred.direction.toUpperCase()})</span>
-                    </div>
-                    <div class="prediction-row">
-                        <span class="label">Confidence:</span>
-                        <div class="confidence-bar">
-                            <div class="confidence-fill ${confidenceClass}" style="width: ${confidencePercent}%"></div>
-                            <span class="confidence-text">${confidencePercent}%</span>
-                        </div>
-                    </div>
-                    <div class="prediction-row">
-                        <span class="label">Direction:</span>
-                        <span class="direction-indicator ${predClass}">
-                            ${pred.direction === 'bullish' ? '📈 Bullish' : pred.direction === 'bearish' ? '📉 Bearish' : '➡️ Neutral'}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
+    // Don't show this section anymore - we're using ai_analysis now in generateAISentimentHTML
+    return '';
 }
 
 // Format price in GBP

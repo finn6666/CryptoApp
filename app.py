@@ -604,6 +604,9 @@ def get_coins():
             # Update score with AI insights
             coin_data['enhanced_score'] = ai_score
 
+        returned_symbols = [c['symbol'] for c in coins_data]
+        logger.info(f"Returning {len(coins_data)} live coins (excluded {len(favorites)} favorites): {returned_symbols}")
+        
         return jsonify({
             'coins': coins_data,
             'last_updated': datetime.now().isoformat(),
