@@ -580,14 +580,14 @@ def get_coins():
             if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded:
                 try:
                     features = {
-                        'price_change_1h': coin.price_change_24h or 0,
-                        'price_change_24h': coin.price_change_24h or 0,
+                        'price_change_1h': matching_coin.price_change_24h or 0,
+                        'price_change_24h': matching_coin.price_change_24h or 0,
                         'volume_change_24h': 0,
                         'market_cap_change_24h': 0,
                         'rsi': 50,
                         'macd': 0,
-                        'moving_avg_7d': coin.price or 0,
-                        'moving_avg_30d': coin.price or 0
+                        'moving_avg_7d': matching_coin.price or 0,
+                        'moving_avg_30d': matching_coin.price or 0
                     }
                     ml_result = ml_pipeline.predict_with_validation(features)
                     pred_pct = ml_result.get('prediction_percentage', 0)
