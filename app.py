@@ -906,6 +906,57 @@ def get_ml_status():
             'service_available': False
         }), 500
 
+@app.route('/api/debug/ml')
+def debug_ml_system():
+    """Comprehensive ML system diagnostics"""
+    try:
+        models_dir = os.path.join(project_root, 'models')
+        
+        debug_info = {
+            'ml_pipeline': {
+                'ML_AVAILABLE': ML_AVAILABLE,
+                'ml_pipeline_exists': ml_pipeline is not None,
+                'model_loaded': ml_pipeline.model_loaded if ml_pipeline else False,
+                'training_status': ml_pipeline.training_status if ml_pipeline else 'N/A',
+                'last_training_time': str(ml_pipeline.last_training_time) if ml_pipeline and ml_pipeline.last_training_time else None,
+            },
+            'gem_detector': {
+                'GEM_DETECTOR_AVAILABLE': GEM_DETECTOR_AVAILABLE,
+                'gem_detector_exists': gem_detector is not None,
+            },
+            'rl_detector': {
+                'RL_DETECTOR_AVAILABLE': RL_DETECTOR_AVAILABLE,
+                'rl_detector_exists': rl_detector is not None,
+            },
+            'model_files': {
+                'models_dir_exists': os.path.exists(models_dir),
+                'crypto_model_pkl': os.path.exists(os.path.join(models_dir, 'crypto_model.pkl')),
+                'scaler_pkl': os.path.exists(os.path.join(models_dir, 'scaler.pkl')),
+                'rl_model_pkl': os.path.exists(os.path.join(models_dir, 'rl_model.pkl')),
+            },
+            'analyzer': {
+                'total_coins': len(analyzer.coins),
+                'coins_with_price': len([c for c in analyzer.coins if c.price and c.price > 0]),
+            },
+            'recommendation': ''
+        }
+        
+        # Add recommendation based on status
+        if not ML_AVAILABLE:
+            debug_info['recommendation'] = 'ML system failed to initialize. Check server logs for import errors.'
+        elif ml_pipeline and not ml_pipeline.model_loaded:
+            debug_info['recommendation'] = 'ML pipeline initialized but no model loaded. Click "Train ML Model" button.'
+        elif not debug_info['model_files']['crypto_model_pkl']:
+            debug_info['recommendation'] = 'Model files missing. Train the model first.'
+        else:
+            debug_info['recommendation'] = 'System appears healthy. Check individual analyzer status.'
+            
+        return jsonify(debug_info)
+        
+    except Exception as e:
+        logger.error(f"Debug endpoint error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/ml/predict/<symbol>')
 def get_ml_prediction(symbol):
     """Get ML price prediction for a specific cryptocurrency"""
