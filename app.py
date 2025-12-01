@@ -1038,7 +1038,9 @@ def add_symbol():
         if success:
             # Immediately fetch data for the new symbol and add it to live data
             try:
+                logger.info(f"Adding symbol {symbol} - fetching data...")
                 fetch_and_add_new_symbol_data(symbol)
+                logger.info(f"Symbol {symbol} added successfully, analyzer has {len(analyzer.coins)} coins")
                 return jsonify({
                     'success': True,
                     'symbol': symbol,
@@ -1046,12 +1048,12 @@ def add_symbol():
                 })
             except Exception as e:
                 # Symbol was added to pipeline but data fetch failed
+                logger.error(f"Failed to fetch data for {symbol}: {e}", exc_info=True)
                 return jsonify({
-                    'success': True,
+                    'success': False,
                     'symbol': symbol,
-                    'message': f'Symbol {symbol} added successfully. Data will be available on next refresh.',
-                    'data_fetch_error': str(e)
-                })
+                    'error': f'Failed to fetch data for {symbol}: {str(e)}'
+                }), 500
         else:
             return jsonify({
                 'success': False,
@@ -1616,6 +1618,19 @@ def rl_train():
 def health():
     """Simple health check endpoint for load balancers and smoke tests"""
     return jsonify({'status': 'ok', 'time': datetime.now().isoformat()}), 200
+
+@app.route('/api/debug/coins')
+def debug_coins():
+    """Debug endpoint to see what coins are currently loaded"""
+    try:
+        coins_list = [{'symbol': coin.symbol, 'name': coin.name, 'price': coin.price} 
+                     for coin in analyzer.coins[:50]]  # First 50 coins
+        return jsonify({
+            'total_coins': len(analyzer.coins),
+            'coins': coins_list
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Simple, configurable runner
