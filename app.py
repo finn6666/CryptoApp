@@ -187,6 +187,39 @@ def fetch_and_add_new_symbol_data(symbol: str):
         
         # Create coin data structure
         market_data = data.get('market_data', {})
+        price = market_data.get('current_price', {}).get('usd', 0)
+        
+        # Check if price is null/0 and coin has migrated
+        if not price or price == 0:
+            logger.warning(f"{symbol} has no price data, checking if token migrated...")
+            
+            # Check common migration patterns
+            name_lower = data.get('name', '').lower()
+            if 'migrated' in name_lower or 'replaced' in name_lower:
+                logger.info(f"{symbol} appears to be migrated, attempting to find new token...")
+                
+                # Special case handling for known migrations
+                migration_map = {
+                    'MATIC': 'polygon-ecosystem-token',  # MATIC -> POL
+                    # Add more migrations here as needed
+                }
+                
+                if symbol.upper() in migration_map:
+                    new_coingecko_id = migration_map[symbol.upper()]
+                    logger.info(f"Using known migration: {symbol} -> {new_coingecko_id}")
+                    
+                    # Fetch data for the new token
+                    response = requests.get(f"https://api.coingecko.com/api/v3/coins/{new_coingecko_id}", 
+                                          params=params, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    market_data = data.get('market_data', {})
+                    price = market_data.get('current_price', {}).get('usd', 0)
+                    
+                    # Update the display to show it's the new token
+                    symbol = data.get('symbol', symbol).upper()
+                    coingecko_id = new_coingecko_id
+        
         new_coin_data = {
             "item": {
                 "id": coingecko_id,
@@ -199,7 +232,7 @@ def fetch_and_add_new_symbol_data(symbol: str):
                 "market_cap_rank": market_data.get('market_cap_rank'),
                 "price_btc": None,
                 "data": {
-                    "price": market_data.get('current_price', {}).get('usd', 0),
+                    "price": price,
                     "price_btc": market_data.get('current_price', {}).get('btc'),
                     "price_change_percentage_24h": {
                         "usd": market_data.get('price_change_percentage_24h', 0)
@@ -891,22 +924,9 @@ def search_coins():
         finally:
             loop.close()
         
-        # Filter out coins that exist in analyzer but have no price data
-        # This prevents users from adding broken/migrated coins like old MATIC
-        filtered_results = []
-        for result in results:
-            symbol = result.get('symbol', '').upper()
-            # Check if coin is loaded and has valid price
-            coin = next((c for c in analyzer.coins if c.symbol == symbol), None)
-            if coin and (coin.price is None or coin.price == 0):
-                # Skip coins with no price data
-                logger.info(f"Filtering out {symbol} from search (no price data)")
-                continue
-            filtered_results.append(result)
-        
         return jsonify({
             'success': True,
-            'results': filtered_results
+            'results': results
         })
         
     except Exception as e:
