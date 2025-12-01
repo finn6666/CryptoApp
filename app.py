@@ -419,6 +419,7 @@ def get_coins():
         # Get favorites to exclude from live list
         favorites = load_favorites()
         favorites_upper = [f.upper() for f in favorites]
+        logger.info(f"Excluding favorites from live coins: {favorites_upper}")
         
         # List of stablecoins to exclude
         STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
@@ -507,7 +508,7 @@ def get_coins():
             }
             
             ai_insights = []
-            ai_score = coin.attractiveness_score
+            ai_score = matching_coin.attractiveness_score
             
             # 1. RL Detector Analysis (preferred - most advanced)
             if RL_DETECTOR_AVAILABLE and rl_detector:
@@ -684,7 +685,8 @@ def get_favorites():
                     }
                     
                     # Try RL analysis first (most comprehensive)
-                    if RL_DETECTOR_AVAILABLE and rl_detector:
+                    analysis_done = False
+                    if RL_DETECTOR_AVAILABLE and rl_detector and not analysis_done:
                         try:
                             market_context = {
                                 'total_market_cap': sum(float(c.market_cap or 0) for c in analyzer.coins if c.market_cap),
@@ -707,13 +709,12 @@ def get_favorites():
                                 'analysis_type': 'RL Enhanced'
                             }
                             coin_data['enhanced_score'] = rl_analysis.get('gem_score', coin.attractiveness_score)
-                            favorite_coins.append(coin_data)
-                            break
+                            analysis_done = True
                         except Exception as e:
                             logging.warning(f"RL analysis failed for favorite {coin.symbol}: {e}")
                     
                     # Try Gem Detector (fallback)
-                    if GEM_DETECTOR_AVAILABLE and gem_detector:
+                    if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                         try:
                             gem_result = gem_detector.predict_hidden_gem(coin_dict)
                             if gem_result:
@@ -740,13 +741,12 @@ def get_favorites():
                                     'analysis_type': 'Gem Detector'
                                 }
                                 coin_data['enhanced_score'] = gem_result.get('gem_score', coin.attractiveness_score)
-                                favorite_coins.append(coin_data)
-                                break
+                                analysis_done = True
                         except Exception as e:
                             logging.warning(f"Gem detection failed for favorite {coin.symbol}: {e}")
                     
                     # Basic ML prediction (last fallback)
-                    if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded:
+                    if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded and not analysis_done:
                         try:
                             features = {
                                 'price_change_1h': coin.price_change_24h or 0,
@@ -772,6 +772,7 @@ def get_favorites():
                                 'prediction': f"{pred_pct:+.1f}%",
                                 'analysis_type': 'ML Model'
                             }
+                            analysis_done = True
                         except Exception as ml_error:
                             logging.warning(f"ML prediction failed for favorite {coin.symbol}: {ml_error}")
                     
