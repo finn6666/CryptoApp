@@ -56,66 +56,75 @@ class CryptoAnalyzer:
     def _parse_coins(self, coins_data: List[Dict]) -> List[Coin]:
         """Parse raw coin data into Coin objects"""
         coins = []
+        skipped = []
         
         for coin_item in coins_data:
-            item = coin_item['item']
-            data = item.get('data', {})
+            try:
+                item = coin_item['item']
+                data = item.get('data', {})
+                
+                # Handle different price formats
+                price = None
+                if 'price' in data and data['price'] is not None:
+                    if isinstance(data['price'], str):
+                        # Remove commas and convert
+                        price_str = data['price'].replace(',', '')
+                        try:
+                            price = float(price_str)
+                        except ValueError:
+                            price = None
+                    else:
+                        price = data['price']
+                elif 'presale_price' in data:
+                    price = data['presale_price']
             
-            # Handle different price formats
-            price = None
-            if 'price' in data and data['price'] is not None:
-                if isinstance(data['price'], str):
-                    # Remove commas and convert
-                    price_str = data['price'].replace(',', '')
+                # Get price change
+                price_change = None
+                if 'price_change_percentage_24h' in data and data['price_change_percentage_24h']:
+                    price_change_data = data['price_change_percentage_24h']
+                    if isinstance(price_change_data, dict):
+                        # Try different currency keys
+                        price_change = (price_change_data.get('gbp') or 
+                                    price_change_data.get('usd') or 
+                                    price_change_data.get('eur'))
+                    elif isinstance(price_change_data, (int, float)):
+                        # Direct numeric value
+                        price_change = price_change_data
+                
+                # Parse risk level
+                risk_level = None
+                if 'risk_level' in item:
                     try:
-                        price = float(price_str)
+                        risk_level = RiskLevel(item['risk_level'])
                     except ValueError:
-                        price = None
-                else:
-                    price = data['price']
-            elif 'presale_price' in data:
-                price = data['presale_price']
+                        risk_level = None
+                
+                coin = Coin(
+                    id=item['id'],
+                    name=item['name'],
+                    symbol=item['symbol'],
+                    status=CoinStatus(item['status']),
+                    attractiveness_score=item.get('attractiveness_score', 0.0),
+                    investment_highlights=item.get('investment_highlights', []),
+                    market_cap_rank=item.get('market_cap_rank'),
+                    price=price,
+                    price_btc=float(item.get('price_btc', 0)) if item.get('price_btc') else None,
+                    price_change_24h=price_change,
+                    market_cap=data.get('market_cap'),
+                    total_volume=data.get('total_volume'),
+                    risk_level=risk_level,
+                    launch_date=item.get('launch_date'),
+                    presale_discount=item.get('presale_discount'),
+                    presale_price=data.get('presale_price')
+                )
+                coins.append(coin)
+            except Exception as e:
+                symbol = coin_item.get('item', {}).get('symbol', 'UNKNOWN')
+                skipped.append(symbol)
+                print(f"⚠️  Skipped coin {symbol} due to parsing error: {e}")
         
-            # Get price change
-            price_change = None
-            if 'price_change_percentage_24h' in data and data['price_change_percentage_24h']:
-                price_change_data = data['price_change_percentage_24h']
-                if isinstance(price_change_data, dict):
-                    # Try different currency keys
-                    price_change = (price_change_data.get('gbp') or 
-                                price_change_data.get('usd') or 
-                                price_change_data.get('eur'))
-                elif isinstance(price_change_data, (int, float)):
-                    # Direct numeric value
-                    price_change = price_change_data
-            
-            # Parse risk level
-            risk_level = None
-            if 'risk_level' in item:
-                try:
-                    risk_level = RiskLevel(item['risk_level'])
-                except ValueError:
-                    risk_level = None
-            
-            coin = Coin(
-                id=item['id'],
-                name=item['name'],
-                symbol=item['symbol'],
-                status=CoinStatus(item['status']),
-                attractiveness_score=item.get('attractiveness_score', 0.0),
-                investment_highlights=item.get('investment_highlights', []),
-                market_cap_rank=item.get('market_cap_rank'),
-                price=price,
-                price_btc=float(item.get('price_btc', 0)) if item.get('price_btc') else None,
-                price_change_24h=price_change,
-                market_cap=data.get('market_cap'),
-                total_volume=data.get('total_volume'),
-                risk_level=risk_level,
-                launch_date=item.get('launch_date'),
-                presale_discount=item.get('presale_discount'),
-                presale_price=data.get('presale_price')
-            )
-            coins.append(coin)
+        if skipped:
+            print(f"⚠️  Skipped {len(skipped)} coins during load: {', '.join(skipped)}")
         
         return coins
 
