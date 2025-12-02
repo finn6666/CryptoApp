@@ -280,6 +280,9 @@ app = Flask(__name__,
            template_folder='src/web/templates',
            static_folder='src/web/static')
 
+# Track start time for uptime metrics
+start_time = time.time()
+
 # Auto-shutdown after idle time
 IDLE_TIMEOUT = 300  # 5 minutes in seconds
 last_request_time = time.time()
@@ -2089,6 +2092,41 @@ def get_idle_status():
 def health():
     """Simple health check endpoint for load balancers and smoke tests"""
     return jsonify({'status': 'ok', 'time': datetime.now().isoformat()}), 200
+
+@app.route('/api/health')
+def api_health():
+    """Enhanced health check for SIEM monitoring"""
+    return jsonify({
+        'status': 'online',
+        'timestamp': datetime.now().isoformat(),
+        'components': {
+            'analyzer': analyzer is not None,
+            'ml_pipeline': ML_AVAILABLE,
+            'gem_detector': GEM_DETECTOR_AVAILABLE,
+            'rl_detector': RL_DETECTOR_AVAILABLE
+        },
+        'uptime_hours': (time.time() - start_time) / 3600 if 'start_time' in globals() else 0
+    }), 200
+
+@app.route('/api/metrics')
+def api_metrics():
+    """System metrics for SIEM dashboard"""
+    import psutil
+    
+    return jsonify({
+        'timestamp': datetime.now().isoformat(),
+        'system': {
+            'cpu_percent': psutil.cpu_percent(interval=1),
+            'memory_percent': psutil.virtual_memory().percent,
+            'disk_percent': psutil.disk_usage('/').percent
+        },
+        'application': {
+            'total_coins': len(analyzer.coins) if analyzer else 0,
+            'ml_available': ML_AVAILABLE,
+            'gem_detector_available': GEM_DETECTOR_AVAILABLE,
+            'rl_detector_available': RL_DETECTOR_AVAILABLE
+        }
+    }), 200
 
 @app.route('/api/debug/coins')
 def debug_coins():

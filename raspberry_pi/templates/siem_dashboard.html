@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CryptoApp SIEM Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0e27;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header .status {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.online {
+            background: #4caf50;
+        }
+
+        .status-indicator.offline {
+            background: #f44336;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #1a1f3a;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            border: 1px solid #2a2f4a;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 8px;
+            background: #0f1425;
+            border-radius: 5px;
+        }
+
+        .metric-label {
+            color: #b0b0b0;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        .metric-value.good {
+            color: #4caf50;
+        }
+
+        .metric-value.warning {
+            color: #ff9800;
+        }
+
+        .metric-value.critical {
+            color: #f44336;
+        }
+
+        .alerts-section {
+            margin-top: 20px;
+        }
+
+        .alert-counts {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .alert-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .alert-badge.critical {
+            background: #f44336;
+        }
+
+        .alert-badge.high {
+            background: #ff9800;
+        }
+
+        .alert-badge.medium {
+            background: #2196f3;
+        }
+
+        .alert-badge.low {
+            background: #4caf50;
+        }
+
+        .alert-item {
+            background: #0f1425;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid;
+        }
+
+        .alert-item.critical {
+            border-left-color: #f44336;
+        }
+
+        .alert-item.high {
+            border-left-color: #ff9800;
+        }
+
+        .alert-item.medium {
+            border-left-color: #2196f3;
+        }
+
+        .alert-item.low {
+            border-left-color: #4caf50;
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .alert-time {
+            color: #888;
+            font-size: 12px;
+        }
+
+        .alert-description {
+            color: #b0b0b0;
+            font-size: 14px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #0f1425;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-fill.good {
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #ff9800, #ffc107);
+        }
+
+        .progress-fill.critical {
+            background: linear-gradient(90deg, #f44336, #e91e63);
+        }
+
+        .refresh-time {
+            text-align: center;
+            color: #888;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .temperature {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ CryptoApp SIEM Dashboard</h1>
+        <div class="status">
+            <div class="status-item">
+                <div class="status-indicator online" id="pi-status"></div>
+                <span>Raspberry Pi</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator" id="vm-status"></div>
+                <span>Azure VM</span>
+            </div>
+            <div class="status-item">
+                <span id="uptime-display">Uptime: Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid">
+        <!-- Raspberry Pi Metrics -->
+        <div class="card">
+            <h2>🍓 Raspberry Pi System</h2>
+            <div class="metric">
+                <span class="metric-label">CPU Usage</span>
+                <span class="metric-value" id="pi-cpu">--</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill good" id="pi-cpu-bar" style="width: 0%"></div>
+            </div>
+            
+            <div class="metric" style="margin-top: 15px;">
+                <span class="metric-label">Memory Usage</span>
+                <span class="metric-value" id="pi-memory">--</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill good" id="pi-memory-bar" style="width: 0%"></div>
+            </div>
+            
+            <div class="metric" style="margin-top: 15px;">
+                <span class="metric-label">Disk Usage</span>
+                <span class="metric-value" id="pi-disk">--</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill good" id="pi-disk-bar" style="width: 0%"></div>
+            </div>
+            
+            <div class="temperature" id="pi-temp">-- °C</div>
+        </div>
+
+        <!-- Azure VM Metrics -->
+        <div class="card">
+            <h2>☁️ Azure VM Health</h2>
+            <div class="metric">
+                <span class="metric-label">Status</span>
+                <span class="metric-value" id="vm-status-text">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">API Latency</span>
+                <span class="metric-value" id="vm-latency">--</span>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Last Check</span>
+                <span class="metric-value" id="vm-last-check">--</span>
+            </div>
+        </div>
+
+        <!-- Alert Summary -->
+        <div class="card">
+            <h2>🚨 Alert Summary</h2>
+            <div class="alert-counts">
+                <div class="alert-badge critical">
+                    <span id="alert-critical">0</span> Critical
+                </div>
+                <div class="alert-badge high">
+                    <span id="alert-high">0</span> High
+                </div>
+                <div class="alert-badge medium">
+                    <span id="alert-medium">0</span> Medium
+                </div>
+                <div class="alert-badge low">
+                    <span id="alert-low">0</span> Low
+                </div>
+            </div>
+            <div class="metric">
+                <span class="metric-label">Total Alerts (24h)</span>
+                <span class="metric-value" id="alert-total">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Alerts -->
+    <div class="card alerts-section">
+        <h2>📋 Recent Alerts</h2>
+        <div id="recent-alerts">
+            <p style="color: #888; text-align: center;">Loading alerts...</p>
+        </div>
+    </div>
+
+    <div class="refresh-time">
+        Last updated: <span id="last-update">--</span> | Auto-refresh every 10s
+    </div>
+
+    <script>
+        function updateDashboard() {
+            fetch('/api/dashboard')
+                .then(res => res.json())
+                .then(data => {
+                    // Update timestamp
+                    document.getElementById('last-update').textContent = 
+                        new Date(data.timestamp).toLocaleTimeString();
+                    
+                    // Update uptime
+                    document.getElementById('uptime-display').textContent = 
+                        `Uptime: ${data.uptime.toFixed(1)}h`;
+                    
+                    // Update Pi metrics
+                    if (data.system.pi) {
+                        updatePiMetrics(data.system.pi);
+                    }
+                    
+                    // Update VM status
+                    if (data.system.vm) {
+                        updateVMMetrics(data.system.vm);
+                    }
+                    
+                    // Update alerts
+                    updateAlerts(data.alerts);
+                })
+                .catch(err => console.error('Dashboard update error:', err));
+        }
+
+        function updatePiMetrics(pi) {
+            // CPU
+            const cpu = pi.cpu_percent;
+            document.getElementById('pi-cpu').textContent = `${cpu.toFixed(1)}%`;
+            document.getElementById('pi-cpu').className = 
+                `metric-value ${cpu > 80 ? 'critical' : cpu > 60 ? 'warning' : 'good'}`;
+            document.getElementById('pi-cpu-bar').style.width = `${cpu}%`;
+            document.getElementById('pi-cpu-bar').className = 
+                `progress-fill ${cpu > 80 ? 'critical' : cpu > 60 ? 'warning' : 'good'}`;
+            
+            // Memory
+            const mem = pi.memory_percent;
+            document.getElementById('pi-memory').textContent = `${mem.toFixed(1)}%`;
+            document.getElementById('pi-memory').className = 
+                `metric-value ${mem > 85 ? 'critical' : mem > 70 ? 'warning' : 'good'}`;
+            document.getElementById('pi-memory-bar').style.width = `${mem}%`;
+            document.getElementById('pi-memory-bar').className = 
+                `progress-fill ${mem > 85 ? 'critical' : mem > 70 ? 'warning' : 'good'}`;
+            
+            // Disk
+            const disk = pi.disk_percent;
+            document.getElementById('pi-disk').textContent = `${disk.toFixed(1)}%`;
+            document.getElementById('pi-disk').className = 
+                `metric-value ${disk > 90 ? 'critical' : disk > 75 ? 'warning' : 'good'}`;
+            document.getElementById('pi-disk-bar').style.width = `${disk}%`;
+            document.getElementById('pi-disk-bar').className = 
+                `progress-fill ${disk > 90 ? 'critical' : disk > 75 ? 'warning' : 'good'}`;
+            
+            // Temperature
+            if (pi.temperature) {
+                const temp = pi.temperature;
+                document.getElementById('pi-temp').textContent = `${temp}°C`;
+                document.getElementById('pi-temp').className = 
+                    `temperature ${temp > 70 ? 'critical' : temp > 60 ? 'warning' : 'good'}`;
+            }
+        }
+
+        function updateVMMetrics(vm) {
+            const statusEl = document.getElementById('vm-status');
+            const statusText = document.getElementById('vm-status-text');
+            
+            statusText.textContent = vm.status.toUpperCase();
+            statusEl.className = `status-indicator ${vm.status === 'online' ? 'online' : 'offline'}`;
+            statusText.className = `metric-value ${vm.status === 'online' ? 'good' : 'critical'}`;
+            
+            if (vm.latency_ms) {
+                const latency = vm.latency_ms;
+                document.getElementById('vm-latency').textContent = `${latency.toFixed(0)}ms`;
+                document.getElementById('vm-latency').className = 
+                    `metric-value ${latency > 5000 ? 'critical' : latency > 2000 ? 'warning' : 'good'}`;
+            } else {
+                document.getElementById('vm-latency').textContent = 'N/A';
+            }
+        }
+
+        function updateAlerts(alerts) {
+            document.getElementById('alert-critical').textContent = alerts.critical;
+            document.getElementById('alert-high').textContent = alerts.high;
+            document.getElementById('alert-medium').textContent = alerts.medium;
+            document.getElementById('alert-low').textContent = alerts.low;
+            document.getElementById('alert-total').textContent = alerts.total;
+            
+            // Update recent alerts list
+            const alertsContainer = document.getElementById('recent-alerts');
+            if (alerts.recent && alerts.recent.length > 0) {
+                alertsContainer.innerHTML = alerts.recent.slice(-10).reverse().map(alert => `
+                    <div class="alert-item ${alert.severity.toLowerCase()}">
+                        <div class="alert-header">
+                            <span>${alert.title}</span>
+                            <span class="alert-time">${new Date(alert.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                        <div class="alert-description">
+                            [${alert.category}] ${alert.description}
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                alertsContainer.innerHTML = '<p style="color: #888; text-align: center;">No recent alerts</p>';
+            }
+        }
+
+        // Initial load
+        updateDashboard();
+        
+        // Auto-refresh every 10 seconds
+        setInterval(updateDashboard, 10000);
+    </script>
+</body>
+</html>

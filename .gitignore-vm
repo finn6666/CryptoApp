@@ -1,0 +1,5 @@
+# Additional .gitignore rules for Azure VM only
+# After git pull on VM, run: cat .gitignore-vm >> .git/info/exclude
+
+# Don't pull Raspberry Pi monitoring files to VM
+raspberry_pi/

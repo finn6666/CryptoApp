@@ -1,0 +1,34 @@
+{
+  "azure_vm": {
+    "url": "http://your-vm-ip:5001",
+    "check_interval": 60,
+    "timeout": 10
+  },
+  "thresholds": {
+    "cpu_percent": 80,
+    "memory_percent": 85,
+    "disk_percent": 90,
+    "api_latency_ms": 5000,
+    "gem_score_spike": 15.0,
+    "volume_spike_multiplier": 5.0,
+    "price_change_24h_spike": 50.0
+  },
+  "alerts": {
+    "email_enabled": false,
+    "email_to": "your-email@example.com",
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "your-email@gmail.com",
+    "smtp_password": "your-app-password"
+  },
+  "market_monitoring": {
+    "coingecko_api": "https://api.coingecko.com/api/v3",
+    "check_interval": 300,
+    "top_n_coins": 50
+  },
+  "anomaly_detection": {
+    "enabled": true,
+    "window_size": 20,
+    "std_dev_threshold": 2.5
+  }
+}
