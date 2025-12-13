@@ -837,13 +837,18 @@ def get_favorites():
                             'enhanced_score': 5.0
                         }
                         favorite_coins.append(coin_data)
-                        found = True
                     else:
-                        missing_coins.append(symbol)
+                        if symbol not in missing_coins:
+                            missing_coins.append(symbol)
                         logger.warning(f"Could not fetch {symbol} from API")
                 except Exception as e:
-                    logger.error(f"Error fetching {symbol}: {e}")
-                    missing_coins.append(symbol)
+                    if symbol not in missing_coins:
+                        missing_coins.append(symbol)
+                    # Check if it's a rate limit error
+                    if '429' in str(e):
+                        logger.warning(f"Rate limit hit for {symbol} - try again in a few minutes")
+                    else:
+                        logger.error(f"Error fetching {symbol}: {e}")
         
         if missing_coins:
             logger.info(f"Missing favorite coins (could not fetch): {', '.join(missing_coins)}")

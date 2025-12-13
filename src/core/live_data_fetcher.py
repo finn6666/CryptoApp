@@ -391,7 +391,7 @@ class LiveDataFetcher:
             print(f"❌ Error saving data: {e}")
 
 
-def fetch_specific_coin(symbol: str):
+def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
     """Fetch data for a specific coin by symbol (for favorites that aren't in low-cap list)"""
     fetcher = LiveDataFetcher()
     
@@ -418,7 +418,7 @@ def fetch_specific_coin(symbol: str):
         if not coin_id:
             coin_id = coins[0].get('id')  # Use first result if no exact match
         
-        # Fetch detailed coin data
+        # Fetch detailed coin data with rate limit handling
         url = f"{fetcher.coingecko_base_url}/coins/{coin_id}"
         params = {
             'localization': False,
@@ -428,8 +428,19 @@ def fetch_specific_coin(symbol: str):
             'developer_data': False
         }
         
-        response = fetcher.session.get(url, params=params, timeout=10)
-        response.raise_for_status()
+        try:
+            response = fetcher.session.get(url, params=params, timeout=10)
+            response.raise_for_status()
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429 and retry_on_rate_limit:
+                # Rate limited - wait 2 seconds and try once more
+                print(f"Rate limit hit for {symbol}, waiting 2 seconds...")
+                time.sleep(2)
+                response = fetcher.session.get(url, params=params, timeout=10)
+                response.raise_for_status()
+            else:
+                raise
+        
         coin_data = response.json()
         
         # Extract market data
