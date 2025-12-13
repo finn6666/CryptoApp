@@ -844,9 +844,6 @@ def get_favorites():
                 except Exception as e:
                     logger.error(f"Error fetching {symbol}: {e}")
                     missing_coins.append(symbol)
-            
-            if not found:
-                missing_coins.append(symbol)
         
         if missing_coins:
             logger.info(f"Missing favorite coins (could not fetch): {', '.join(missing_coins)}")
