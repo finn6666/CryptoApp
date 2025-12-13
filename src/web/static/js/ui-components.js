@@ -125,11 +125,11 @@ function generateMLReasoningHTML(coin, coinId, mlEnabled) {
 }
 
 // Format price in GBP
-function formatPrice(priceUSD) {
-    if (!priceUSD) return 'N/A';
+function formatPrice(price) {
+    if (!price || price === 0) return 'N/A';
     
-    const usdToGbp = 0.8;
-    const priceInGbp = priceUSD * usdToGbp;
+    // Price is already in GBP from the API
+    const priceInGbp = price;
     
     if (priceInGbp < 0.01) {
         return `£${priceInGbp.toPrecision(2)}`;
