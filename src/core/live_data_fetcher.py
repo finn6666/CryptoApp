@@ -391,6 +391,66 @@ class LiveDataFetcher:
             print(f"❌ Error saving data: {e}")
 
 
+def fetch_specific_coin(symbol: str):
+    """Fetch data for a specific coin by symbol (for favorites that aren't in low-cap list)"""
+    fetcher = LiveDataFetcher()
+    
+    try:
+        # Search for the coin to get its ID
+        url = f"{fetcher.coingecko_base_url}/search"
+        params = {'query': symbol}
+        response = fetcher.session.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        search_data = response.json()
+        coins = search_data.get('coins', [])
+        
+        if not coins:
+            return None
+        
+        # Find exact match
+        coin_id = None
+        for coin in coins:
+            if coin.get('symbol', '').upper() == symbol.upper():
+                coin_id = coin.get('id')
+                break
+        
+        if not coin_id:
+            coin_id = coins[0].get('id')  # Use first result if no exact match
+        
+        # Fetch detailed coin data
+        url = f"{fetcher.coingecko_base_url}/coins/{coin_id}"
+        params = {
+            'localization': False,
+            'tickers': False,
+            'market_data': True,
+            'community_data': False,
+            'developer_data': False
+        }
+        
+        response = fetcher.session.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        coin_data = response.json()
+        
+        # Extract market data
+        market_data = coin_data.get('market_data', {})
+        
+        return {
+            'id': coin_data.get('id'),
+            'symbol': coin_data.get('symbol', '').upper(),
+            'name': coin_data.get('name'),
+            'current_price': market_data.get('current_price', {}).get('gbp', 0),
+            'market_cap': market_data.get('market_cap', {}).get('gbp', 0),
+            'market_cap_rank': market_data.get('market_cap_rank'),
+            'total_volume': market_data.get('total_volume', {}).get('gbp', 0),
+            'price_change_percentage_24h': market_data.get('price_change_percentage_24h', 0)
+        }
+        
+    except Exception as e:
+        print(f"Error fetching {symbol}: {e}")
+        return None
+
+
 def fetch_and_update_data(force_refresh: bool = False):
     """Main function to fetch live data and update the application"""
     import os

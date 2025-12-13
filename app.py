@@ -672,6 +672,8 @@ def force_refresh():
 def get_favorites():
     """Get all favorite coins with their current data and comprehensive AI analysis"""
     try:
+        from src.core.live_data_fetcher import fetch_specific_coin
+        
         favorites = load_favorites()
         favorite_coins = []
         missing_coins = []
@@ -817,12 +819,37 @@ def get_favorites():
                     favorite_coins.append(coin_data)
                     break
             
+            # If not found in low-cap list, fetch it directly from API
+            if not found:
+                logger.info(f"Fetching {symbol} directly from API (not in low-cap list)")
+                try:
+                    coin_data_raw = fetch_specific_coin(symbol)
+                    if coin_data_raw:
+                        coin_data = {
+                            'symbol': coin_data_raw['symbol'],
+                            'name': coin_data_raw['name'],
+                            'price': coin_data_raw['current_price'],
+                            'price_change_24h': coin_data_raw['price_change_percentage_24h'],
+                            'score': 5.0,  # Default score
+                            'market_cap': coin_data_raw['market_cap'],
+                            'market_cap_rank': coin_data_raw['market_cap_rank'],
+                            'ai_analysis': None,
+                            'enhanced_score': 5.0
+                        }
+                        favorite_coins.append(coin_data)
+                        found = True
+                    else:
+                        missing_coins.append(symbol)
+                        logger.warning(f"Could not fetch {symbol} from API")
+                except Exception as e:
+                    logger.error(f"Error fetching {symbol}: {e}")
+                    missing_coins.append(symbol)
+            
             if not found:
                 missing_coins.append(symbol)
-                logger.warning(f"Favorite coin {symbol} not found in analyzer.coins - may need refresh")
         
         if missing_coins:
-            logger.info(f"Missing favorite coins (need refresh): {', '.join(missing_coins)}")
+            logger.info(f"Missing favorite coins (could not fetch): {', '.join(missing_coins)}")
         
         ml_status = ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded
         logger.info(f"🔍 Favorites API - ML Enhanced: {ml_status}, Favorite coins: {len(favorite_coins)}, Missing: {len(missing_coins)}")
