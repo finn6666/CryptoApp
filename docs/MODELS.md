@@ -16,9 +16,11 @@ This directory stores trained machine learning models for the crypto analysis sy
 - **Used For**: Scikit-learn models (Random Forest, classifiers, scalers)
 
 **Example Files**:
-- `crypto_model.pkl` - Main prediction model
-- `scaler.pkl` - Feature scaling parameters
-- `gem_detector.pkl` - Hidden gem classification model
+- `crypto_model.pkl` - Main prediction model (Random Forest)
+- `scaler.pkl` - Feature scaling parameters (StandardScaler)
+- `hidden_gem_detector.pkl` - Hidden gem classification model
+- `rl_agent.pkl` - Reinforcement learning agent metadata
+- `rl_agent_network.pth` - RL neural network (PyTorch format)
 
 #### `.joblib` Files (Joblib Format)  
 - **What**: Optimized format for NumPy arrays (used by scikit-learn)
@@ -100,10 +102,13 @@ STEP 3: MODEL TRAINING (Weekly/On-Demand)
                      │ (Saved to disk)     │
                      │                     │
                      │ 📁 models/          │
-                     │  ├─ crypto_model    │
-                     │  ├─ gem_detector    │
-                     │  ├─ rl_agent        │
-                     │  └─ scaler          │
+                     │  ├─ crypto_model.pkl│
+                     │  ├─ hidden_gem_     │
+                     │  │  detector.pkl    │
+                     │  ├─ rl_agent.pkl    │
+                     │  ├─ rl_agent_       │
+                     │  │  network.pth     │
+                     │  └─ scaler.pkl      │
                      └──────────┬──────────┘
                                 │
 
@@ -114,21 +119,33 @@ STEP 4: PREDICTION & ANALYSIS (When User Refreshes)
                      │ from Disk           │
                      └──────────┬──────────┘
                                 │
-                    ┌───────────┴───────────┐
-                    ↓                       ↓
-         ┌──────────────────┐    ┌──────────────────┐
-         │ Price Predictor  │    │ Gem Detector     │
-         │ (Random Forest)  │    │ (Classifier)     │
-         └────────┬─────────┘    └────────┬─────────┘
-                  │                       │
-                  └───────────┬───────────┘
-                              ↓
-                   ┌─────────────────────┐
-                   │ Crypto Analyzer     │
-                   │ • Calculates scores │
-                   │ • Ranks coins       │
-                   │ • Finds gems        │
-                   └──────────┬──────────┘
+          ┌─────────────────────┼─────────────────────┐
+          ↓                     ↓                     ↓
+   ┌─────────────┐    ┌─────────────────┐   ┌──────────────┐
+   │ ML Pipeline │    │ Gem Detector    │   │ RL Agent     │
+   │ (Random     │    │ (Enhanced       │   │ (Deep Q      │
+   │  Forest)    │    │  Classifier)    │   │  Network)    │
+   └──────┬──────┘    └────────┬────────┘   └──────┬───────┘
+          │                    │                    │
+          └────────────────────┼────────────────────┘
+                               ↓
+                    ┌─────────────────────┐
+                    │ Crypto Analyzer     │
+                    │ • Calculates scores │
+                    │ • Ranks coins       │
+                    │ • Finds gems        │
+                    │ • RL decisions      │
+                    │ • DeepSeek insights │
+                    └──────────┬──────────┘
+                               │
+          ┌────────────────────┼────────────────────┐
+          ↓                    ↓                    ↓
+   ┌─────────────┐    ┌─────────────────┐  ┌──────────────┐
+   │ Low-Cap     │    │ Favorites       │  │ On-Demand    │
+   │ Coins       │    │ (Any coin)      │  │ API Fetch    │
+   │ (<£1 price) │    │ ETH, SOL, etc.  │  │ (Rate limit  │
+   │             │    │                 │  │  handling)   │
+   └─────────────┘    └─────────────────┘  └──────────────┘
                               │
 
 STEP 5: PRESENTATION
@@ -154,10 +171,9 @@ STEP 5: PRESENTATION
 Just like you don't forget what you learned after sleeping, the app doesn't forget its trained patterns after restarting. Models are the persistent storage of learned cryptocurrency patterns and behaviors.
 
 **Key Points**:
-- `.pkl`/`.joblib` = Saved models
+- `.pkl`/`.joblib` = Saved models (scikit-learn, metadata)
+- `.pth` = PyTorch neural networks (RL agent)
 - Models trained once, used many times
-- Updated weekly with new data
+- Updated weekly with new data via scheduler
 - Load quickly on startup
 - Enable fast predictions without retraining
-
-**Note**: Files are generated automatically by the system. No manual files required.

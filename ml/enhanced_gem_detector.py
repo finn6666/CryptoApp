@@ -24,6 +24,14 @@ from .advanced_alpha_features import AdvancedAlphaFeatures
 # Import DeepSeek AI sentiment analyzer
 from .deepseek_analyzer import deepseek_analyzer
 
+# Import Simple RL (optional, lightweight learning)
+try:
+    from .simple_rl import simple_rl_learner
+    SIMPLE_RL_AVAILABLE = True
+except ImportError:
+    SIMPLE_RL_AVAILABLE = False
+    simple_rl_learner = None
+
 class HiddenGemDetector:
     """
     Enhanced ML model specifically designed to identify hidden gems
@@ -56,6 +64,14 @@ class HiddenGemDetector:
             print("✨ AI Sentiment Analysis: ENABLED (DeepSeek)")
         else:
             print("ℹ️  AI Sentiment Analysis: Disabled (using ML scores only)")
+        
+        # Check Simple RL availability
+        self.rl_enabled = SIMPLE_RL_AVAILABLE and simple_rl_learner is not None
+        if self.rl_enabled:
+            stats = simple_rl_learner.get_stats()
+            print(f"🧠 Simple RL Learning: ENABLED ({stats['total_trades']} trades, {stats['success_rate']:.1f}% success)")
+        else:
+            print("ℹ️  Simple RL Learning: Disabled")
         
         # Create models directory if it doesn't exist
         os.makedirs(model_dir, exist_ok=True)
@@ -557,11 +573,14 @@ class HiddenGemDetector:
             elif row['narrative_strength'] > 0.7:
                 score += 0.06  # Strong narrative
             
-            # 5. Social and community momentum (10% weight)
-            if row['social_momentum'] > 0.7 and row['community_growth'] > 0.6:
-                score += 0.08  # Growing community
+            # 5. Early signals and smart money (10% weight) - FOCUS ON EARLY DETECTION
+            # De-emphasize social momentum (retail indicator), emphasize smart money
+            if row['whale_accumulation_score'] > 0.6 and row['quiet_accumulation_signal'] > 0.6:
+                score += 0.10  # Smart money accumulating (EARLY SIGNAL)
             elif row['developer_activity'] > 0.7:
-                score += 0.04  # Active development
+                score += 0.05  # Active development (EARLY SIGNAL)
+            elif row['social_momentum'] > 0.8:  # Only use if extremely high
+                score += 0.02  # Reduced weight - can be retail hype
             
             # 6. Risk-reward profile (5% weight)
             if row['upside_potential'] > 0.8 and row['risk_reward_ratio'] > 0.6:
@@ -573,9 +592,11 @@ class HiddenGemDetector:
                 row['breakout_potential'] > 0.6 and row['technology_score'] > 0.6):
                 score += 0.1  # Bonus for perfect setup
             
-            # Momentum play: strong social momentum + price discovery
-            if row['social_momentum'] > 0.8 and row['price_discovery_phase'] > 0.7:
-                score += 0.08  # Momentum bonus
+            # Early detection bonus: whale activity + quiet accumulation + off-peak signals
+            if (row['whale_accumulation_score'] > 0.6 and 
+                row['quiet_accumulation_signal'] > 0.6 and 
+                row['off_peak_anomaly'] > 0.5):
+                score += 0.12  # EARLY SIGNAL BONUS - smart money moving before retail
             
             # Innovation play: high tech score + utility + narrative
             if (row['technology_score'] > 0.8 and row['utility_score'] > 0.7 and 
@@ -705,6 +726,19 @@ class HiddenGemDetector:
             # Enhance with AI sentiment analysis
             enhanced_data = deepseek_analyzer.enhance_gem_score(base_gem_score, coin_data)
             
+            # Apply RL boost if enabled
+            rl_data = {}
+            if self.rl_enabled:
+                rl_recommendation = simple_rl_learner.get_recommendation(
+                    enhanced_data['enhanced_score'], 
+                    features
+                )
+                rl_data = rl_recommendation
+                # Apply RL boost to final score
+                enhanced_data['enhanced_score'] += rl_recommendation['rl_boost']
+                # Clamp to 0-100
+                enhanced_data['enhanced_score'] = max(0, min(100, enhanced_data['enhanced_score']))
+            
             # Build result with both ML and AI insights
             result = {
                 'is_hidden_gem': bool(prediction),
@@ -727,7 +761,11 @@ class HiddenGemDetector:
                     'community_strength': features['community_growth']
                 },
                 'ai_sentiment': enhanced_data.get('sentiment_analysis'),  # AI insights
-                'ai_enabled': enhanced_data.get('ai_enabled', False)
+                'ai_enabled': enhanced_data.get('ai_enabled', False),
+                'rl_recommendation': rl_data.get('action') if self.rl_enabled else None,
+                'rl_confidence': rl_data.get('confidence') if self.rl_enabled else None,
+                'rl_boost': rl_data.get('rl_boost', 0) if self.rl_enabled else 0,
+                'rl_enabled': self.rl_enabled
             }
             
             return result
@@ -916,6 +954,46 @@ class HiddenGemDetector:
         except Exception as e:
             print(f"❌ Error loading model: {e}")
             return False
+
+    def learn_from_outcome(self, symbol: str, entry_price: float, 
+                          current_price: float, days_held: int,
+                          features: Dict[str, float], notes: str = None) -> Optional[Dict]:
+        """
+        Teach the RL system from actual trading outcome
+        
+        Args:
+            symbol: Coin symbol (e.g., 'BTC')
+            entry_price: Price when you bought
+            current_price: Current/exit price
+            days_held: Days held
+            features: Features from original analysis
+            notes: Optional notes about the trade
+        
+        Returns:
+            Learning summary or None if RL disabled
+        """
+        if not self.rl_enabled:
+            return None
+        
+        # Calculate profit
+        profit_pct = ((current_price - entry_price) / entry_price) * 100
+        
+        # Let RL learn with full trade details
+        result = simple_rl_learner.learn_from_outcome(
+            features=features,
+            action='buy',  # Assume buy if you're tracking outcome
+            profit_pct=profit_pct,
+            days_held=days_held,
+            symbol=symbol,
+            entry_price=entry_price,
+            exit_price=current_price,
+            notes=notes
+        )
+        
+        print(f"🧠 RL learned from {symbol}: {profit_pct:+.1f}% over {days_held} days")
+        print(f"   New success rate: {result['new_success_rate']:.1%}")
+        
+        return result
 
     def get_model_info(self) -> Dict:
         """Get information about the current model"""

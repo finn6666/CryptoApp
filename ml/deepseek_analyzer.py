@@ -11,6 +11,10 @@ import requests
 from typing import Dict, Optional, List
 from datetime import datetime, timedelta
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+# Load environment variables to get API key
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 

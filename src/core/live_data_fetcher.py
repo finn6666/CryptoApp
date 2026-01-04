@@ -1,39 +1,45 @@
 import requests
 import json
 import time
+import os
 from typing import Dict, List
 from .crypto_analyzer import Coin, CoinStatus, RiskLevel
+from .config import Config
 
 class LiveDataFetcher:
-    """Fetches live cryptocurrency data from APIs"""
+    """Fetches live cryptocurrency data from CoinMarketCap API"""
     
     def __init__(self):
-        self.coingecko_base_url = "https://api.coingecko.com/api/v3"
+        self.cmc_base_url = "https://pro-api.coinmarketcap.com/v1"
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'CryptoAnalyzer/1.0'
-        })
+        self.session.headers.update(Config.get_cmc_headers())
         
     def get_trending_coins(self, limit: int = 10) -> List[Dict]:
-        """Get trending coins from CoinGecko"""
+        """Get trending coins from CoinMarketCap"""
         try:
-            url = f"{self.coingecko_base_url}/search/trending"
-            response = self.session.get(url, timeout=10)
+            url = f"{self.cmc_base_url}/cryptocurrency/trending/gainers-losers"
+            params = {
+                'limit': limit,
+                'convert': 'GBP'
+            }
+            response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             
             data = response.json()
             trending_coins = []
             
-            for item in data.get('coins', [])[:limit]:
-                coin_data = item.get('item', {})
+            # CMC returns gainers list
+            for coin in data.get('data', [])[:limit]:
+                quote = coin.get('quote', {}).get('GBP', {})
                 trending_coins.append({
-                    'id': coin_data.get('id'),
-                    'name': coin_data.get('name'),
-                    'symbol': coin_data.get('symbol'),
-                    'market_cap_rank': coin_data.get('market_cap_rank'),
-                    'thumb': coin_data.get('thumb'),
-                    'price_btc': coin_data.get('price_btc'),
-                    'score': coin_data.get('score', 0)
+                    'id': str(coin.get('id')),
+                    'name': coin.get('name'),
+                    'symbol': coin.get('symbol'),
+                    'market_cap_rank': coin.get('cmc_rank'),
+                    'current_price': quote.get('price'),
+                    'market_cap': quote.get('market_cap'),
+                    'total_volume': quote.get('volume_24h'),
+                    'price_change_percentage_24h': quote.get('percent_change_24h')
                 })
             
             return trending_coins[:limit]
@@ -50,20 +56,33 @@ class LiveDataFetcher:
                           'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 
                           'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
             
-            url = f"{self.coingecko_base_url}/coins/markets"
+            url = f"{self.cmc_base_url}/cryptocurrency/listings/latest"
             params = {
-                'vs_currency': 'gbp',
-                'order': 'market_cap_desc',
-                'per_page': 250,  # Get more coins to filter from
-                'page': 1,
-                'sparkline': False,
-                'price_change_percentage': '24h'
+                'limit': 500,  # Get more coins to filter from
+                'convert': 'GBP',
+                'sort': 'market_cap',
+                'sort_dir': 'desc'
             }
             
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             
-            all_coins = response.json()
+            data = response.json()
+            all_coins = []
+            
+            # Convert CMC format to our format
+            for coin in data.get('data', []):
+                quote = coin.get('quote', {}).get('GBP', {})
+                all_coins.append({
+                    'id': str(coin.get('id')),
+                    'name': coin.get('name'),
+                    'symbol': coin.get('symbol'),
+                    'market_cap_rank': coin.get('cmc_rank'),
+                    'current_price': quote.get('price'),
+                    'market_cap': quote.get('market_cap'),
+                    'total_volume': quote.get('volume_24h'),
+                    'price_change_percentage_24h': quote.get('percent_change_24h')
+                })
             
             # Filter for TRUE low cap coins under £1 price - exclude stablecoins
             # Looking for coins ranked 100+ with market cap under $100M and price under £1
@@ -131,27 +150,41 @@ class LiveDataFetcher:
                           'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 
                           'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
             
-            # Get coins and filter by recent addition (approximate)
-            url = f"{self.coingecko_base_url}/coins/markets"
+            # Get latest listings from CMC
+            url = f"{self.cmc_base_url}/cryptocurrency/listings/latest"
             params = {
-                'vs_currency': 'gbp',
-                'order': 'market_cap_desc',
-                'per_page': 250,
-                'page': 1,
-                'sparkline': False
+                'limit': 500,
+                'convert': 'GBP',
+                'sort': 'date_added',
+                'sort_dir': 'desc'
             }
             
             response = self.session.get(url, params=params, timeout=10)
             response.raise_for_status()
             
-            coins = response.json()
+            data = response.json()
+            coins = []
+            
+            # Convert CMC format
+            for coin in data.get('data', []):
+                quote = coin.get('quote', {}).get('GBP', {})
+                coins.append({
+                    'id': str(coin.get('id')),
+                    'name': coin.get('name'),
+                    'symbol': coin.get('symbol'),
+                    'market_cap_rank': coin.get('cmc_rank'),
+                    'current_price': quote.get('price'),
+                    'market_cap': quote.get('market_cap'),
+                    'total_volume': quote.get('volume_24h'),
+                    'price_change_percentage_24h': quote.get('percent_change_24h')
+                })
             
             # Filter for small market caps (potential gems) under £1 - exclude stablecoins
             # Looking for coins ranked 150+ with market cap under $50M and price under £1
             small_cap_coins = [coin for coin in coins 
                              if coin.get('market_cap_rank') and 
                              coin.get('market_cap_rank') >= 150 and
-                             coin.get('market_cap') and
+                             coin.get('market_cap') and 
                              coin.get('market_cap') < 50_000_000 and  # Under $50M market cap - micro caps
                              coin.get('current_price') and
                              coin.get('current_price') <= 1.0 and  # Under £1
@@ -396,36 +429,11 @@ def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
     fetcher = LiveDataFetcher()
     
     try:
-        # Search for the coin to get its ID
-        url = f"{fetcher.coingecko_base_url}/search"
-        params = {'query': symbol}
-        response = fetcher.session.get(url, params=params, timeout=10)
-        response.raise_for_status()
-        
-        search_data = response.json()
-        coins = search_data.get('coins', [])
-        
-        if not coins:
-            return None
-        
-        # Find exact match
-        coin_id = None
-        for coin in coins:
-            if coin.get('symbol', '').upper() == symbol.upper():
-                coin_id = coin.get('id')
-                break
-        
-        if not coin_id:
-            coin_id = coins[0].get('id')  # Use first result if no exact match
-        
-        # Fetch detailed coin data with rate limit handling
-        url = f"{fetcher.coingecko_base_url}/coins/{coin_id}"
+        # Use CMC quotes endpoint to get data by symbol
+        url = f"{fetcher.cmc_base_url}/cryptocurrency/quotes/latest"
         params = {
-            'localization': False,
-            'tickers': False,
-            'market_data': True,
-            'community_data': False,
-            'developer_data': False
+            'symbol': symbol.upper(),
+            'convert': 'GBP'
         }
         
         try:
@@ -441,20 +449,23 @@ def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
             else:
                 raise
         
-        coin_data = response.json()
+        data = response.json()
+        coin_data = data.get('data', {}).get(symbol.upper())
         
-        # Extract market data
-        market_data = coin_data.get('market_data', {})
+        if not coin_data:
+            return None
+        
+        quote = coin_data.get('quote', {}).get('GBP', {})
         
         return {
-            'id': coin_data.get('id'),
+            'id': str(coin_data.get('id')),
             'symbol': coin_data.get('symbol', '').upper(),
             'name': coin_data.get('name'),
-            'current_price': market_data.get('current_price', {}).get('gbp', 0),
-            'market_cap': market_data.get('market_cap', {}).get('gbp', 0),
-            'market_cap_rank': market_data.get('market_cap_rank'),
-            'total_volume': market_data.get('total_volume', {}).get('gbp', 0),
-            'price_change_percentage_24h': market_data.get('price_change_percentage_24h', 0)
+            'current_price': quote.get('price', 0),
+            'market_cap': quote.get('market_cap', 0),
+            'market_cap_rank': coin_data.get('cmc_rank'),
+            'total_volume': quote.get('volume_24h', 0),
+            'price_change_percentage_24h': quote.get('percent_change_24h', 0)
         }
         
     except Exception as e:

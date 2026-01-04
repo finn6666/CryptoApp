@@ -13,10 +13,10 @@ class Config:
     """Application configuration with secure API key management"""
     
     # API Keys
-    COINGECKO_API_KEY = os.getenv('COINGECKO_API_KEY')
+    COINMARKETCAP_API_KEY = os.getenv('COINMARKETCAP_API_KEY')
     
     # API URLs
-    COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3"
+    COINMARKETCAP_BASE_URL = "https://pro-api.coinmarketcap.com/v1"
     
     # App Settings
     DEFAULT_COIN_LIMIT = 10
@@ -25,18 +25,15 @@ class Config:
     
     @classmethod
     def validate(cls):
-        """Validate configuration - CoinGecko API key is optional"""
+        """Validate configuration - CoinMarketCap API key required"""
+        if not cls.COINMARKETCAP_API_KEY:
+            raise ValueError("COINMARKETCAP_API_KEY not found in environment")
         return True
     
     @classmethod
-    def get_coingecko_headers(cls):
-        """Get headers for CoinGecko API requests"""
-        headers = {
-            'Accept': 'application/json',
-            'User-Agent': 'CryptoApp/1.0'
+    def get_cmc_headers(cls):
+        """Get headers for CoinMarketCap API requests"""
+        return {
+            'X-CMC_PRO_API_KEY': cls.COINMARKETCAP_API_KEY,
+            'Accept': 'application/json'
         }
-        
-        if cls.COINGECKO_API_KEY:
-            headers['x-cg-pro-api-key'] = cls.COINGECKO_API_KEY
-            
-        return headers

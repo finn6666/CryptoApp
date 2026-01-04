@@ -28,6 +28,9 @@ class AdvancedAlphaFeatures:
         self.price_history = {}
         self.sentiment_baselines = {}
         
+        # Early detection focus: Track coins showing early signals
+        self.early_signal_tracker = {}
+        
     def extract_contrarian_psychology_features(self, coin_data: Dict) -> Dict[str, float]:
         """
         BEHAVIORAL PSYCHOLOGY SIGNALS - Look for crowd psychology errors
@@ -168,29 +171,31 @@ class AdvancedAlphaFeatures:
         
         The Theory: Smart money (institutions, whales, experienced traders) 
         leaves footprints. Detecting their activity early provides alpha.
+        
+        ENHANCED: Focus on EARLY detection before retail catches on
         """
         features = {}
         
         try:
-            # 10. WHALE ACCUMULATION PATTERN
+            # 10. WHALE ACCUMULATION PATTERN (EARLY SIGNAL)
             # Large, consistent buying without major price impact = smart accumulation
             whale_pattern = self._detect_whale_accumulation_pattern(coin_data)
             features['whale_accumulation_score'] = whale_pattern
             
-            # 11. INSTITUTIONAL PREPARATION SIGNALS
-            # Signs that institutions are preparing to enter
+            # 11. INSTITUTIONAL PREPARATION SIGNALS (EARLY SIGNAL)
+            # Signs that institutions are preparing to enter - BEFORE announcements
             institutional_prep = self._detect_institutional_preparation(coin_data)
             features['institutional_prep_score'] = institutional_prep
             
-            # 12. RETAIL EXHAUSTION SIGNAL
-            # When retail investors give up, smart money often enters
-            retail_exhaustion = self._calculate_retail_exhaustion_score(coin_data)
-            features['retail_exhaustion_score'] = retail_exhaustion
+            # 12. EARLY MOVER ADVANTAGE SIGNAL (NEW - EARLY SIGNAL)
+            # Detect when smart money is moving BEFORE retail awareness
+            early_mover = self._detect_early_mover_advantage(coin_data)
+            features['early_mover_advantage_score'] = early_mover
             
         except Exception as e:
             features['whale_accumulation_score'] = 0.3
             features['institutional_prep_score'] = 0.3
-            features['retail_exhaustion_score'] = 0.3
+            features['early_mover_advantage_score'] = 0.3
             
         return features
     
@@ -413,6 +418,56 @@ class AdvancedAlphaFeatures:
             return 0.2
         except:
             return 0.2
+    
+    def _detect_early_mover_advantage(self, coin_data: Dict) -> float:
+        """
+        NEW: Detect when smart money is moving BEFORE retail catches on
+        
+        Early signals:
+        - Volume increasing but price stable (quiet accumulation)
+        - Activity during off-peak hours (when retail sleeping)
+        - Low social buzz but high on-chain activity
+        - Gradual position building without price spikes
+        """
+        try:
+            symbol = coin_data.get('symbol', 'UNKNOWN')
+            volume = self._extract_numeric_value(coin_data.get('total_volume', '0'))
+            market_cap = self._extract_numeric_value(coin_data.get('market_cap', '0'))
+            price_change = coin_data.get('price_change_24h', 0)
+            rank = coin_data.get('market_cap_rank', 999)
+            
+            early_signal_score = 0.0
+            
+            # Signal 1: High volume with minimal price impact (smart money accumulating)
+            if market_cap > 0 and volume > 0:
+                volume_ratio = volume / market_cap
+                price_impact = abs(price_change) / 100
+                
+                # High volume (>0.12) with low price movement (<0.04) = EARLY SIGNAL
+                if volume_ratio > 0.12 and price_impact < 0.04:
+                    early_signal_score += 0.4
+                elif volume_ratio > 0.08 and price_impact < 0.06:
+                    early_signal_score += 0.25
+            
+            # Signal 2: Off-peak activity (Asian hours, weekends)
+            current_hour = datetime.now().hour
+            # UTC hours 0-8 and 14-16 are often when smart money moves (off US retail hours)
+            if (0 <= current_hour <= 8 or 14 <= current_hour <= 16) and abs(price_change) > 3:
+                early_signal_score += 0.3
+            
+            # Signal 3: Mid-tier coins with suspicious activity (500-800 rank)
+            # Often overlooked by retail but good tech/utility
+            if 500 < rank < 800 and volume > 200_000:
+                early_signal_score += 0.2
+            
+            # Signal 4: Gradual accumulation pattern (steady volume, no spikes)
+            if volume > 0 and 1 < abs(price_change) < 4:  # Slow grind
+                early_signal_score += 0.15
+            
+            return min(early_signal_score, 1.0)
+            
+        except Exception as e:
+            return 0.3
     
     def _calculate_limited_downside_score(self, coin_data: Dict) -> float:
         """Calculate limited downside potential"""

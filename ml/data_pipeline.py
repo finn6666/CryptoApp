@@ -5,6 +5,9 @@ from datetime import datetime
 from typing import List, Dict
 import asyncio
 import aiohttp
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class CryptoDataPipeline:
     def __init__(self):
@@ -12,8 +15,9 @@ class CryptoDataPipeline:
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.data_dir = os.path.join(project_root, 'data')
         self.supported_symbols = ["BTC", "ETH", "ADA", "SOL", "MATIC", "DOT", "BOSS"]
-        self.coingecko_base = "https://api.coingecko.com/api/v3"
-        self._coins_cache = None
+        self.cmc_base = "https://pro-api.coinmarketcap.com/v1"
+        self.api_key = os.getenv('COINMARKETCAP_API_KEY')
+        self._symbol_to_id = None
     
     async def collect_training_data(self, days: int = 90) -> str:
         """Collect comprehensive training data for all supported symbols"""
@@ -58,26 +62,38 @@ class CryptoDataPipeline:
             raise Exception("No data collected for training")
     
     async def _fetch_symbol_data(self, session: aiohttp.ClientSession, symbol: str, days: int) -> List[Dict]:
-        """Fetch historical data for a single symbol"""
+        """Fetch historical data for a single symbol from CoinMarketCap"""
         try:
-            coingecko_id = await self._get_coingecko_id(symbol)
-            
-            url = f"{self.coingecko_base}/coins/{coingecko_id}/market_chart"
+            # Use CMC quotes endpoint
+            url = f"{self.cmc_base}/cryptocurrency/quotes/latest"
+            headers = {'X-CMC_PRO_API_KEY': self.api_key}
             params = {
-                "vs_currency": "usd",
-                "days": str(days),
-                "interval": "hourly"
+                'symbol': symbol,
+                'convert': 'USD'
             }
             
-            async with session.get(url, params=params) as response:
+            async with session.get(url, headers=headers, params=params) as response:
                 if response.status != 200:
                     logging.warning(f"API error for {symbol}: {response.status}")
                     return []
                     
                 data = await response.json()
+                coin_data = data.get('data', {}).get(symbol)
                 
-                prices = data.get('prices', [])
-                volumes = data.get('total_volumes', [])
+                if not coin_data:
+                    return []
+                
+                quote = coin_data.get('quote', {}).get('USD', {})
+                
+                # CMC doesn't provide historical hourly data in basic plan
+                # Store current snapshot (you'd need CMC Pro for historical)
+                return [{
+                    'timestamp': datetime.now(),
+                    'price': quote.get('price', 0),
+                    'volume': quote.get('volume_24h', 0),
+                    'market_cap': quote.get('market_cap', 0),
+                    'percent_change_24h': quote.get('percent_change_24h', 0)
+                }]
                 market_caps = data.get('market_caps', [])
                 
                 result = []
@@ -150,71 +166,37 @@ class CryptoDataPipeline:
     
     async def search_symbols(self, query: str, limit: int = 10) -> List[Dict[str, str]]:
         """Search for symbols matching a query"""
-        if not hasattr(self, '_coins_cache') or not self._coins_cache:
-            await self._load_coins_list()
-        
-        query_lower = query.lower()
-        matches = []
-        
-        for coin in self._coins_cache:
-            if (query_lower in coin['symbol'].lower() or 
-                query_lower in coin['name'].lower()):
-                matches.append({
-                    'symbol': coin['symbol'].upper(),
-                    'name': coin['name'],
-                    'coingecko_id': coin['id']
-                })
-                
-                if len(matches) >= limit:
-                    break
-        
-        return matches
-
-    async def _get_coingecko_id(self, symbol: str) -> str:
-        """Automatically find CoinGecko ID for any symbol"""
-        # Cache the coins list to avoid repeated API calls
-        if not hasattr(self, '_coins_cache') or not self._coins_cache:
-            await self._load_coins_list()
-        
-        symbol_upper = symbol.upper()
-        
-        # Try exact symbol match first
-        for coin in self._coins_cache:
-            if coin['symbol'].upper() == symbol_upper:
-                return coin['id']
-        
-        # If no exact match, raise error with suggestions
-        suggestions = [coin['symbol'].upper() for coin in self._coins_cache 
-                      if symbol_upper in coin['symbol'].upper()][:5]
-        
-        if suggestions:
-            raise ValueError(f"Symbol '{symbol}' not found. Did you mean: {suggestions}?")
-        else:
-            raise ValueError(f"Symbol '{symbol}' not supported by CoinGecko")
-    
-    async def _load_coins_list(self):
-        """Load and cache the full CoinGecko coins list"""
+        # For CMC, we'll search directly via API
         try:
+            headers = {'X-CMC_PRO_API_KEY': self.api_key}
+            url = f"{self.cmc_base}/cryptocurrency/map"
+            params = {'limit': 5000}
+            
             async with aiohttp.ClientSession() as session:
-                url = f"{self.coingecko_base}/coins/list"
-                async with session.get(url) as response:
+                async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
-                        self._coins_cache = await response.json()
-                        logging.info(f"Loaded {len(self._coins_cache)} coins from CoinGecko API")
-                    else:
-                        # Fallback to hardcoded mapping if API fails
-                        self._coins_cache = self._get_fallback_mapping()
-                        logging.warning("Using fallback coin mapping")
+                        data = await response.json()
+                        coins = data.get('data', [])
+                        
+                        query_lower = query.lower()
+                        matches = []
+                        
+                        for coin in coins:
+                            if (query_lower in coin['symbol'].lower() or 
+                                query_lower in coin['name'].lower()):
+                                matches.append({
+                                    'symbol': coin['symbol'].upper(),
+                                    'name': coin['name'],
+                                    'cmc_id': coin['id']
+                                })
+                                
+                                if len(matches) >= limit:
+                                    break
+                        
+                        return matches
         except Exception as e:
-            logging.warning(f"Failed to load coins list: {e}, using fallback")
-            self._coins_cache = self._get_fallback_mapping()
-
-    def _get_fallback_mapping(self):
-        """Fallback mapping in CoinGecko API format"""
-        return [
-            {'id': 'bitcoin', 'symbol': 'btc', 'name': 'Bitcoin'},
-            {'id': 'ethereum', 'symbol': 'eth', 'name': 'Ethereum'},
-            {'id': 'cardano', 'symbol': 'ada', 'name': 'Cardano'},
+            logging.error(f"Error searching symbols: {e}")
+            return []
             {'id': 'solana', 'symbol': 'sol', 'name': 'Solana'},
             {'id': 'matic-network', 'symbol': 'matic', 'name': 'Polygon'},
             {'id': 'polkadot', 'symbol': 'dot', 'name': 'Polkadot'}

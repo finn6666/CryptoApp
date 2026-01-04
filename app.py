@@ -9,6 +9,10 @@ import logging
 import threading
 import time
 import signal
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging for production
 logging.basicConfig(
@@ -150,98 +154,60 @@ def fetch_and_add_new_symbol_data(symbol: str):
     try:
         import requests
         import json
+        import os
         from datetime import datetime
+        from dotenv import load_dotenv
+        
+        load_dotenv()
+        cmc_api_key = os.getenv('COINMARKETCAP_API_KEY')
         
         logger.info(f"Fetching data for new symbol: {symbol}")
         
-        # First, get the CoinGecko ID for the symbol
+        # First, validate the symbol exists
         if not data_pipeline:
             raise Exception("Data pipeline not available")
         
-        # Use asyncio to get the coingecko ID
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            validation_result = loop.run_until_complete(data_pipeline.validate_symbol(symbol))
-        finally:
-            loop.close()
-        
-        if validation_result['status'] != 'valid':
-            raise Exception(f"Symbol {symbol} is not valid")
-        
-        coingecko_id = validation_result['coingecko_id']
-        
-        # Fetch current market data for the symbol
-        coingecko_url = f"https://api.coingecko.com/api/v3/coins/{coingecko_id}"
+        # Fetch current market data from CMC
+        cmc_url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+        headers = {'X-CMC_PRO_API_KEY': cmc_api_key}
         params = {
-            'localization': 'false',
-            'tickers': 'false',
-            'market_data': 'true',
-            'community_data': 'false',
-            'developer_data': 'false',
-            'sparkline': 'false'
+            'symbol': symbol.upper(),
+            'convert': 'USD'
         }
         
-        response = requests.get(coingecko_url, params=params, timeout=10)
+        response = requests.get(cmc_url, headers=headers, params=params, timeout=10)
         response.raise_for_status()
         data = response.json()
         
-        # Create coin data structure
-        market_data = data.get('market_data', {})
-        price = market_data.get('current_price', {}).get('usd', 0)
+        coin_data = data.get('data', {}).get(symbol.upper())
+        if not coin_data:
+            raise Exception(f"Symbol {symbol} not found on CoinMarketCap")
         
-        # Check if price is null/0 and coin has migrated
-        if not price or price == 0:
-            logger.warning(f"{symbol} has no price data, checking if token migrated...")
-            
-            # Check common migration patterns
-            name_lower = data.get('name', '').lower()
-            if 'migrated' in name_lower or 'replaced' in name_lower:
-                logger.info(f"{symbol} appears to be migrated, attempting to find new token...")
-                
-                # Special case handling for known migrations
-                migration_map = {
-                    'MATIC': 'polygon-ecosystem-token',  # MATIC -> POL
-                    # Add more migrations here as needed
-                }
-                
-                if symbol.upper() in migration_map:
-                    new_coingecko_id = migration_map[symbol.upper()]
-                    logger.info(f"Using known migration: {symbol} -> {new_coingecko_id}")
-                    
-                    # Fetch data for the new token
-                    response = requests.get(f"https://api.coingecko.com/api/v3/coins/{new_coingecko_id}", 
-                                          params=params, timeout=10)
-                    response.raise_for_status()
-                    data = response.json()
-                    market_data = data.get('market_data', {})
-                    price = market_data.get('current_price', {}).get('usd', 0)
-                    
-                    # Update the display to show it's the new token
-                    symbol = data.get('symbol', symbol).upper()
-                    coingecko_id = new_coingecko_id
+        # Create coin data structure
+        quote = coin_data.get('quote', {}).get('USD', {})
+        price = quote.get('price', 0)
         
         new_coin_data = {
             "item": {
-                "id": coingecko_id,
-                "name": data.get('name', symbol),
+                "id": str(coin_data.get('id')),
+                "name": coin_data.get('name', symbol),
                 "symbol": symbol.upper(),
                 "status": "current",
                 "attractiveness_score": 6.0,  # Default score for new additions
                 "investment_highlights": ["Recently added symbol"],
                 "risk_level": "medium",
-                "market_cap_rank": market_data.get('market_cap_rank'),
+                "market_cap_rank": coin_data.get('cmc_rank'),
                 "price_btc": None,
                 "data": {
                     "price": price,
-                    "price_btc": market_data.get('current_price', {}).get('btc'),
+                    "price_btc": None,
                     "price_change_percentage_24h": {
-                        "usd": market_data.get('price_change_percentage_24h', 0)
+                        "usd": quote.get('percent_change_24h', 0)
                     },
-                    "market_cap": f"${market_data.get('market_cap', {}).get('usd', 0):,}" if market_data.get('market_cap', {}).get('usd') else "N/A",
-                    "total_volume": f"${market_data.get('total_volume', {}).get('usd', 0):,}" if market_data.get('total_volume', {}).get('usd') else "N/A",
+                    "market_cap": f"${quote.get('market_cap', 0):,}" if quote.get('market_cap') else "N/A",
+                    "total_volume": f"${quote.get('volume_24h', 0):,}" if quote.get('volume_24h') else "N/A",
                     "content": None,
-                    "source": "coingecko"
+                    "source": "coinmarketcap"
                 }
             }
         }
@@ -252,7 +218,7 @@ def fetch_and_add_new_symbol_data(symbol: str):
             with open(live_data_file, 'r') as f:
                 live_data = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            live_data = {"last_updated": datetime.now().isoformat(), "sources": ["coingecko"], "coins": []}
+            live_data = {"last_updated": datetime.now().isoformat(), "sources": ["coinmarketcap"], "coins": []}
         
         # Check if symbol already exists
         existing_symbols = [coin["item"]["symbol"] for coin in live_data.get("coins", [])]
@@ -1472,7 +1438,7 @@ def validate_symbol():
             return jsonify({
                 'success': True,
                 'symbol': validation_result['symbol'],
-                'coingecko_id': validation_result['coingecko_id'],
+                'cmc_id': validation_result.get('cmc_id', validation_result.get('coingecko_id')),  # Support both for now
                 'name': validation_result['name'],
                 'valid': True
             })
@@ -2169,6 +2135,138 @@ def debug_coins():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ========================================
+# Trade Journal & RL Learning Routes
+# ========================================
+
+@app.route('/trades')
+def trades_page():
+    """Trade journal page for reporting trades and RL learning"""
+    return render_template('trades.html')
+
+@app.route('/api/rl/report-trade', methods=['POST'])
+def report_trade():
+    """Report a trade outcome to teach the RL system"""
+    try:
+        data = request.json
+        
+        # Validate required fields
+        required_fields = ['symbol', 'entry_price', 'exit_price', 'days_held']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        symbol = data['symbol'].upper()
+        entry_price = float(data['entry_price'])
+        exit_price = float(data['exit_price'])
+        days_held = int(data['days_held'])
+        notes = data.get('notes', '')
+        
+        # Calculate profit
+        profit_pct = ((exit_price - entry_price) / entry_price) * 100
+        
+        # Get gem detector to access RL
+        if not GEM_DETECTOR_AVAILABLE or not gem_detector:
+            return jsonify({
+                'error': 'RL not available. Gem detector not initialized.'
+            }), 503
+        
+        # Teach RL (we'll use simplified features for now)
+        # In a real scenario, you'd want to store the original analysis features
+        features = {
+            'profit_indicator': 1.0 if profit_pct > 0 else -1.0,
+            'days_held': days_held / 100.0,  # Normalize
+            'entry_price': entry_price / 10000.0,  # Normalize
+        }
+        
+        result = gem_detector.learn_from_outcome(
+            symbol=symbol,
+            entry_price=entry_price,
+            current_price=exit_price,
+            days_held=days_held,
+            features=features,
+            notes=notes
+        )
+        
+        if not result:
+            return jsonify({
+                'error': 'RL learning not available'
+            }), 503
+        
+        # Store trade info for display (add to result)
+        result['symbol'] = symbol
+        result['entry_price'] = entry_price
+        result['exit_price'] = exit_price
+        result['profit_pct'] = round(profit_pct, 2)
+        result['days_held'] = days_held
+        result['notes'] = notes
+        result['new_success_rate'] = round(result['new_success_rate'] * 100, 2)
+        
+        logger.info(f"Trade reported: {symbol} {profit_pct:+.1f}% over {days_held} days")
+        
+        return jsonify(result), 200
+        
+    except ValueError as e:
+        return jsonify({'error': f'Invalid number format: {str(e)}'}), 400
+    except Exception as e:
+        logger.error(f"Error reporting trade: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rl/stats')
+def rl_stats():
+    """Get RL learning statistics"""
+    try:
+        if not GEM_DETECTOR_AVAILABLE or not gem_detector:
+            return jsonify({
+                'success': False,
+                'error': 'RL not available'
+            }), 503
+        
+        # Import simple_rl to get stats
+        from ml.simple_rl import simple_rl_learner
+        
+        stats = simple_rl_learner.get_stats()
+        stats['success'] = True
+        
+        return jsonify(stats), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting RL stats: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/rl/trades')
+def rl_trades():
+    """Get recent trades from RL history"""
+    try:
+        from ml.simple_rl import simple_rl_learner
+        
+        # Get trade history
+        recent_trades = simple_rl_learner.trade_history[-20:]  # Last 20 trades
+        
+        # Enhance with calculated values
+        enhanced_trades = []
+        for trade in reversed(recent_trades):  # Most recent first
+            enhanced_trade = trade.copy()
+            # Add any missing fields for display
+            enhanced_trade['symbol'] = enhanced_trade.get('symbol', 'N/A')
+            enhanced_trades.append(enhanced_trade)
+        
+        return jsonify({
+            'success': True,
+            'trades': enhanced_trades
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting trades: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'trades': []
+        }), 500
 
 if __name__ == '__main__':
     # Simple, configurable runner
