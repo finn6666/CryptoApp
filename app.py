@@ -561,7 +561,8 @@ def get_coins():
                 'price_change_24h': coin.price_change_24h or 0,
                 'market_cap_rank': coin.market_cap_rank,
                 'recently_added': coin.symbol in [c.symbol for c in recently_added_coins],  # Flag for UI
-                'ai_analysis': None  # Will be populated below
+                'ai_analysis': None,  # Will be populated below
+                'ai_sentiment': None  # DeepSeek sentiment
             })
         
         # Add comprehensive AI analysis to each coin
@@ -596,6 +597,7 @@ def get_coins():
             
             ai_insights = []
             ai_score = matching_coin.attractiveness_score
+            analysis_done = False
             
             # 1. RL Detector Analysis (preferred - most advanced)
             if RL_DETECTOR_AVAILABLE and rl_detector:
@@ -621,6 +623,7 @@ def get_coins():
                         'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
                         'analysis_type': 'RL Enhanced'
                     }
+                    analysis_done = True
                     ai_score = rl_analysis.get('gem_score', ai_score)
                     continue  # RL analysis is most comprehensive, skip others
                 except Exception as e:
@@ -654,6 +657,12 @@ def get_coins():
                             'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
                             'analysis_type': 'Gem Detector'
                         }
+                        
+                        # Extract DeepSeek ai_sentiment if present
+                        if gem_result.get('ai_sentiment'):
+                            coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
+                        
+                        analysis_done = True
                         ai_score = gem_result.get('gem_score', ai_score)
                         continue
                 except Exception as e:
@@ -679,8 +688,24 @@ def get_coins():
                     recommendation = 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID'
                     
                     coin_data['ai_analysis'] = {
-                        'recommendation': recommendation,
-                        'confidence': f"{ml_result.get('confidence', 0)*100:.0f}%",
+                    analysis_done = True
+                except Exception as e:
+                    logging.warning(f"ML prediction failed for {symbol}: {e}")
+            
+            # If no sentiment from gem_detector, try DeepSeek directly
+            if coin_data.get('ai_sentiment') is None:
+                try:
+                    from ml.deepseek_analyzer import deepseek_analyzer
+                    sentiment = deepseek_analyzer.analyze_coin_sentiment(coin_dict)
+                    if sentiment:
+                        coin_data['ai_sentiment'] = {
+                            'score': sentiment.score,
+                            'confidence': sentiment.confidence,
+                            'key_points': sentiment.key_points,
+                            'reasoning': sentiment.reasoning
+                        }
+                except Exception as ds_error:
+                    logging.debug(f"DeepSeek not available for {symbol}: {ds_error:.0f}%",
                         'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
                         'prediction': f"{pred_pct:+.1f}%",
                         'analysis_type': 'ML Model'
