@@ -760,7 +760,7 @@ class HiddenGemDetector:
                     'innovation_score': features['technology_score'],
                     'community_strength': features['community_growth']
                 },
-                'ai_sentiment': enhanced_data.get('sentiment_analysis'),  # AI insights
+                'ai_sentiment': enhanced_data.get('sentiment'),  # AI insights from DeepSeek
                 'ai_enabled': enhanced_data.get('ai_enabled', False),
                 'rl_recommendation': rl_data.get('action') if self.rl_enabled else None,
                 'rl_confidence': rl_data.get('confidence') if self.rl_enabled else None,

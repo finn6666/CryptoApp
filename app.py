@@ -659,7 +659,9 @@ def get_favorites():
                         'market_cap': coin.market_cap,
                         'market_cap_rank': coin.market_cap_rank,
                         'ai_analysis': None,
-                        'enhanced_score': coin.attractiveness_score
+                        'enhanced_score': coin.attractiveness_score,
+                        'ai_sentiment': None,
+                        'investment_highlights': coin.investment_highlights
                     }
                     
                     # Prepare coin dict for analysis
@@ -747,6 +749,11 @@ def get_favorites():
                                     'analysis_type': 'Gem Detector'
                                 }
                                 coin_data['enhanced_score'] = gem_result.get('gem_score', coin.attractiveness_score)
+                                
+                                # Extract DeepSeek ai_sentiment if present
+                                if gem_result.get('ai_sentiment'):
+                                    coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
+                                
                                 analysis_done = True
                         except Exception as e:
                             logging.warning(f"Gem detection failed for favorite {coin.symbol}: {e}")
@@ -791,6 +798,11 @@ def get_favorites():
                 try:
                     coin_data_raw = fetch_specific_coin(symbol)
                     if coin_data_raw:
+                        # Generate investment highlights for directly-fetched coins
+                        from src.core.live_data_fetcher import LiveDataFetcher
+                        fetcher = LiveDataFetcher()
+                        highlights = fetcher.generate_investment_highlights(coin_data_raw)
+                        
                         coin_data = {
                             'symbol': coin_data_raw['symbol'],
                             'name': coin_data_raw['name'],
@@ -800,8 +812,61 @@ def get_favorites():
                             'market_cap': coin_data_raw['market_cap'],
                             'market_cap_rank': coin_data_raw['market_cap_rank'],
                             'ai_analysis': None,
-                            'enhanced_score': 5.0
+                            'enhanced_score': 5.0,
+                            'ai_sentiment': None,
+                            'investment_highlights': highlights
                         }
+                        
+                        # Run gem_detector analysis on directly-fetched coins
+                        coin_dict = {
+                            'symbol': coin_data_raw['symbol'],
+                            'name': coin_data_raw['name'],
+                            'price': coin_data_raw['current_price'] or 0,
+                            'market_cap': coin_data_raw['market_cap'] or 0,
+                            'volume_24h': coin_data_raw['total_volume'] or 0,
+                            'price_change_24h': coin_data_raw['price_change_percentage_24h'] or 0,
+                            'market_cap_rank': coin_data_raw['market_cap_rank']
+                        }
+                        
+                        analysis_done = False
+                        
+                        # Try gem_detector analysis (includes DeepSeek)
+                        if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
+                            try:
+                                gem_result = gem_detector.predict_hidden_gem(coin_dict)
+                                if gem_result:
+                                    gem_prob = gem_result.get('gem_probability', 0)
+                                    is_gem = gem_prob > 0.6
+                                    
+                                    strengths = gem_result.get('key_strengths', [])
+                                    weaknesses = gem_result.get('key_weaknesses', [])
+                                    
+                                    summary_parts = []
+                                    if is_gem:
+                                        summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
+                                    if strengths:
+                                        summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
+                                    if weaknesses:
+                                        summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
+                                    
+                                    coin_data['ai_analysis'] = {
+                                        'recommendation': 'BUY' if is_gem else 'WATCH',
+                                        'confidence': f"{gem_prob*100:.0f}%",
+                                        'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
+                                        'risk_level': gem_result.get('risk_level', 'Medium'),
+                                        'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                                        'analysis_type': 'Gem Detector'
+                                    }
+                                    coin_data['enhanced_score'] = gem_result.get('gem_score', 5.0)
+                                    
+                                    # Extract DeepSeek ai_sentiment if present
+                                    if gem_result.get('ai_sentiment'):
+                                        coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
+                                    
+                                    analysis_done = True
+                            except Exception as e:
+                                logging.warning(f"Gem detection failed for directly-fetched {symbol}: {e}")
+                        
                         favorite_coins.append(coin_data)
                     else:
                         if symbol not in missing_coins:

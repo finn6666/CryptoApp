@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trade Journal - CryptoApp RL Learning</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .back-btn {
+            background: #f0f0f0;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background: #e0e0e0;
+        }
+
+        .header h1 {
+            color: #2a5298;
+            margin: 0;
+        }
+
+        .header p {
+            color: #666;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-card.success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .stat-card.danger {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #2a5298;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .trade-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .trade-item {
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: transform 0.2s;
+        }
+
+        .trade-item:hover {
+            transform: translateX(5px);
+        }
+
+        .trade-item.profit {
+            border-left-color: #38ef7d;
+        }
+
+        .trade-item.loss {
+            border-left-color: #f45c43;
+        }
+
+        .trade-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .trade-symbol {
+            font-weight: bold;
+            font-size: 18px;
+            color: #2a5298;
+        }
+
+        .trade-profit {
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .trade-profit.positive {
+            color: #38ef7d;
+        }
+
+        .trade-profit.negative {
+            color: #f45c43;
+        }
+
+        .trade-details {
+            font-size: 14px;
+            color: #666;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .emoji {
+            font-size: 24px;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            margin-bottom: 20px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+        
+        <div class="header">
+            <div class="header-top">
+                <h1>🧠 Trade Journal & RL Learning</h1>
+                <a href="/" class="back-btn">← Dashboard</a>
+            </div>
+            <p>Report your trades to teach the RL system what works. The more you report, the smarter it gets!</p>
+            
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTrades">0</div>
+                    <div class="stat-label">Total Trades</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-value" id="winRate">0%</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="winningTrades">0</div>
+                    <div class="stat-label">Winning Trades</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-value" id="losingTrades">0</div>
+                    <div class="stat-label">Losing Trades</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-grid">
+            <div class="card">
+                <h2><span class="emoji">📝</span> Report a Trade</h2>
+                
+                <div id="alertBox" class="alert"></div>
+                
+                <form id="tradeForm">
+                    <div class="form-group">
+                        <label for="symbol">Coin Symbol *</label>
+                        <input type="text" id="symbol" name="symbol" placeholder="BTC, ETH, SOL..." required>
+                    </div>
+
+                    <div class="input-row">
+                        <div class="form-group">
+                            <label for="entryPrice">Entry Price ($) *</label>
+                            <input type="number" id="entryPrice" name="entryPrice" step="0.00000001" placeholder="2000.00" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="exitPrice">Exit Price ($) *</label>
+                            <input type="number" id="exitPrice" name="exitPrice" step="0.00000001" placeholder="2500.00" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="daysHeld">Days Held *</label>
+                        <input type="number" id="daysHeld" name="daysHeld" min="1" placeholder="14" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notes">Notes (Optional)</label>
+                        <input type="text" id="notes" name="notes" placeholder="Why did you make this trade?">
+                    </div>
+
+                    <button type="submit" id="submitBtn">
+                        📊 Report Trade & Teach RL
+                    </button>
+                </form>
+
+                <div class="loading" id="loadingIndicator">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 10px;">Teaching RL...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><span class="emoji">📈</span> Recent Trades</h2>
+                <div class="trade-list" id="tradeList">
+                    <p style="color: #666; text-align: center;">No trades reported yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load stats and trades on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadTrades();
+        });
+
+        // Handle form submission
+        document.getElementById('tradeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                symbol: document.getElementById('symbol').value.toUpperCase(),
+                entry_price: parseFloat(document.getElementById('entryPrice').value),
+                exit_price: parseFloat(document.getElementById('exitPrice').value),
+                days_held: parseInt(document.getElementById('daysHeld').value),
+                notes: document.getElementById('notes').value
+            };
+
+            // Show loading
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('loadingIndicator').style.display = 'block';
+            hideAlert();
+
+            try {
+                const response = await fetch('/api/rl/report-trade', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showAlert('success', `✅ Trade reported! RL learned: ${result.profit_pct > 0 ? 'Success' : 'Loss'} pattern. New success rate: ${result.new_success_rate}%`);
+                    
+                    // Reset form
+                    document.getElementById('tradeForm').reset();
+                    
+                    // Reload stats and trades
+                    loadStats();
+                    loadTrades();
+                } else {
+                    showAlert('error', `❌ Error: ${result.error || 'Failed to report trade'}`);
+                }
+            } catch (error) {
+                showAlert('error', `❌ Network error: ${error.message}`);
+            } finally {
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        });
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/rl/stats');
+                const stats = await response.json();
+
+                if (stats.success) {
+                    document.getElementById('totalTrades').textContent = stats.total_trades || 0;
+                    document.getElementById('winRate').textContent = (stats.success_rate || 0) + '%';
+                    document.getElementById('winningTrades').textContent = stats.winning_trades || 0;
+                    document.getElementById('losingTrades').textContent = stats.losing_trades || 0;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        async function loadTrades() {
+            try {
+                const response = await fetch('/api/rl/trades');
+                const data = await response.json();
+
+                const tradeList = document.getElementById('tradeList');
+                
+                if (data.success && data.trades && data.trades.length > 0) {
+                    tradeList.innerHTML = data.trades.map(trade => {
+                        const profitClass = trade.success ? 'profit' : 'loss';
+                        const profitSign = trade.profit_pct >= 0 ? '+' : '';
+                        const profitColor = trade.profit_pct >= 0 ? 'positive' : 'negative';
+                        
+                        return `
+                            <div class="trade-item ${profitClass}">
+                                <div class="trade-header">
+                                    <span class="trade-symbol">${trade.symbol || 'N/A'}</span>
+                                    <span class="trade-profit ${profitColor}">${profitSign}${trade.profit_pct.toFixed(2)}%</span>
+                                </div>
+                                <div class="trade-details">
+                                    <div>Days Held: ${trade.days_held}</div>
+                                    <div>Reward: ${trade.reward.toFixed(3)}</div>
+                                    <div>Entry: $${trade.entry_price?.toFixed(2) || 'N/A'}</div>
+                                    <div>Exit: $${trade.exit_price?.toFixed(2) || 'N/A'}</div>
+                                </div>
+                                ${trade.notes ? `<div style="margin-top: 10px; font-style: italic; color: #666;">Note: ${trade.notes}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    tradeList.innerHTML = '<p style="color: #666; text-align: center;">No trades reported yet.</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load trades:', error);
+            }
+        }
+
+        function showAlert(type, message) {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.className = `alert ${type} show`;
+            alertBox.textContent = message;
+            
+            setTimeout(() => {
+                hideAlert();
+            }, 5000);
+        }
+
+        function hideAlert() {
+            const alertBox = document.getElementById('alertBox');
+            alertBox.classList.remove('show');
+        }
+    </script>
+</body>
+</html>

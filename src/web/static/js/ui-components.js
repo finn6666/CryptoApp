@@ -118,9 +118,17 @@ function generateAISentimentHTML(coin, coinId) {
     `;
 }
 
-// Generate ML reasoning HTML section
+// Generate ML reasoning HTML section  
 function generateMLReasoningHTML(coin, coinId, mlEnabled) {
-    // Don't show this section anymore - we're using ai_analysis now in generateAISentimentHTML
+    // Show investment highlights if available
+    if (coin.investment_highlights && coin.investment_highlights.length > 0) {
+        return `
+            <div class="investment-highlights">
+                <div class="highlights-label">💡 ML Insights:</div>
+                <div class="highlights-text">${coin.investment_highlights}</div>
+            </div>
+        `;
+    }
     return '';
 }
 

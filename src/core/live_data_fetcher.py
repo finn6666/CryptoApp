@@ -256,57 +256,108 @@ class LiveDataFetcher:
         return max(1.0, min(10.0, score))
     
     def generate_investment_highlights(self, coin_data: Dict) -> List[str]:
-        """Generate investment highlights based on coin data (optimized for low caps)"""
+        """Generate personable, varied investment highlights"""
+        import random
         highlights = []
         
-        # Market cap analysis
+        # Market cap analysis with personality
         market_cap = coin_data.get('market_cap', 0) or 0
-        if market_cap < 10_000_000:  # Under $10M
-            highlights.append("Micro cap gem")
-        elif market_cap < 50_000_000:  # Under $50M
-            highlights.append("Small cap potential")
-        elif market_cap < 100_000_000:  # Under $100M
-            highlights.append("Low cap opportunity")
-        elif market_cap < 500_000_000:  # Under $500M
-            highlights.append("Mid-small cap")
-        
-        # Price performance
         price_change = coin_data.get('price_change_percentage_24h', 0) or 0
-        if price_change > 50:
-            highlights.append("Explosive growth")
-        elif price_change > 20:
-            highlights.append("Strong momentum")
-        elif price_change > 10:
-            highlights.append("Good uptrend")
-        elif price_change > 5:
-            highlights.append("Positive movement")
-        elif price_change < -20:
-            highlights.append("Major dip opportunity")
-        elif price_change < -10:
-            highlights.append("Potential buy the dip")
-        
-        # Volume analysis
         volume = coin_data.get('total_volume', 0) or 0
+        
+        # Micro caps (under $10M) - exciting language
+        if market_cap < 10_000_000:
+            highlights.append(random.choice([
+                "Absolute micro cap - huge upside potential",
+                "Hidden gem territory under $10M",
+                "Early-stage opportunity, high risk/reward",
+                "Tiny market cap = room to explode"
+            ]))
+        # Small caps ($10M-$50M)
+        elif market_cap < 50_000_000:
+            highlights.append(random.choice([
+                "Small cap with growth runway",
+                "Under $50M - still early",
+                "Small enough to 10x, big enough to trust",
+                "Growing from small cap base"
+            ]))
+        # Low caps ($50M-$100M)
+        elif market_cap < 100_000_000:
+            highlights.append(random.choice([
+                "Low cap sweet spot under $100M",
+                "Established but room to run",
+                "Mid-tier cap with potential",
+                "Flying under radar at this cap"
+            ]))
+        
+        # Price action with context
+        if price_change > 50:
+            highlights.append(random.choice([
+                f"Parabolic +{price_change:.0f}% move today",
+                f"Explosive +{price_change:.0f}% - late or early?",
+                f"+{price_change:.0f}% rocket - FOMO zone"
+            ]))
+        elif price_change > 20:
+            highlights.append(random.choice([
+                f"Strong +{price_change:.0f}% momentum building",
+                f"Solid +{price_change:.0f}% pump in play",
+                f"+{price_change:.0f}% catching attention"
+            ]))
+        elif price_change > 5:
+            highlights.append(random.choice([
+                f"Healthy +{price_change:.1f}% gain",
+                f"Riding +{price_change:.1f}% wave",
+                f"Steady +{price_change:.1f}% climb"
+            ]))
+        elif price_change < -30:
+            highlights.append(random.choice([
+                f"Brutal {price_change:.0f}% dump - bottom?",
+                f"{price_change:.0f}% bloodbath - contrarian play?",
+                f"Heavy {price_change:.0f}% drop - buy fear?"
+            ]))
+        elif price_change < -15:
+            highlights.append(random.choice([
+                f"{price_change:.0f}% dip - accumulation zone?",
+                f"{price_change:.0f}% pullback - fishing for entry",
+                f"{price_change:.0f}% discount appearing"
+            ]))
+        elif price_change < -5:
+            highlights.append(random.choice([
+                f"Minor {price_change:.1f}% retrace",
+                f"{price_change:.1f}% cooling off",
+                f"{price_change:.1f}% healthy correction"
+            ]))
+        
+        # Volume insights with personality
         if market_cap > 0:
             volume_ratio = volume / market_cap
             if volume_ratio > 0.5:
-                highlights.append("High trading volume")
+                highlights.append(random.choice([
+                    "Massive volume - something's brewing",
+                    "Volume explosion - whales active",
+                    "Crazy high volume ratio"
+                ]))
             elif volume_ratio > 0.2:
-                highlights.append("Active trading")
+                highlights.append(random.choice([
+                    "Active trading, good liquidity",
+                    "Strong volume support",
+                    "Healthy trading flow"
+                ]))
             elif volume_ratio < 0.01:
-                highlights.append("Low liquidity risk")
+                highlights.append(random.choice([
+                    "Low liquidity - tread carefully",
+                    "Thin volume = slippage risk",
+                    "Illiquid - hard to exit"
+                ]))
         
-        # Volume thresholds
-        if volume > 10_000_000:  # $10M+ volume
-            highlights.append("Good liquidity")
-        elif volume > 1_000_000:  # $1M+ volume
-            highlights.append("Decent volume")
-        elif volume < 100_000:  # Under $100K volume
-            highlights.append("Low volume")
-        
-        # Default highlights if none found
+        # Fallback if nothing interesting
         if not highlights:
-            highlights = ["Low cap coin", "High risk/reward"]
+            highlights = [random.choice([
+                "High risk, high reward play",
+                "Speculative micro cap bet",
+                "Early stage - do your research",
+                "Volatile small cap opportunity"
+            ])]
         
         return highlights[:3]  # Limit to 3 highlights
     
@@ -457,7 +508,7 @@ def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
         
         quote = coin_data.get('quote', {}).get('GBP', {})
         
-        return {
+        result = {
             'id': str(coin_data.get('id')),
             'symbol': coin_data.get('symbol', '').upper(),
             'name': coin_data.get('name'),
@@ -467,6 +518,11 @@ def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
             'total_volume': quote.get('volume_24h', 0),
             'price_change_percentage_24h': quote.get('percent_change_24h', 0)
         }
+        
+        # Debug logging to diagnose 24h change issue
+        print(f"📊 Fetched {symbol}: price={result['current_price']:.4f}, 24h_change={result['price_change_percentage_24h']:.2f}%")
+        
+        return result
         
     except Exception as e:
         print(f"Error fetching {symbol}: {e}")
