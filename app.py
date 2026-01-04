@@ -865,6 +865,22 @@ def get_favorites():
                         except Exception as e:
                             logging.warning(f"Gem detection failed for favorite {coin.symbol}: {e}")
                     
+                    # If gem_detector didn't work, try DeepSeek directly for sentiment
+                    if not analysis_done or (coin_data.get('ai_sentiment') is None):
+                        try:
+                            from ml.deepseek_analyzer import deepseek_analyzer
+                            sentiment = deepseek_analyzer.analyze_coin_sentiment(coin_dict)
+                            if sentiment:
+                                coin_data['ai_sentiment'] = {
+                                    'score': sentiment.score,
+                                    'confidence': sentiment.confidence,
+                                    'key_points': sentiment.key_points,
+                                    'reasoning': sentiment.reasoning
+                                }
+                                logger.info(f"✅ DeepSeek sentiment (direct) added for {coin.symbol}")
+                        except Exception as ds_error:
+                            logging.warning(f"DeepSeek direct call failed for {coin.symbol}: {ds_error}")
+                    
                     # Basic ML prediction (last fallback)
                     if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded and not analysis_done:
                         try:

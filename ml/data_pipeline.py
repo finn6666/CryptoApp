@@ -197,10 +197,6 @@ class CryptoDataPipeline:
         except Exception as e:
             logging.error(f"Error searching symbols: {e}")
             return []
-            {'id': 'solana', 'symbol': 'sol', 'name': 'Solana'},
-            {'id': 'matic-network', 'symbol': 'matic', 'name': 'Polygon'},
-            {'id': 'polkadot', 'symbol': 'dot', 'name': 'Polkadot'}
-        ]
     
     def get_latest_training_file(self) -> str:
         """Get the most recent training data file"""
