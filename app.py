@@ -246,11 +246,12 @@ app = Flask(__name__,
            template_folder='src/web/templates',
            static_folder='src/web/static')
 
-# Track start time for uptime metrics
+# Constants
+STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
+MIN_PRICE = 0.00000001
+MAX_PRICE = 1.25
+IDLE_TIMEOUT = 300  # 5 minutes
 start_time = time.time()
-
-# Auto-shutdown after idle time
-IDLE_TIMEOUT = 300  # 5 minutes in seconds
 last_request_time = time.time()
 shutdown_enabled = os.environ.get('AUTO_SHUTDOWN', 'true').lower() in ('1', 'true', 'yes')
 
@@ -302,7 +303,6 @@ def load_favorites():
 def save_favorites(favorites):
     """Save user's favorite coins to JSON file"""
     try:
-        # Ensure data directory exists
         os.makedirs(os.path.dirname(FAVORITES_FILE), exist_ok=True)
         with open(FAVORITES_FILE, 'w') as f:
             json.dump(favorites, f, indent=2)
@@ -310,6 +310,114 @@ def save_favorites(favorites):
     except Exception as e:
         print(f"Error saving favorites: {e}")
         return False
+
+# Helper Functions
+def safe_float(val):
+    """Convert string value to float (handles currency symbols)"""
+    if isinstance(val, str):
+        return float(val.replace('£', '').replace('$', '').replace(',', ''))
+    return float(val or 0)
+
+def coin_to_dict(coin, include_highlights=False):
+    """Convert Coin object to dictionary for analysis"""
+    coin_dict = {
+        'symbol': coin.symbol,
+        'name': coin.name,
+        'price': coin.price or 0,
+        'market_cap': safe_float(getattr(coin, 'market_cap', 0)),
+        'volume_24h': safe_float(getattr(coin, 'total_volume', 0)),
+        'price_change_24h': coin.price_change_24h or 0,
+        'market_cap_rank': coin.market_cap_rank
+    }
+    if include_highlights:
+        highlights = coin.investment_highlights
+        coin_dict['investment_highlights'] = ' • '.join(highlights) if isinstance(highlights, list) else highlights
+    return coin_dict
+
+def analyze_coin_with_ai(coin_dict, coin=None):
+    """Run comprehensive AI analysis on a coin (RL -> Gem -> ML fallback)"""
+    result = {'ai_analysis': None, 'ai_sentiment': None, 'enhanced_score': coin.attractiveness_score if coin else 5.0}
+    
+    # Try RL analysis first
+    if RL_DETECTOR_AVAILABLE and rl_detector:
+        try:
+            market_context = {
+                'total_market_cap': sum(safe_float(c.market_cap) for c in analyzer.coins if c.market_cap),
+                'market_sentiment': 'neutral',
+                'btc_dominance': 45.0
+            }
+            rl_analysis = rl_detector.analyze_live_coin(coin_dict, market_context)
+            result['ai_analysis'] = {
+                'recommendation': rl_analysis.get('rl_recommendation', 'hold').upper(),
+                'confidence': f"{rl_analysis.get('rl_confidence', 0) * 100:.0f}%",
+                'summary': rl_analysis.get('rl_reasoning', ''),
+                'risk_level': rl_analysis.get('risk_assessment', {}).get('risk_level', 'Medium'),
+                'position_size': f"{rl_analysis.get('position_size_percent', 0):.1f}%",
+                'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
+                'analysis_type': 'RL Enhanced'
+            }
+            result['enhanced_score'] = rl_analysis.get('gem_score', result['enhanced_score'])
+            return result
+        except Exception as e:
+            logger.warning(f"RL analysis failed: {e}")
+    
+    # Try Gem Detector
+    if GEM_DETECTOR_AVAILABLE and gem_detector:
+        try:
+            gem_result = gem_detector.predict_hidden_gem(coin_dict)
+            if gem_result:
+                gem_prob = gem_result.get('gem_probability', 0)
+                strengths = gem_result.get('key_strengths', [])
+                weaknesses = gem_result.get('key_weaknesses', [])
+                summary_parts = []
+                if gem_prob > 0.6:
+                    summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
+                if strengths:
+                    summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
+                if weaknesses:
+                    summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
+                
+                result['ai_analysis'] = {
+                    'recommendation': 'BUY' if gem_prob > 0.6 else 'WATCH',
+                    'confidence': f"{gem_prob*100:.0f}%",
+                    'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
+                    'risk_level': gem_result.get('risk_level', 'Medium'),
+                    'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                    'analysis_type': 'Gem Detector'
+                }
+                result['enhanced_score'] = gem_result.get('gem_score', result['enhanced_score'])
+                if gem_result.get('ai_sentiment'):
+                    result['ai_sentiment'] = gem_result.get('ai_sentiment')
+                return result
+        except Exception as e:
+            logger.warning(f"Gem detection failed: {e}")
+    
+    # Try basic ML
+    if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded:
+        try:
+            features = {
+                'price_change_1h': coin_dict.get('price_change_24h', 0),
+                'price_change_24h': coin_dict.get('price_change_24h', 0),
+                'volume_change_24h': 0, 'market_cap_change_24h': 0,
+                'rsi': 50, 'macd': 0,
+                'moving_avg_7d': coin_dict.get('price', 0),
+                'moving_avg_30d': coin_dict.get('price', 0)
+            }
+            ml_result = ml_pipeline.predict_with_validation(features)
+            pred_pct = ml_result.get('prediction_percentage', 0)
+            direction = 'bullish' if pred_pct > 2 else 'bearish' if pred_pct < -2 else 'neutral'
+            
+            result['ai_analysis'] = {
+                'recommendation': 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID',
+                'confidence': f"{ml_result.get('confidence', 0)*100:.0f}%",
+                'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
+                'prediction': f"{pred_pct:+.1f}%",
+                'analysis_type': 'ML Model'
+            }
+        except Exception as e:
+            logger.warning(f"ML prediction failed: {e}")
+    
+    return result
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -385,14 +493,9 @@ def get_stats():
 def get_coins():
     """Get coins data (excluding favorites)"""
     try:
-        # Get favorites to exclude from live list
         favorites = load_favorites()
         favorites_upper = [f.upper() for f in favorites]
-        logger.info(f"Excluding favorites from live coins: {favorites_upper}")
-        
-        # List of stablecoins to exclude
-        STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
-        MIN_PRICE = 0.00000001  # Minimum price threshold (1 satoshi equivalent)
+        logger.info(f"Excluding favorites: {favorites_upper}")
         
         # Get recently added symbols from data pipeline
         recently_added_coins = []
