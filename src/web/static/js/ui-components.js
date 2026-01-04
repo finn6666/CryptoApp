@@ -1,78 +1,82 @@
 // UI Components and HTML Generators
 
-// Generate AI analysis HTML section
+// Generate combined AI analysis HTML section (ML + DeepSeek)
 function generateAISentimentHTML(coin, coinId) {
-    let html = '';
+    // Only show if we have AI analysis or DeepSeek sentiment
+    if (!coin.ai_analysis && !coin.ai_sentiment) {
+        return '';
+    }
     
-    // Show ai_analysis section if available (🤖 ML Analysis)
-    if (coin.ai_analysis) {
-        const analysis = coin.ai_analysis;
+    const analysis = coin.ai_analysis;
+    const sentiment = coin.ai_sentiment;
+    
+    // Determine title based on what's available
+    let title = '🤖 AI Analysis';
+    if (analysis && sentiment) {
+        title = '🤖🧠 AI Analysis';
+    } else if (sentiment && !analysis) {
+        title = '🧠 AI Sentiment';
+    } else if (analysis) {
+        title = `🤖 ${analysis.analysis_type || 'AI Analysis'}`;
+    }
+    
+    // Build ML analysis content
+    let mlContent = '';
+    if (analysis) {
         const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
                                    analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
         
-        html += `
-            <div class="ai-sentiment-section">
-                <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}-analysis')">
-                    <span>🤖 ${analysis.analysis_type || 'AI Analysis'}</span>
-                    <span class="arrow">▼</span>
-                </button>
-                <div id="ai-sentiment-${coinId}-analysis" class="ml-reasoning-content" style="display: none;">
-                    <div class="ml-prediction-detail">
-                        <div class="prediction-row">
-                            <span class="label">Recommendation:</span>
-                            <span class="value ${recommendationClass}"><strong>${analysis.recommendation}</strong></span>
-                        </div>
-                        <div class="prediction-row">
-                            <span class="label">Confidence:</span>
-                            <span class="value">${analysis.confidence}</span>
-                        </div>
-                        ${analysis.summary ? `
-                            <div class="sentiment-reasoning">
-                                <strong>Analysis:</strong>
-                                <p>${analysis.summary}</p>
-                            </div>
-                        ` : ''}
-                        ${analysis.risk_level ? `
-                            <div class="prediction-row">
-                                <span class="label">Risk Level:</span>
-                                <span class="value">${analysis.risk_level}</span>
-                            </div>
-                        ` : ''}
-                        ${analysis.timing_score ? `
-                            <div class="prediction-row">
-                                <span class="label">Timing:</span>
-                                <span class="value">${analysis.timing_score}</span>
-                            </div>
-                        ` : ''}
-                        ${analysis.position_size ? `
-                            <div class="prediction-row">
-                                <span class="label">Position Size:</span>
-                                <span class="value">${analysis.position_size}</span>
-                            </div>
-                        ` : ''}
-                        ${analysis.gem_score ? `
-                            <div class="prediction-row">
-                                <span class="label">Gem Score:</span>
-                                <span class="value">${analysis.gem_score}</span>
-                            </div>
-                        ` : ''}
-                        ${analysis.prediction ? `
-                            <div class="prediction-row">
-                                <span class="label">Prediction:</span>
-                                <span class="value">${analysis.prediction}</span>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
+        mlContent = `
+            <div class="prediction-row">
+                <span class="label">Recommendation:</span>
+                <span class="value ${recommendationClass}"><strong>${analysis.recommendation}</strong></span>
             </div>
+            <div class="prediction-row">
+                <span class="label">Confidence:</span>
+                <span class="value">${analysis.confidence}</span>
+            </div>
+            ${analysis.summary ? `
+                <div class="sentiment-reasoning">
+                    <strong>ML Analysis:</strong>
+                    <p>${analysis.summary}</p>
+                </div>
+            ` : ''}
+            ${analysis.risk_level ? `
+                <div class="prediction-row">
+                    <span class="label">Risk Level:</span>
+                    <span class="value">${analysis.risk_level}</span>
+                </div>
+            ` : ''}
+            ${analysis.timing_score ? `
+                <div class="prediction-row">
+                    <span class="label">Timing:</span>
+                    <span class="value">${analysis.timing_score}</span>
+                </div>
+            ` : ''}
+            ${analysis.position_size ? `
+                <div class="prediction-row">
+                    <span class="label">Position Size:</span>
+                    <span class="value">${analysis.position_size}</span>
+                </div>
+            ` : ''}
+            ${analysis.gem_score ? `
+                <div class="prediction-row">
+                    <span class="label">Gem Score:</span>
+                    <span class="value">${analysis.gem_score}</span>
+                </div>
+            ` : ''}
+            ${analysis.prediction ? `
+                <div class="prediction-row">
+                    <span class="label">Prediction:</span>
+                    <span class="value">${analysis.prediction}</span>
+                </div>
+            ` : ''}
         `;
     }
     
-    // Show ai_sentiment section if available (🧠 DeepSeek AI Sentiment)
-    if (coin.ai_sentiment && coin.ai_sentiment.key_points && coin.ai_sentiment.key_points.length > 0) {
-        const sentiment = coin.ai_sentiment;
-        
-        // Derive sentiment label from score (-1 to 1)
+    // Build DeepSeek sentiment content
+    let sentimentContent = '';
+    if (sentiment && sentiment.key_points && sentiment.key_points.length > 0) {
         let sentimentLabel = 'Neutral';
         let sentimentClass = 'neutral';
         if (sentiment.score >= 0.3) {
@@ -86,47 +90,48 @@ function generateAISentimentHTML(coin, coinId) {
         const scorePercent = sentiment.score ? (sentiment.score * 10).toFixed(0) : 'N/A';
         const confidencePercent = sentiment.confidence ? (sentiment.confidence * 100).toFixed(0) : 'N/A';
         
-        html += `
-            <div class="ai-sentiment-section">
-                <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}-deepseek')">
-                    <span>🧠 AI Sentiment (DeepSeek)</span>
-                    <span class="arrow">▼</span>
-                </button>
-                <div id="ai-sentiment-${coinId}-deepseek" class="ml-reasoning-content" style="display: none;">
-                    <div class="ml-prediction-detail">
-                        <div class="prediction-row">
-                            <span class="label">Sentiment:</span>
-                            <span class="value ${sentimentClass}">${sentimentLabel.toUpperCase()}</span>
-                        </div>
-                        <div class="prediction-row">
-                            <span class="label">Score:</span>
-                            <span class="value">${scorePercent}/10</span>
-                        </div>
-                        <div class="prediction-row">
-                            <span class="label">Confidence:</span>
-                            <span class="value">${confidencePercent}%</span>
-                        </div>
-                        ${sentiment.key_points && sentiment.key_points.length > 0 ? `
-                            <div class="sentiment-points">
-                                <strong>Key Points:</strong>
-                                <ul>
-                                    ${sentiment.key_points.map(point => `<li>${point}</li>`).join('')}
-                                </ul>
-                            </div>
-                        ` : ''}
-                        ${sentiment.reasoning ? `
-                            <div class="sentiment-reasoning">
-                                <strong>Analysis:</strong>
-                                <p>${sentiment.reasoning}</p>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
+        sentimentContent = `
+            ${analysis ? '<hr style="margin: 15px 0; border: 0; border-top: 1px solid #333;">' : ''}
+            <div class="prediction-row">
+                <span class="label">AI Sentiment:</span>
+                <span class="value ${sentimentClass}"><strong>${sentimentLabel.toUpperCase()}</strong></span>
             </div>
+            <div class="prediction-row">
+                <span class="label">Sentiment Score:</span>
+                <span class="value">${scorePercent}/10 (${confidencePercent}% confidence)</span>
+            </div>
+            ${sentiment.key_points && sentiment.key_points.length > 0 ? `
+                <div class="sentiment-points">
+                    <strong>Key Insights:</strong>
+                    <ul>
+                        ${sentiment.key_points.map(point => `<li>${point}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+            ${sentiment.reasoning ? `
+                <div class="sentiment-reasoning">
+                    <strong>DeepSeek Analysis:</strong>
+                    <p>${sentiment.reasoning}</p>
+                </div>
+            ` : ''}
         `;
     }
     
-    return html;
+    // Combine everything into ONE section
+    return `
+        <div class="ai-sentiment-section">
+            <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}')">
+                <span>${title}</span>
+                <span class="arrow">▼</span>
+            </button>
+            <div id="ai-sentiment-${coinId}" class="ml-reasoning-content" style="display: none;">
+                <div class="ml-prediction-detail">
+                    ${mlContent}
+                    ${sentimentContent}
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 // Generate ML reasoning HTML section  
