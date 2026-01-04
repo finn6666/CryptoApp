@@ -70,7 +70,6 @@ function generateAISentimentHTML(coin, coinId) {
     
     // Show ai_sentiment section if available (🧠 DeepSeek AI Sentiment)
     if (coin.ai_sentiment && coin.ai_sentiment.key_points && coin.ai_sentiment.key_points.length > 0) {
-    if (coin.ai_sentiment && coin.ai_sentiment.key_points && coin.ai_sentiment.key_points.length > 0) {
         const sentiment = coin.ai_sentiment;
         
         // Derive sentiment label from score (-1 to 1)
