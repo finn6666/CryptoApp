@@ -661,7 +661,7 @@ def get_favorites():
                         'ai_analysis': None,
                         'enhanced_score': coin.attractiveness_score,
                         'ai_sentiment': None,
-                        'investment_highlights': coin.investment_highlights
+                        'investment_highlights': ' • '.join(coin.investment_highlights) if isinstance(coin.investment_highlights, list) else coin.investment_highlights
                     }
                     
                     # Prepare coin dict for analysis
@@ -725,6 +725,7 @@ def get_favorites():
                     if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                         try:
                             gem_result = gem_detector.predict_hidden_gem(coin_dict)
+                            logger.info(f"🔍 Gem analysis for {coin.symbol}: has_result={gem_result is not None}, ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else False}")
                             if gem_result:
                                 gem_prob = gem_result.get('gem_probability', 0)
                                 is_gem = gem_prob > 0.6
@@ -753,6 +754,12 @@ def get_favorites():
                                 # Extract DeepSeek ai_sentiment if present
                                 if gem_result.get('ai_sentiment'):
                                     coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
+                                    logger.info(f"✅ Added DeepSeek sentiment for {coin.symbol}")
+                                else:
+                                    logger.warning(f"⚠️ No DeepSeek sentiment for {coin.symbol} - ai_enabled={gem_result.get('ai_enabled')}")
+                                    logger.info(f"✅ DeepSeek sentiment added for {coin.symbol}: {coin_data['ai_sentiment'].get('score')}")
+                                else:
+                                    logger.warning(f"⚠️ No DeepSeek sentiment for {coin.symbol} (ai_enabled={gem_result.get('ai_enabled')})")
                                 
                                 analysis_done = True
                         except Exception as e:
@@ -802,6 +809,8 @@ def get_favorites():
                         from src.core.live_data_fetcher import LiveDataFetcher
                         fetcher = LiveDataFetcher()
                         highlights = fetcher.generate_investment_highlights(coin_data_raw)
+                        highlights_str = ' • '.join(highlights) if isinstance(highlights, list) else highlights
+                        logger.info(f"💡 Generated highlights for {symbol}: '{highlights[:50]}...'")
                         
                         coin_data = {
                             'symbol': coin_data_raw['symbol'],
@@ -814,7 +823,7 @@ def get_favorites():
                             'ai_analysis': None,
                             'enhanced_score': 5.0,
                             'ai_sentiment': None,
-                            'investment_highlights': highlights
+                            'investment_highlights': highlights_str
                         }
                         
                         # Run gem_detector analysis on directly-fetched coins
@@ -834,6 +843,7 @@ def get_favorites():
                         if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                             try:
                                 gem_result = gem_detector.predict_hidden_gem(coin_dict)
+                                logger.info(f"🔍 Direct-fetch gem analysis for {symbol}: ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else 'NO RESULT'}")
                                 if gem_result:
                                     gem_prob = gem_result.get('gem_probability', 0)
                                     is_gem = gem_prob > 0.6
@@ -862,6 +872,9 @@ def get_favorites():
                                     # Extract DeepSeek ai_sentiment if present
                                     if gem_result.get('ai_sentiment'):
                                         coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
+                                        logger.info(f"✅ DeepSeek sentiment added for direct-fetch {symbol}: {coin_data['ai_sentiment'].get('score')}")
+                                    else:
+                                        logger.warning(f"⚠️ No DeepSeek sentiment for direct-fetch {symbol} (ai_enabled={gem_result.get('ai_enabled')})")
                                     
                                     analysis_done = True
                             except Exception as e:

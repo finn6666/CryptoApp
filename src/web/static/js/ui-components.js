@@ -72,9 +72,18 @@ function generateAISentimentHTML(coin, coinId) {
     }
 
     const sentiment = coin.ai_sentiment;
-    const sentimentLabel = sentiment.sentiment || 'Neutral';
-    const sentimentClass = sentimentLabel.toLowerCase() === 'bullish' ? 'positive' : 
-                           sentimentLabel.toLowerCase() === 'bearish' ? 'negative' : 'neutral';
+    
+    // Derive sentiment label from score (-1 to 1)
+    let sentimentLabel = 'Neutral';
+    let sentimentClass = 'neutral';
+    if (sentiment.score >= 0.3) {
+        sentimentLabel = 'Bullish';
+        sentimentClass = 'positive';
+    } else if (sentiment.score <= -0.3) {
+        sentimentLabel = 'Bearish';
+        sentimentClass = 'negative';
+    }
+    
     const scorePercent = sentiment.score ? (sentiment.score * 10).toFixed(0) : 'N/A';
     const confidencePercent = sentiment.confidence ? (sentiment.confidence * 100).toFixed(0) : 'N/A';
     
@@ -121,7 +130,7 @@ function generateAISentimentHTML(coin, coinId) {
 // Generate ML reasoning HTML section  
 function generateMLReasoningHTML(coin, coinId, mlEnabled) {
     // Show investment highlights if available
-    if (coin.investment_highlights && coin.investment_highlights.length > 0) {
+    if (coin.investment_highlights && coin.investment_highlights.trim().length > 0) {
         return `
             <div class="investment-highlights">
                 <div class="highlights-label">💡 ML Insights:</div>
