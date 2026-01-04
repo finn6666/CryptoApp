@@ -688,6 +688,12 @@ def get_coins():
                     recommendation = 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID'
                     
                     coin_data['ai_analysis'] = {
+                        'recommendation': recommendation,
+                        'confidence': f"{ml_result.get('confidence', 0)*100:.0f}%",
+                        'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
+                        'prediction': f"{pred_pct:+.1f}%",
+                        'analysis_type': 'ML Model'
+                    }
                     analysis_done = True
                 except Exception as e:
                     logging.warning(f"ML prediction failed for {symbol}: {e}")
@@ -705,13 +711,10 @@ def get_coins():
                             'reasoning': sentiment.reasoning
                         }
                 except Exception as ds_error:
-                    logging.debug(f"DeepSeek not available for {symbol}: {ds_error:.0f}%",
-                        'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
-                        'prediction': f"{pred_pct:+.1f}%",
-                        'analysis_type': 'ML Model'
-                    }
-                except Exception as e:
-                    logging.warning(f"ML prediction failed for {symbol}: {e}")
+                    logging.debug(f"DeepSeek not available for {symbol}: {ds_error}")
+            
+            # Update score with AI insights
+            coin_data['enhanced_score'] = ai_score
             
             # Update score with AI insights
             coin_data['enhanced_score'] = ai_score
