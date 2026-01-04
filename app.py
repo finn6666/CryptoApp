@@ -857,10 +857,7 @@ def get_favorites():
                                 # Extract DeepSeek ai_sentiment if present
                                 if gem_result.get('ai_sentiment'):
                                     coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
-                                    logger.info(f"✅ Added DeepSeek sentiment for {coin.symbol}")
-                                else:
-                                    logger.warning(f"⚠️ No DeepSeek sentiment for {coin.symbol} - ai_enabled={gem_result.get('ai_enabled')}")
-                                    logger.info(f"✅ DeepSeek sentiment added for {coin.symbol}: {coin_data['ai_sentiment'].get('score')}")
+                                    logger.info(f"✅ DeepSeek sentiment added for {coin.symbol}")
                                 else:
                                     logger.warning(f"⚠️ No DeepSeek sentiment for {coin.symbol} (ai_enabled={gem_result.get('ai_enabled')})")
                                 
