@@ -2,19 +2,21 @@
 
 // Generate AI analysis HTML section
 function generateAISentimentHTML(coin, coinId) {
-    // Check for new ai_analysis format
+    let html = '';
+    
+    // Show ai_analysis section if available (🤖 ML Analysis)
     if (coin.ai_analysis) {
         const analysis = coin.ai_analysis;
         const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
                                    analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
         
-        return `
+        html += `
             <div class="ai-sentiment-section">
-                <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}')">
+                <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}-analysis')">
                     <span>🤖 ${analysis.analysis_type || 'AI Analysis'}</span>
                     <span class="arrow">▼</span>
                 </button>
-                <div id="ai-sentiment-${coinId}" class="ml-reasoning-content" style="display: none;">
+                <div id="ai-sentiment-${coinId}-analysis" class="ml-reasoning-content" style="display: none;">
                     <div class="ml-prediction-detail">
                         <div class="prediction-row">
                             <span class="label">Recommendation:</span>
@@ -66,65 +68,66 @@ function generateAISentimentHTML(coin, coinId) {
         `;
     }
     
-    // Fallback to old ai_sentiment format
-    if (!coin.ai_sentiment || !coin.ai_sentiment.key_points || coin.ai_sentiment.key_points.length === 0) {
-        return '';
-    }
-
-    const sentiment = coin.ai_sentiment;
-    
-    // Derive sentiment label from score (-1 to 1)
-    let sentimentLabel = 'Neutral';
-    let sentimentClass = 'neutral';
-    if (sentiment.score >= 0.3) {
-        sentimentLabel = 'Bullish';
-        sentimentClass = 'positive';
-    } else if (sentiment.score <= -0.3) {
-        sentimentLabel = 'Bearish';
-        sentimentClass = 'negative';
-    }
-    
-    const scorePercent = sentiment.score ? (sentiment.score * 10).toFixed(0) : 'N/A';
-    const confidencePercent = sentiment.confidence ? (sentiment.confidence * 100).toFixed(0) : 'N/A';
-    
-    return `
-        <div class="ai-sentiment-section">
-            <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}')">
-                <span>🧠 AI Sentiment (DeepSeek)</span>
-                <span class="arrow">▼</span>
-            </button>
-            <div id="ai-sentiment-${coinId}" class="ml-reasoning-content" style="display: none;">
-                <div class="ml-prediction-detail">
-                    <div class="prediction-row">
-                        <span class="label">Sentiment:</span>
-                        <span class="value ${sentimentClass}">${sentimentLabel.toUpperCase()}</span>
-                    </div>
-                    <div class="prediction-row">
-                        <span class="label">Score:</span>
-                        <span class="value">${scorePercent}/10</span>
-                    </div>
-                    <div class="prediction-row">
-                        <span class="label">Confidence:</span>
-                        <span class="value">${confidencePercent}%</span>
-                    </div>
-                    ${sentiment.key_points && sentiment.key_points.length > 0 ? `
-                        <div class="sentiment-points">
-                            <strong>Key Points:</strong>
-                            <ul>
-                                ${sentiment.key_points.map(point => `<li>${point}</li>`).join('')}
-                            </ul>
+    // Show ai_sentiment section if available (🧠 DeepSeek AI Sentiment)
+    if (coin.ai_sentiment && coin.ai_sentiment.key_points && coin.ai_sentiment.key_points.length > 0) {
+    if (coin.ai_sentiment && coin.ai_sentiment.key_points && coin.ai_sentiment.key_points.length > 0) {
+        const sentiment = coin.ai_sentiment;
+        
+        // Derive sentiment label from score (-1 to 1)
+        let sentimentLabel = 'Neutral';
+        let sentimentClass = 'neutral';
+        if (sentiment.score >= 0.3) {
+            sentimentLabel = 'Bullish';
+            sentimentClass = 'positive';
+        } else if (sentiment.score <= -0.3) {
+            sentimentLabel = 'Bearish';
+            sentimentClass = 'negative';
+        }
+        
+        const scorePercent = sentiment.score ? (sentiment.score * 10).toFixed(0) : 'N/A';
+        const confidencePercent = sentiment.confidence ? (sentiment.confidence * 100).toFixed(0) : 'N/A';
+        
+        html += `
+            <div class="ai-sentiment-section">
+                <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}-deepseek')">
+                    <span>🧠 AI Sentiment (DeepSeek)</span>
+                    <span class="arrow">▼</span>
+                </button>
+                <div id="ai-sentiment-${coinId}-deepseek" class="ml-reasoning-content" style="display: none;">
+                    <div class="ml-prediction-detail">
+                        <div class="prediction-row">
+                            <span class="label">Sentiment:</span>
+                            <span class="value ${sentimentClass}">${sentimentLabel.toUpperCase()}</span>
                         </div>
-                    ` : ''}
-                    ${sentiment.reasoning ? `
-                        <div class="sentiment-reasoning">
-                            <strong>Analysis:</strong>
-                            <p>${sentiment.reasoning}</p>
+                        <div class="prediction-row">
+                            <span class="label">Score:</span>
+                            <span class="value">${scorePercent}/10</span>
                         </div>
-                    ` : ''}
+                        <div class="prediction-row">
+                            <span class="label">Confidence:</span>
+                            <span class="value">${confidencePercent}%</span>
+                        </div>
+                        ${sentiment.key_points && sentiment.key_points.length > 0 ? `
+                            <div class="sentiment-points">
+                                <strong>Key Points:</strong>
+                                <ul>
+                                    ${sentiment.key_points.map(point => `<li>${point}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                        ${sentiment.reasoning ? `
+                            <div class="sentiment-reasoning">
+                                <strong>Analysis:</strong>
+                                <p>${sentiment.reasoning}</p>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
+    }
+    
+    return html;
 }
 
 // Generate ML reasoning HTML section  
