@@ -136,7 +136,7 @@ class WeeklyReportGenerator:
         </head>
         <body>
             <div class="container">
-                <h1>💎 Weekly Crypto Opportunities Report</h1>
+                <h1>GEM: Weekly Crypto Opportunities Report</h1>
                 <p><strong>Report Date:</strong> {date}</p>
                 <p>Here are your top 3 cryptocurrency investment opportunities for this week:</p>
         """.format(date=datetime.now().strftime("%B %d, %Y"))
@@ -168,7 +168,7 @@ class WeeklyReportGenerator:
                 html += f"""
                 <div class="opportunity">
                     <div class="symbol">#{i} {opp['symbol']} - {opp['name']}</div>
-                    <div class="score">💎 Gem Score: {gem_score}%{f' (+{round(sentiment_boost)} AI boost)' if ai_enabled and sentiment_boost > 0 else ''}</div>
+                    <div class="score">GEM: Gem Score: {gem_score}%{f' (+{round(sentiment_boost)} AI boost)' if ai_enabled and sentiment_boost > 0 else ''}</div>
                     
                     <div class="metric">
                         <span class="label">Current Price:</span> ${price if isinstance(price, str) else f'{price:.8f}'}
@@ -217,7 +217,7 @@ class WeeklyReportGenerator:
                 return False
             
             msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"💎 Weekly Crypto Opportunities - {datetime.now().strftime('%B %d, %Y')}"
+            msg['Subject'] = f"GEM: Weekly Crypto Opportunities - {datetime.now().strftime('%B %d, %Y')}"
             msg['From'] = self.email_from
             msg['To'] = self.email_to
             

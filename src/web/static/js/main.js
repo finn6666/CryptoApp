@@ -7,24 +7,23 @@ let userFavorites = [];
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 CryptoApp Dashboard initializing...');
+    console.log('CryptoApp Dashboard initializing...');
     
     try {
         // Load all data in parallel
         await Promise.all([
             loadCoins(),
-            loadFavorites(),
-            loadMLStatus()
+            loadFavorites()
         ]);
         
-        console.log('✅ Dashboard loaded successfully');
+        console.log('Dashboard loaded successfully');
         
         // Start auto-refresh timer
         startRefreshTimer();
         
     } catch (error) {
-        console.error('❌ Error initializing dashboard:', error);
-        showStatus('❌ Error loading dashboard', 'error');
+        console.error('Error initializing dashboard:', error);
+        showStatus('Error loading dashboard', 'error');
     }
 });
 

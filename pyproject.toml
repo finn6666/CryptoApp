@@ -3,7 +3,7 @@ name = "cryptoapp"
 version = "0.1.0"
 description = "Cryptocurrency Analysis and Investment Recommendation Tool"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.13"
 dependencies = [
     "requests>=2.31.0",
     "flask>=2.3.0",

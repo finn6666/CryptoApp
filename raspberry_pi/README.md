@@ -1,15 +1,17 @@
 # 🛡️ Raspberry Pi SIEM Dashboard for CryptoApp
 
-Transform your Raspberry Pi 4 (4GB) into a dedicated Security Information and Event Management (SIEM) dashboard for monitoring your CryptoApp Azure VM and detecting market anomalies.
+Transform your Raspberry Pi into a dedicated Security Information and Event Management (SIEM) dashboard for monitoring your CryptoApp Azure VM and detecting market anomalies.
+
+> **Note:** This is an optional enhancement. CryptoApp works perfectly fine without it.
 
 ## 🎯 What It Does
 
 - **VM Health Monitoring** - Tracks Azure VM uptime, latency, and availability
-- **System Metrics** - Real-time Pi CPU, memory, disk, and temperature monitoring
-- **Market Anomalies** - Detects unusual gem scores, volume spikes, and price movements
-- **Alert Management** - Categorizes and displays alerts by severity (Critical/High/Medium/Low)
-- **Web Dashboard** - Beautiful real-time SIEM interface accessible from any device
-- **Email Alerts** - Optional email notifications for critical events
+- **System Metrics** - Real-time Pi CPU, memory, disk, and temperature
+- **Market Anomalies** - Detects unusual gem scores, volume spikes, price movements
+- **Alert Management** - Severity-based categorization (Critical/High/Medium/Low)
+- **Web Dashboard** - Real-time SIEM interface at `http://your-pi-ip:5002`
+- **Email Alerts** - Optional notifications for critical events
 
 ## 📊 Dashboard Features
 
@@ -35,22 +37,25 @@ Transform your Raspberry Pi 4 (4GB) into a dedicated Security Information and Ev
 
 ### 1. Transfer Files to Your Pi
 
+**Option A: Using Git (Recommended)**
 ```bash
-# From your Mac, transfer the SIEM system to your Pi
-cd /Users/finnbryant/Dev/CryptoApp
-scp -r raspberry_pi pi@your-pi-ip:~/cryptoapp-siem
-
-# Or use git
 ssh pi@your-pi-ip
-git clone https://github.com/finn6666/CryptoApp.git
+git clone https://github.com/yourusername/CryptoApp.git
 cd CryptoApp/raspberry_pi
+```
+
+**Option B: Direct Transfer**
+```bash
+# From your local machine
+cd /path/to/CryptoApp
+scp -r raspberry_pi pi@your-pi-ip:~/cryptoapp-siem
 ```
 
 ### 2. Run Setup Script
 
 ```bash
 ssh pi@your-pi-ip
-cd ~/cryptoapp-siem
+cd ~/CryptoApp/raspberry_pi  # Or ~/cryptoapp-siem if using Option B
 chmod +x setup_pi.sh
 ./setup_pi.sh
 ```

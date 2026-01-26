@@ -82,7 +82,10 @@ wheels/
 *.tar.bz2
 
 ## Data Files (add specific patterns if needed)
-# live_api.json  # Remove if you don't want to track live datadata/Coinmarketcap.api
+data/favorites.json
+data/live_api.json
+data/deepseek_cache/
+data/Coinmarketcap.api
 *.api
 .env
 DEPLOYMENT_CHECKLIST.md

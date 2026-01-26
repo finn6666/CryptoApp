@@ -14,7 +14,6 @@ function generateCoinsTable(coins, mlEnabled = false) {
 
         const { displayScore, scorePercentage, scoreClass, scoreLabel } = getScoreInfo(coin.enhanced_score || coin.score);
         const price = formatPrice(coin.price);
-        const mlEnhancedBadge = mlEnabled && coin.enhanced_score ? '<span class="badge badge-ai">🧠 AI</span>' : '';
         
         const aiSentimentHtml = generateAISentimentHTML(coin, index);
         const mlReasoningHtml = generateMLReasoningHTML(coin, index, mlEnabled);
@@ -26,15 +25,12 @@ function generateCoinsTable(coins, mlEnabled = false) {
                         <button class="favorite-btn-card ${userFavorites.includes(coin.symbol) ? 'active' : ''}" 
                                 onclick="toggleFavorite('${coin.symbol}')" 
                                 title="${userFavorites.includes(coin.symbol) ? 'Remove from favorites' : 'Add to favorites'}">
-                            ${userFavorites.includes(coin.symbol) ? '⭐' : '☆'}
+                            ${userFavorites.includes(coin.symbol) ? '★' : '☆'}
                         </button>
                         <div class="coin-identity">
                             <div class="coin-symbol-large">${coin.symbol}</div>
                             <div class="coin-name-small">${coin.name}</div>
                         </div>
-                    </div>
-                    <div class="badges">
-                        ${mlEnhancedBadge}
                     </div>
                 </div>
                 
@@ -79,7 +75,6 @@ function generateFavoritesTable(favorites, mlEnabled = false) {
 
         const { displayScore, scorePercentage, scoreClass, scoreLabel } = getScoreInfo(coin.enhanced_score || coin.score);
         const price = formatPrice(coin.price);
-        const mlEnhancedBadge = mlEnabled && coin.enhanced_score ? '<span class="badge badge-ai">🧠 AI</span>' : '';
         
         const aiSentimentHtml = generateAISentimentHTML(coin, `fav-${index}`);
         const mlReasoningHtml = generateMLReasoningHTML(coin, `fav-${index}`, mlEnabled);
@@ -88,15 +83,14 @@ function generateFavoritesTable(favorites, mlEnabled = false) {
             <div class="coin-card ${scoreClass}">
                 <div class="coin-card-header">
                     <div class="coin-info">
-                        <button class="favorite-btn-card active" onclick="removeFavorite('${coin.symbol}')" title="Remove from favorites">❌</button>
+                        <button class="favorite-btn-card active" onclick="removeFavorite('${coin.symbol}')" title="Remove from favorites">×</button>
                         <div class="coin-identity">
                             <div class="coin-symbol-large">${coin.symbol}</div>
                             <div class="coin-name-small">${coin.name}</div>
                         </div>
                     </div>
                     <div class="badges">
-                        <span class="badge" style="background: gold; color: black;">⭐ FAVORITE</span>
-                        ${mlEnhancedBadge}
+                        <span class="badge" style="background: gold; color: black;">FAVORITE</span>
                     </div>
                 </div>
                 

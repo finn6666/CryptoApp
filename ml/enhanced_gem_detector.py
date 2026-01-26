@@ -61,17 +61,17 @@ class HiddenGemDetector:
         # Check AI sentiment availability
         self.ai_enabled = deepseek_analyzer.is_available()
         if self.ai_enabled:
-            print("✨ AI Sentiment Analysis: ENABLED (DeepSeek)")
+            print("AI Sentiment Analysis: ENABLED (DeepSeek)")
         else:
-            print("ℹ️  AI Sentiment Analysis: Disabled (using ML scores only)")
+            print("AI Sentiment Analysis: Disabled (using ML scores only)")
         
         # Check Simple RL availability
         self.rl_enabled = SIMPLE_RL_AVAILABLE and simple_rl_learner is not None
         if self.rl_enabled:
             stats = simple_rl_learner.get_stats()
-            print(f"🧠 Simple RL Learning: ENABLED ({stats['total_trades']} trades, {stats['success_rate']:.1f}% success)")
+            print(f"Simple RL Learning: ENABLED ({stats['total_trades']} trades, {stats['success_rate']:.1f}% success)")
         else:
-            print("ℹ️  Simple RL Learning: Disabled")
+            print("Simple RL Learning: Disabled")
         
         # Create models directory if it doesn't exist
         os.makedirs(model_dir, exist_ok=True)
@@ -82,7 +82,12 @@ class HiddenGemDetector:
         
         # Basic price and market features
         features['current_price'] = float(coin_data.get('price', 0))
-        features['price_change_24h'] = float(coin_data.get('price_change_24h', {}).get('usd', 0))
+        price_change = coin_data.get('price_change_24h', 0)
+        # Handle both float and dict formats
+        if isinstance(price_change, dict):
+            features['price_change_24h'] = float(price_change.get('usd', 0))
+        else:
+            features['price_change_24h'] = float(price_change)
         features['market_cap_rank'] = int(coin_data.get('market_cap_rank', 999))
         
         # Hidden gem core indicators
@@ -248,7 +253,7 @@ class HiddenGemDetector:
     def _detect_price_discovery(self, coin_data: Dict) -> float:
         """Detect if coin is in price discovery phase"""
         try:
-            price_change = coin_data.get('price_change_24h', {}).get('usd', 0)
+            price_change = coin_data.get('price_change_24h', 0)
             rank = coin_data.get('market_cap_rank', 999)
             
             # Coins with moderate positive movement and low rank might be in discovery
@@ -263,7 +268,7 @@ class HiddenGemDetector:
     def _detect_accumulation(self, coin_data: Dict) -> float:
         """Detect accumulation patterns"""
         try:
-            price_change = coin_data.get('price_change_24h', {}).get('usd', 0)
+            price_change = coin_data.get('price_change_24h', 0)
             volume_ratio = self._calculate_volume_price_ratio(coin_data)
             
             # High volume with low price movement suggests accumulation
@@ -293,7 +298,7 @@ class HiddenGemDetector:
     def _calculate_volatility_score(self, coin_data: Dict) -> float:
         """Calculate volatility score (moderate volatility is good for gems)"""
         try:
-            price_change = abs(coin_data.get('price_change_24h', {}).get('usd', 0))
+            price_change = abs(coin_data.get('price_change_24h', 0))
             
             # Sweet spot for hidden gems: 3-20% daily volatility
             if 3 <= price_change <= 20:
@@ -308,7 +313,7 @@ class HiddenGemDetector:
     def _calculate_stability_score(self, coin_data: Dict) -> float:
         """Calculate price stability score"""
         try:
-            price_change = abs(coin_data.get('price_change_24h', {}).get('usd', 0))
+            price_change = abs(coin_data.get('price_change_24h', 0))
             return max(0, 1 - (price_change / 100))  # Lower volatility = higher stability
         except:
             return 0.5
@@ -316,7 +321,7 @@ class HiddenGemDetector:
     def _calculate_momentum_score(self, coin_data: Dict) -> float:
         """Calculate positive momentum score"""
         try:
-            price_change = coin_data.get('price_change_24h', {}).get('usd', 0)
+            price_change = coin_data.get('price_change_24h', 0)
             if price_change > 0:
                 return min(price_change / 50, 1.0)  # Normalize positive changes
             return 0
@@ -366,7 +371,7 @@ class HiddenGemDetector:
         try:
             # Based on sector trends and timing
             rank = coin_data.get('market_cap_rank', 999)
-            price_change = coin_data.get('price_change_24h', {}).get('usd', 0)
+            price_change = coin_data.get('price_change_24h', 0)
             
             # Strong narrative coins often have sustained interest
             if rank < 200 and price_change > 0:
@@ -414,7 +419,7 @@ class HiddenGemDetector:
         # Heuristic based on market activity
         try:
             volume_ratio = self._calculate_volume_price_ratio(coin_data)
-            price_change = coin_data.get('price_change_24h', {}).get('usd', 0)
+            price_change = coin_data.get('price_change_24h', 0)
             
             # High volume + positive price = social momentum
             if volume_ratio > 0.1 and price_change > 5:
@@ -431,7 +436,7 @@ class HiddenGemDetector:
         try:
             # Without market context, use basic heuristics
             rank = coin_data.get('market_cap_rank', 999)
-            price_change = coin_data.get('price_change_24h', {}).get('usd', 0)
+            price_change = coin_data.get('price_change_24h', 0)
             
             # Lower cap coins with moderate gains might be in good cycle position
             if rank > 300 and 0 < price_change < 15:
@@ -533,7 +538,7 @@ class HiddenGemDetector:
         # Create sophisticated labels based on hidden gem criteria
         labels = self._create_hidden_gem_labels(df)
         
-        print(f"✅ Created dataset with {len(df)} samples and {len(df.columns)} features")
+        print(f"SUCCESS: Created dataset with {len(df)} samples and {len(df.columns)} features")
         print(f"   Hidden gems identified: {sum(labels)} ({sum(labels)/len(labels)*100:.1f}%)")
         
         return df, labels
@@ -547,13 +552,13 @@ class HiddenGemDetector:
             
             # Core hidden gem criteria (weighted scoring)
             
-            # 1. Market cap positioning (25% weight)
+            # 1. Market cap positioning (30% weight) - FAVOR LOW CAPS MORE
             if row['is_nano_cap']:
-                score += 0.15  # Highest potential
+                score += 0.25  # Highest potential - extreme moonshot (boosted for better scores)
             elif row['is_micro_cap']:
-                score += 0.12
+                score += 0.20  # High potential (boosted)
             elif row['is_low_cap']:
-                score += 0.08
+                score += 0.15  # Good potential (boosted)
             
             # 2. Volume and activity signals (25% weight)
             if row['volume_surge'] > 0.6 and row['volume_price_ratio'] > 0.08:
@@ -596,23 +601,23 @@ class HiddenGemDetector:
             if (row['whale_accumulation_score'] > 0.6 and 
                 row['quiet_accumulation_signal'] > 0.6 and 
                 row['off_peak_anomaly'] > 0.5):
-                score += 0.12  # EARLY SIGNAL BONUS - smart money moving before retail
+                score += 0.15  # EARLY SIGNAL BONUS - smart money moving before retail (boosted)
             
             # Innovation play: high tech score + utility + narrative
             if (row['technology_score'] > 0.8 and row['utility_score'] > 0.7 and 
                 row['narrative_strength'] > 0.7):
                 score += 0.08  # Innovation bonus
             
-            # Conservative threshold for hidden gem classification
-            # Require score > 0.65 to be classified as hidden gem
-            labels.append(1 if score > 0.65 else 0)
+            # Aggressive threshold for hidden gem classification - favor high-risk plays
+            # Lower threshold to catch more speculative opportunities
+            labels.append(1 if score > 0.40 else 0)  # Lowered to 0.40 for more moonshot picks
         
         return labels
     
     def train_model(self, training_data: pd.DataFrame, labels: List[int]) -> Optional[Dict]:
         """Train the enhanced hidden gem detection model"""
         try:
-            print("🏋️ Training Hidden Gem Detection Model...")
+            print("Training Hidden Gem Detection Model...")
             
             # Handle any missing values
             training_data = training_data.fillna(0)
@@ -677,7 +682,7 @@ class HiddenGemDetector:
                 'model_type': 'GradientBoostingClassifier'
             }
             
-            print(f"✅ Model trained successfully!")
+            print(f"SUCCESS: Model trained successfully!")
             print(f"   Accuracy: {accuracy:.3f}")
             print(f"   AUC Score: {auc_score:.3f}")
             print(f"   CV Score: {cv_scores.mean():.3f} (±{cv_scores.std():.3f})")
@@ -685,13 +690,14 @@ class HiddenGemDetector:
             return result
             
         except Exception as e:
-            print(f"❌ Error training model: {e}")
+            print(f"ERROR: Error training model: {e}")
             return None
     
     def predict_hidden_gem(self, coin_data: Dict, market_context: Optional[Dict] = None) -> Optional[Dict]:
         """Predict if a coin is a hidden gem with detailed analysis"""
         if not self.model_loaded or self.model is None:
-            return None
+            # FALLBACK: Use heuristic-based scoring when model not trained
+            return self._heuristic_gem_score(coin_data, market_context)
         
         try:
             # Extract features
@@ -715,13 +721,26 @@ class HiddenGemDetector:
             prediction = self.model.predict(features_scaled)[0]
             probability = self.model.predict_proba(features_scaled)[0]
             
+            # BOOST probability for low-cap coins (favor speculation)
+            raw_probability = float(probability[1])
+            
+            # Apply aggressive boost for low caps
+            if features.get('is_nano_cap', 0):
+                boosted_probability = min(raw_probability + 0.25, 0.95)  # +25% boost for nano-caps
+            elif features.get('is_micro_cap', 0):
+                boosted_probability = min(raw_probability + 0.20, 0.90)  # +20% boost for micro-caps
+            elif features.get('is_low_cap', 0):
+                boosted_probability = min(raw_probability + 0.15, 0.85)  # +15% boost for small-caps
+            else:
+                boosted_probability = raw_probability
+            
             # Get detailed feature analysis
             feature_analysis = self._analyze_features(features)
             top_features = self._get_top_contributing_features(features)
             risk_assessment = self._assess_investment_risk(features)
             
-            # Base gem score from ML model
-            base_gem_score = float(probability[1] * 100)
+            # Base gem score from BOOSTED probability
+            base_gem_score = float(boosted_probability * 100)
             
             # Enhance with AI sentiment analysis
             enhanced_data = deepseek_analyzer.enhance_gem_score(base_gem_score, coin_data)
@@ -741,9 +760,9 @@ class HiddenGemDetector:
             
             # Build result with both ML and AI insights
             result = {
-                'is_hidden_gem': bool(prediction),
-                'gem_probability': float(probability[1]),
-                'confidence': float(max(probability)),
+                'is_hidden_gem': bool(prediction) or boosted_probability > 0.5,  # More lenient
+                'gem_probability': float(boosted_probability),  # Use boosted probability
+                'confidence': float(max(boosted_probability, 1 - boosted_probability)),  # Confidence based on boost
                 'gem_score': enhanced_data['enhanced_score'],  # AI-enhanced score
                 'base_gem_score': base_gem_score,  # Original ML score
                 'sentiment_boost': enhanced_data.get('sentiment_boost', 0),  # AI contribution
@@ -752,7 +771,7 @@ class HiddenGemDetector:
                 'key_strengths': feature_analysis['strengths'],
                 'key_weaknesses': feature_analysis['weaknesses'],
                 'top_features': top_features,
-                'recommendation': self._generate_recommendation(features, probability[1]),
+                'recommendation': self._generate_recommendation(features, boosted_probability),
                 'feature_breakdown': {
                     'market_position': features['market_cap_rank'],
                     'volume_activity': features['volume_price_ratio'],
@@ -771,7 +790,7 @@ class HiddenGemDetector:
             return result
             
         except Exception as e:
-            print(f"❌ Error making prediction: {e}")
+            print(f"ERROR: Error making prediction: {e}")
             return None
     
     def _analyze_features(self, features: Dict) -> Dict:
@@ -779,15 +798,15 @@ class HiddenGemDetector:
         strengths = []
         weaknesses = []
         
-        # Market positioning
+        # Market positioning - emphasize moonshot potential
         if features['is_nano_cap']:
-            strengths.append("Ultra-low market cap with extreme upside potential")
+            strengths.append(" Nano-cap moonshot - 100x+ potential if project executes")
         elif features['is_micro_cap']:
-            strengths.append("Micro-cap positioning with high growth potential")
+            strengths.append("GEM: Micro-cap gem - 50x+ potential with strong execution")
         elif features['is_low_cap']:
-            strengths.append("Low market cap with good growth opportunity")
+            strengths.append("⭐ Small-cap opportunity - 10x+ potential")
         else:
-            weaknesses.append("Higher market cap limits explosive growth potential")
+            weaknesses.append("Larger market cap - limited to 2-5x upside")
         
         # Volume and activity
         if features['volume_price_ratio'] > 0.1:
@@ -845,16 +864,16 @@ class HiddenGemDetector:
         return contributions[:5]
     
     def _assess_investment_risk(self, features: Dict) -> Dict:
-        """Assess investment risk level"""
+        """Assess investment risk level - frame as opportunity for gem hunters"""
         risk_score = 0
         
-        # Market cap risk (higher for lower caps)
+        # Market cap "risk" = upside potential for gem hunters
         if features['is_nano_cap']:
-            risk_score += 0.4
+            risk_score += 0.35  # Reduced from 0.4 - high risk = high reward
         elif features['is_micro_cap']:
-            risk_score += 0.3
+            risk_score += 0.25  # Reduced from 0.3
         elif features['is_low_cap']:
-            risk_score += 0.2
+            risk_score += 0.15  # Reduced from 0.2
         
         # Liquidity risk
         if features['liquidity_score'] < 0.3:
@@ -869,15 +888,15 @@ class HiddenGemDetector:
         # Whale concentration risk
         risk_score += features['whale_concentration_risk'] * 0.2
         
-        # Determine risk level
+        # Determine risk level - frame as opportunity
         if risk_score > 0.7:
-            level = "Very High"
+            level = "Extreme Moonshot"  # Was "Very High" - sounds more exciting
         elif risk_score > 0.5:
-            level = "High"
+            level = "High Volatility"  # Was "High" - volatility = opportunity
         elif risk_score > 0.3:
-            level = "Medium"
+            level = "Moderate Risk"
         else:
-            level = "Low"
+            level = "Conservative"
         
         return {
             'score': risk_score,
@@ -885,17 +904,29 @@ class HiddenGemDetector:
         }
     
     def _generate_recommendation(self, features: Dict, gem_probability: float) -> str:
-        """Generate investment recommendation"""
-        if gem_probability > 0.8:
-            return "STRONG BUY - Exceptional hidden gem potential with multiple positive indicators"
-        elif gem_probability > 0.7:
-            return "BUY - Strong hidden gem characteristics, consider position sizing"
-        elif gem_probability > 0.6:
-            return "MODERATE BUY - Good potential but monitor key metrics closely"
-        elif gem_probability > 0.4:
-            return "WATCH - Some positive signals but needs further analysis"
+        """Generate investment recommendation - aggressive bias for moonshots"""
+        # Check if it's a low cap for bonus bullishness
+        is_low_cap = features.get('is_micro_cap', 0) or features.get('is_nano_cap', 0)
+        is_nano = features.get('is_nano_cap', 0)
+        
+        if gem_probability > 0.70:
+            return "STRONG BUY - Moonshot potential detected, high conviction play"
+        elif gem_probability > 0.55:
+            return "BUY - Strong asymmetric upside, position for explosive gains"
+        elif gem_probability > 0.40:
+            if is_nano:
+                return "STRONG BUY - Extreme moonshot, 100x potential if legit"
+            elif is_low_cap:
+                return "BUY - Speculative play with 10x+ potential, high risk/high reward"
+            return "MODERATE BUY - Decent setup, monitor for entry signals"
+        elif gem_probability > 0.25:
+            if is_low_cap:
+                return "BUY - High-risk moonshot opportunity, DCA recommended"
+            return "WATCH - Some potential, needs better setup"
         else:
-            return "PASS - Limited hidden gem characteristics detected"
+            if is_low_cap:
+                return "WATCH - Speculative opportunity, wait for signals"
+            return "PASS - Better opportunities available"
     
     def save_model(self, filepath: Optional[str] = None) -> bool:
         """Save the trained model"""
@@ -914,13 +945,13 @@ class HiddenGemDetector:
                 }
                 
                 joblib.dump(model_data, filepath)
-                print(f"✅ Model saved to {filepath}")
+                print(f"Model saved to {filepath}")
                 return True
             else:
-                print("❌ No trained model to save")
+                print("No trained model to save")
                 return False
         except Exception as e:
-            print(f"❌ Error saving model: {e}")
+            print(f"Error saving model: {e}")
             return False
     
     def load_model(self, filepath: Optional[str] = None) -> bool:
@@ -930,7 +961,7 @@ class HiddenGemDetector:
                 filepath = self.model_path
                 
             if not os.path.exists(filepath):
-                print(f"❌ Model file not found: {filepath}")
+                print(f"ERROR: Model file not found: {filepath}")
                 return False
                 
             model_data = joblib.load(filepath)
@@ -944,7 +975,7 @@ class HiddenGemDetector:
             trained_date = model_data.get('trained_date', 'Unknown')
             model_version = model_data.get('model_version', '1.0')
             
-            print(f"✅ Hidden Gem Detector model loaded successfully")
+            print(f"Hidden Gem Detector model loaded successfully")
             print(f"   Version: {model_version}")
             print(f"   Trained: {trained_date}")
             print(f"   Features: {len(self.feature_names)}")
@@ -952,8 +983,87 @@ class HiddenGemDetector:
             return True
             
         except Exception as e:
-            print(f"❌ Error loading model: {e}")
+            print(f"Error loading model: {e}")
             return False
+
+    def _heuristic_gem_score(self, coin_data: Dict, market_context: Optional[Dict] = None) -> Dict:
+        """
+        Heuristic-based gem scoring (NO MODEL NEEDED - AGGRESSIVE MODE)
+        Used when ML model isn't trained yet - favors moonshot opportunities
+        """
+        # Extract features for analysis
+        features = self.extract_advanced_features(coin_data, market_context)
+        
+        # Start with aggressive base score for low-caps
+        if features.get('is_nano_cap', 0):
+            base_score = 65.0  # Start HIGH for nano-caps (100x potential)
+        elif features.get('is_micro_cap', 0):
+            base_score = 55.0  # Start HIGH for micro-caps (50x potential)
+        elif features.get('is_low_cap', 0):
+            base_score = 45.0  # Start GOOD for small-caps (10x potential)
+        else:
+            base_score = 30.0  # Established coins - limited upside
+        
+        # Boost for positive price action
+        price_change = features.get('price_change_24h', 0)
+        if price_change > 10:
+            base_score += 15
+        elif price_change > 5:
+            base_score += 10
+        elif price_change > 0:
+            base_score += 5
+        
+        # Boost for volume activity
+        volume_ratio = features.get('volume_price_ratio', 0)
+        if volume_ratio > 0.1:
+            base_score += 15
+        elif volume_ratio > 0.05:
+            base_score += 10
+        
+        # Boost for technical setup
+        breakout = features.get('breakout_potential', 0)
+        if breakout > 0.7:
+            base_score += 10
+        elif breakout > 0.5:
+            base_score += 5
+        
+        # Cap at 95
+        base_score = min(base_score, 95.0)
+        gem_probability = base_score / 100.0
+        
+        # Get AI sentiment boost
+        enhanced_data = deepseek_analyzer.enhance_gem_score(base_score, coin_data)
+        
+        # Build aggressive result
+        return {
+            'is_hidden_gem': gem_probability > 0.40,  # Low threshold
+            'gem_probability': gem_probability,
+            'confidence': max(0.6, gem_probability),  # Always show decent confidence
+            'gem_score': enhanced_data['enhanced_score'],
+            'base_gem_score': base_score,
+            'sentiment_boost': enhanced_data.get('sentiment_boost', 0),
+            'risk_level': "Extreme Moonshot" if features.get('is_nano_cap') else "High Volatility",
+            'risk_score': 0.7,  # High risk = high reward
+            'key_strengths': [
+                f"{'Nano' if features.get('is_nano_cap') else 'Micro' if features.get('is_micro_cap') else 'Small'}-cap moonshot opportunity",
+                f"{abs(price_change):.1f}% 24h price action",
+                "Early positioning opportunity - get in before the crowd"
+            ],
+            'key_weaknesses': ["High volatility", "Speculative play"],
+            'top_features': [],
+            'recommendation': self._generate_recommendation(features, gem_probability),
+            'feature_breakdown': {
+                'market_position': features['market_cap_rank'],
+                'volume_activity': volume_ratio,
+                'technical_setup': breakout,
+                'innovation_score': features.get('technology_score', 0.5),
+                'community_strength': features.get('community_growth', 0.5)
+            },
+            'ai_sentiment': enhanced_data.get('sentiment'),
+            'ai_enabled': enhanced_data.get('ai_enabled', False),
+            'rl_enabled': False,
+            'heuristic_mode': True  # Flag to indicate heuristic scoring
+        }
 
     def learn_from_outcome(self, symbol: str, entry_price: float, 
                           current_price: float, days_held: int,
@@ -990,7 +1100,7 @@ class HiddenGemDetector:
             notes=notes
         )
         
-        print(f"🧠 RL learned from {symbol}: {profit_pct:+.1f}% over {days_held} days")
+        print(f"RL: RL learned from {symbol}: {profit_pct:+.1f}% over {days_held} days")
         print(f"   New success rate: {result['new_success_rate']:.1%}")
         
         return result

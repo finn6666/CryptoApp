@@ -40,10 +40,6 @@ ML_AVAILABLE = False
 gem_detector = None
 GEM_DETECTOR_AVAILABLE = False
 
-# Initialize RL components  
-rl_detector = None
-RL_DETECTOR_AVAILABLE = False
-
 # Initialize data pipeline for symbol management
 data_pipeline = None
 SYMBOLS_AVAILABLE = False
@@ -122,32 +118,8 @@ def initialize_gem_detector():
         GEM_DETECTOR_AVAILABLE = False
         return False
 
-def initialize_rl_detector():
-    """Initialize the RL-enhanced gem detector"""
-    global rl_detector, RL_DETECTOR_AVAILABLE
-    logger.info("Attempting to initialize RL Detector...")
-    try:
-        from ml.rl_integration import RLLiveTrading
-        
-        logger.info("RL Detector imports successful")
-        
-        # Try to load existing RL model
-        model_path = os.path.join(project_root, 'models', 'rl_model.pkl')
-        if os.path.exists(model_path):
-            rl_detector = RLLiveTrading(model_filepath=model_path)
-            logger.info("RL model loaded successfully")
-        else:
-            rl_detector = RLLiveTrading()  # Start fresh
-            logger.info("Starting with new RL agent")
-        
-        RL_DETECTOR_AVAILABLE = True
-        logger.info("RL Detector initialized successfully")
-        return True
-        
-    except Exception as e:
-        logger.error(f"RL Detector not available: {e}")
-        RL_DETECTOR_AVAILABLE = False
-        return False
+# Note: RL functionality is provided by simple_rl.py integrated into HiddenGemDetector
+# No separate RL detector initialization needed
 
 def fetch_and_add_new_symbol_data(symbol: str):
     """Fetch data for a newly added symbol and add it to the live data"""
@@ -335,33 +307,10 @@ def coin_to_dict(coin, include_highlights=False):
     return coin_dict
 
 def analyze_coin_with_ai(coin_dict, coin=None):
-    """Run comprehensive AI analysis on a coin (RL -> Gem -> ML fallback)"""
+    """Run comprehensive AI analysis on a coin (Gem Detector with integrated RL -> ML fallback)"""
     result = {'ai_analysis': None, 'ai_sentiment': None, 'enhanced_score': coin.attractiveness_score if coin else 5.0}
     
-    # Try RL analysis first
-    if RL_DETECTOR_AVAILABLE and rl_detector:
-        try:
-            market_context = {
-                'total_market_cap': sum(safe_float(c.market_cap) for c in analyzer.coins if c.market_cap),
-                'market_sentiment': 'neutral',
-                'btc_dominance': 45.0
-            }
-            rl_analysis = rl_detector.analyze_live_coin(coin_dict, market_context)
-            result['ai_analysis'] = {
-                'recommendation': rl_analysis.get('rl_recommendation', 'hold').upper(),
-                'confidence': f"{rl_analysis.get('rl_confidence', 0) * 100:.0f}%",
-                'summary': rl_analysis.get('rl_reasoning', ''),
-                'risk_level': rl_analysis.get('risk_assessment', {}).get('risk_level', 'Medium'),
-                'position_size': f"{rl_analysis.get('position_size_percent', 0):.1f}%",
-                'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
-                'analysis_type': 'RL Enhanced'
-            }
-            result['enhanced_score'] = rl_analysis.get('gem_score', result['enhanced_score'])
-            return result
-        except Exception as e:
-            logger.warning(f"RL analysis failed: {e}")
-    
-    # Try Gem Detector
+    # Try Gem Detector (includes integrated simple_rl)
     if GEM_DETECTOR_AVAILABLE and gem_detector:
         try:
             gem_result = gem_detector.predict_hidden_gem(coin_dict)
@@ -382,10 +331,10 @@ def analyze_coin_with_ai(coin_dict, coin=None):
                     'confidence': f"{gem_prob*100:.0f}%",
                     'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
                     'risk_level': gem_result.get('risk_level', 'Medium'),
-                    'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                    'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
                     'analysis_type': 'Gem Detector'
                 }
-                result['enhanced_score'] = gem_result.get('gem_score', result['enhanced_score'])
+                result['enhanced_score'] = min(10, gem_result.get('gem_score', result['enhanced_score']) / 10)
                 if gem_result.get('ai_sentiment'):
                     result['ai_sentiment'] = gem_result.get('ai_sentiment')
                 return result
@@ -405,10 +354,28 @@ def analyze_coin_with_ai(coin_dict, coin=None):
             }
             ml_result = ml_pipeline.predict_with_validation(features)
             pred_pct = ml_result.get('prediction_percentage', 0)
-            direction = 'bullish' if pred_pct > 2 else 'bearish' if pred_pct < -2 else 'neutral'
+            direction = 'bullish' if pred_pct > 1 else 'bearish' if pred_pct < -1 else 'neutral'
+            
+            # More nuanced recommendation considering multiple factors
+            gem_score = coin_dict.get('enhanced_score') or coin_dict.get('score', 0)
+            sentiment_score = coin_dict.get('ai_sentiment', {}).get('score', 0) if coin_dict.get('ai_sentiment') else 0
+            
+            # Calculate weighted recommendation score
+            rec_score = (pred_pct * 0.4) + (gem_score / 10 * 0.4) + (sentiment_score * 5 * 0.2)
+            
+            # Individualized thresholds based on gem score
+            buy_threshold = 1.5 if gem_score < 60 else 0.8
+            avoid_threshold = -1.5 if gem_score < 60 else -0.8
+            
+            if rec_score > buy_threshold:
+                recommendation = 'BUY'
+            elif rec_score < avoid_threshold:
+                recommendation = 'AVOID'
+            else:
+                recommendation = 'HOLD'
             
             result['ai_analysis'] = {
-                'recommendation': 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID',
+                'recommendation': recommendation,
                 'confidence': f"{ml_result.get('confidence', 0)*100:.0f}%",
                 'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
                 'prediction': f"{pred_pct:+.1f}%",
@@ -424,42 +391,36 @@ logging.basicConfig(level=logging.INFO)
 
 # Initialize ML components immediately
 # Try to initialize ML components on startup
-print("🚀 Starting CryptoApp...")
+print("[INFO] Starting CryptoApp...")
 try:
     initialize_ml()
 except Exception as e:
-    print(f"⚠️ Startup ML initialization failed: {e}")
+    print(f"[WARNING] Startup ML initialization failed: {e}")
 
 # Try to initialize data pipeline on startup
 try:
     initialize_data_pipeline()
 except Exception as e:
-    print(f"⚠️ Startup data pipeline initialization failed: {e}")
+    print(f"[WARNING] Startup data pipeline initialization failed: {e}")
 
 # Try to initialize gem detector on startup
 try:
     initialize_gem_detector()
 except Exception as e:
-    print(f"⚠️ Startup gem detector initialization failed: {e}")
+    print(f"[WARNING] Startup gem detector initialization failed: {e}")
 
-# Try to initialize RL detector on startup
-try:
-    initialize_rl_detector()
-except Exception as e:
-    print(f"⚠️ Startup RL detector initialization failed: {e}")
+# Note: RL functionality integrated into gem_detector via simple_rl
 
 # Initialize analyzer with live data (after all other components)
 analyzer = CryptoAnalyzer(data_file='data/live_api.json')
-print(f"📊 ML_AVAILABLE: {ML_AVAILABLE}")
-print(f"🤖 ml_pipeline: {ml_pipeline}")
-print(f"🔧 ml_service: {ml_service}")
-print(f"� GEM_DETECTOR_AVAILABLE: {GEM_DETECTOR_AVAILABLE}")
-print(f"🔍 gem_detector: {gem_detector}")
-print(f"�📊 Analyzer loaded {len(analyzer.coins)} coins from data/live_api.json")
+print(f"[INFO] ML_AVAILABLE: {ML_AVAILABLE}")
+print(f"[INFO] ml_pipeline: {ml_pipeline}")
+print(f"[INFO] ml_service: {ml_service}")
+print(f"[INFO] GEM_DETECTOR_AVAILABLE: {GEM_DETECTOR_AVAILABLE}")
+print(f"[INFO] gem_detector: {gem_detector}")
+print(f"[INFO] Analyzer loaded {len(analyzer.coins)} coins from data/live_api.json")
 
 # Print RL status
-print(f"🧠 RL_DETECTOR_AVAILABLE: {RL_DETECTOR_AVAILABLE}")
-print(f"🤖 rl_detector: {rl_detector}")
 
 @app.route('/')
 def index():
@@ -596,40 +557,13 @@ def get_coins():
             }
             
             ai_insights = []
-            ai_score = matching_coin.attractiveness_score
+            ai_score = min(10, matching_coin.attractiveness_score / 10)  # Normalize from 0-100 to 0-10
             analysis_done = False
             
-            # 1. RL Detector Analysis (preferred - most advanced)
-            if RL_DETECTOR_AVAILABLE and rl_detector:
-                try:
-                    market_context = {
-                        'total_market_cap': sum(float(c.market_cap or 0) for c in analyzer.coins if c.market_cap),
-                        'market_sentiment': 'neutral',
-                        'btc_dominance': 45.0
-                    }
-                    rl_analysis = rl_detector.analyze_live_coin(coin_dict, market_context)
-                    
-                    # Build text-based insights from RL
-                    recommendation = rl_analysis.get('rl_recommendation', 'hold').upper()
-                    confidence = rl_analysis.get('rl_confidence', 0) * 100
-                    reasoning = rl_analysis.get('rl_reasoning', '')
-                    
-                    coin_data['ai_analysis'] = {
-                        'recommendation': recommendation,
-                        'confidence': f"{confidence:.0f}%",
-                        'summary': reasoning,
-                        'risk_level': rl_analysis.get('risk_assessment', {}).get('risk_level', 'Medium'),
-                        'position_size': f"{rl_analysis.get('position_size_percent', 0):.1f}%",
-                        'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
-                        'analysis_type': 'RL Enhanced'
-                    }
-                    analysis_done = True
-                    ai_score = rl_analysis.get('gem_score', ai_score)
-                    continue  # RL analysis is most comprehensive, skip others
-                except Exception as e:
-                    logging.warning(f"RL analysis failed for {symbol}: {e}")
+            # 1. Gem Detector Analysis (includes integrated simple_rl)
+            # Note: RL_DETECTOR removed - simple_rl is now integrated in gem_detector
             
-            # 2. Gem Detector Analysis (fallback)
+            # 2. Gem Detector Analysis (includes simple_rl)
             if GEM_DETECTOR_AVAILABLE and gem_detector:
                 try:
                     gem_result = gem_detector.predict_hidden_gem(coin_dict)
@@ -641,35 +575,51 @@ def get_coins():
                         strengths = gem_result.get('key_strengths', [])
                         weaknesses = gem_result.get('key_weaknesses', [])
                         
+                        # Extract DeepSeek ai_sentiment if present for individualized summary
+                        ai_sentiment = gem_result.get('ai_sentiment')
+                        if ai_sentiment:
+                            coin_data['ai_sentiment'] = ai_sentiment
+                        
+                        # Build concise, individualized summary
                         summary_parts = []
-                        if is_gem:
-                            summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
-                        if strengths:
-                            summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
-                        if weaknesses:
-                            summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
+                        
+                        # Use DeepSeek key_points for personalized insights (concise version)
+                        if ai_sentiment and ai_sentiment.get('key_points'):
+                            key_points = ai_sentiment['key_points']
+                            # Show main insight and risk only
+                            if is_gem:
+                                summary_parts.append(f"🔥 {key_points[0]}")
+                            else:
+                                summary_parts.append(key_points[0])
+                            # Add risk for context
+                            if len(key_points) > 2:
+                                summary_parts.append(f"⚠️ {key_points[2]}")
+                        else:
+                            # Fallback to generic if no DeepSeek data
+                            if is_gem:
+                                summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
+                            if strengths:
+                                summary_parts.append(f"{', '.join(strengths[:1])}")
+                            if weaknesses:
+                                summary_parts.append(f"⚠️ {weaknesses[0]}")
                         
                         coin_data['ai_analysis'] = {
                             'recommendation': 'BUY' if is_gem else 'WATCH',
                             'confidence': f"{gem_prob*100:.0f}%",
                             'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
                             'risk_level': gem_result.get('risk_level', 'Medium'),
-                            'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                            'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
                             'analysis_type': 'Gem Detector'
                         }
                         
-                        # Extract DeepSeek ai_sentiment if present
-                        if gem_result.get('ai_sentiment'):
-                            coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
-                        
                         analysis_done = True
-                        ai_score = gem_result.get('gem_score', ai_score)
-                        continue
+                        ai_score = min(10, gem_result.get('gem_score', ai_score) / 10)  # Ensure 0-10 scale
+                        # Don't continue - let DeepSeek run if no sentiment yet
                 except Exception as e:
                     logging.warning(f"Gem detection failed for {symbol}: {e}")
             
-            # 3. Basic ML Prediction (last fallback)
-            if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded:
+            # 3. Basic ML Prediction (last fallback - only if no analysis done yet)
+            if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded and not analysis_done:
                 try:
                     features = {
                         'price_change_1h': matching_coin.price_change_24h or 0,
@@ -685,7 +635,7 @@ def get_coins():
                     pred_pct = ml_result.get('prediction_percentage', 0)
                     
                     direction = 'bullish' if pred_pct > 2 else 'bearish' if pred_pct < -2 else 'neutral'
-                    recommendation = 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID'
+                    recommendation = 'BUY' if pred_pct > 2 else 'HOLD' if pred_pct > -2 else 'AVOID'
                     
                     coin_data['ai_analysis'] = {
                         'recommendation': recommendation,
@@ -710,14 +660,12 @@ def get_coins():
                             'key_points': sentiment.key_points,
                             'reasoning': sentiment.reasoning
                         }
+                        logger.info(f"[SUCCESS] DeepSeek sentiment (direct) added for live coin {symbol}")
                 except Exception as ds_error:
-                    logging.debug(f"DeepSeek not available for {symbol}: {ds_error}")
+                    logger.warning(f"DeepSeek not available for {symbol}: {ds_error}")
             
-            # Update score with AI insights
-            coin_data['enhanced_score'] = ai_score
-            
-            # Update score with AI insights
-            coin_data['enhanced_score'] = ai_score
+            # Update score with AI insights (ensure it's 0-10 scale)
+            coin_data['enhanced_score'] = min(10, ai_score)
 
         returned_symbols = [c['symbol'] for c in coins_data]
         logger.info(f"Returning {len(coins_data)} live coins (excluded {len(favorites)} favorites): {returned_symbols}")
@@ -753,7 +701,7 @@ def force_refresh():
                             print(f"Warning: Could not fetch data for {symbol}: {e}")
                     
                     if added_symbols:
-                        print(f"✅ Added data for new symbols: {added_symbols}")
+                        print(f"Added data for new symbols: {added_symbols}")
                 except Exception as e:
                     print(f"Warning: Error processing pipeline symbols: {e}")
             
@@ -786,11 +734,11 @@ def get_favorites():
                         'name': coin.name,
                         'price': coin.price,
                         'price_change_24h': coin.price_change_24h,
-                        'score': coin.attractiveness_score,
+                        'score': min(10, coin.attractiveness_score / 10),
                         'market_cap': coin.market_cap,
                         'market_cap_rank': coin.market_cap_rank,
                         'ai_analysis': None,
-                        'enhanced_score': coin.attractiveness_score,
+                        'enhanced_score': min(10, coin.attractiveness_score / 10),
                         'ai_sentiment': None,
                         'investment_highlights': ' • '.join(coin.investment_highlights) if isinstance(coin.investment_highlights, list) else coin.investment_highlights
                     }
@@ -819,7 +767,7 @@ def get_favorites():
                     
                     # Try RL analysis first (most comprehensive)
                     analysis_done = False
-                    if RL_DETECTOR_AVAILABLE and rl_detector and not analysis_done:
+                    if False:  # RL integrated into gem_detector
                         try:
                             # Calculate total market cap with string handling
                             def safe_float(val):
@@ -832,7 +780,7 @@ def get_favorites():
                                 'market_sentiment': 'neutral',
                                 'btc_dominance': 45.0
                             }
-                            rl_analysis = rl_detector.analyze_live_coin(coin_dict, market_context)
+                            rl_analysis = None  # rl_detector removed(coin_dict, market_context)
                             
                             recommendation = rl_analysis.get('rl_recommendation', 'hold').upper()
                             confidence = rl_analysis.get('rl_confidence', 0) * 100
@@ -847,7 +795,7 @@ def get_favorites():
                                 'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
                                 'analysis_type': 'RL Enhanced'
                             }
-                            coin_data['enhanced_score'] = rl_analysis.get('gem_score', coin.attractiveness_score)
+                            coin_data['enhanced_score'] = min(10, rl_analysis.get('gem_score', coin.attractiveness_score / 10))
                             analysis_done = True
                         except Exception as e:
                             logging.warning(f"RL analysis failed for favorite {coin.symbol}: {e}")
@@ -856,7 +804,7 @@ def get_favorites():
                     if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                         try:
                             gem_result = gem_detector.predict_hidden_gem(coin_dict)
-                            logger.info(f"🔍 Gem analysis for {coin.symbol}: has_result={gem_result is not None}, ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else False}")
+                            logger.info(f"[GEM] Gem analysis for {coin.symbol}: has_result={gem_result is not None}, ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else False}")
                             if gem_result:
                                 gem_prob = gem_result.get('gem_probability', 0)
                                 is_gem = gem_prob > 0.6
@@ -864,30 +812,43 @@ def get_favorites():
                                 strengths = gem_result.get('key_strengths', [])
                                 weaknesses = gem_result.get('key_weaknesses', [])
                                 
+                                # Extract DeepSeek ai_sentiment if present for individualized summary
+                                ai_sentiment = gem_result.get('ai_sentiment')
+                                if ai_sentiment:
+                                    coin_data['ai_sentiment'] = ai_sentiment
+                                
+                                # Build concise, individualized summary
                                 summary_parts = []
-                                if is_gem:
-                                    summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
-                                if strengths:
-                                    summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
-                                if weaknesses:
-                                    summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
+                                
+                                # Use DeepSeek key_points for personalized insights (concise version)
+                                if ai_sentiment and ai_sentiment.get('key_points'):
+                                    key_points = ai_sentiment['key_points']
+                                    # Show main insight and risk only
+                                    if is_gem:
+                                        summary_parts.append(f"🔥 {key_points[0]}")
+                                    else:
+                                        summary_parts.append(key_points[0])
+                                    # Add risk for context
+                                    if len(key_points) > 2:
+                                        summary_parts.append(f"⚠️ {key_points[2]}")
+                                else:
+                                    # Fallback to generic if no DeepSeek data
+                                    if is_gem:
+                                        summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
+                                    if strengths:
+                                        summary_parts.append(f"{', '.join(strengths[:1])}")
+                                    if weaknesses:
+                                        summary_parts.append(f"⚠️ {weaknesses[0]}")
                                 
                                 coin_data['ai_analysis'] = {
                                     'recommendation': 'BUY' if is_gem else 'WATCH',
                                     'confidence': f"{gem_prob*100:.0f}%",
                                     'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
                                     'risk_level': gem_result.get('risk_level', 'Medium'),
-                                    'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                                    'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
                                     'analysis_type': 'Gem Detector'
                                 }
-                                coin_data['enhanced_score'] = gem_result.get('gem_score', coin.attractiveness_score)
-                                
-                                # Extract DeepSeek ai_sentiment if present
-                                if gem_result.get('ai_sentiment'):
-                                    coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
-                                    logger.info(f"✅ DeepSeek sentiment added for {coin.symbol}")
-                                else:
-                                    logger.warning(f"⚠️ No DeepSeek sentiment for {coin.symbol} (ai_enabled={gem_result.get('ai_enabled')})")
+                                coin_data['enhanced_score'] = min(10, gem_result.get('gem_score', coin.attractiveness_score / 10))
                                 
                                 analysis_done = True
                         except Exception as e:
@@ -905,7 +866,7 @@ def get_favorites():
                                     'key_points': sentiment.key_points,
                                     'reasoning': sentiment.reasoning
                                 }
-                                logger.info(f"✅ DeepSeek sentiment (direct) added for {coin.symbol}")
+                                logger.info(f"[SUCCESS] DeepSeek sentiment (direct) added for {coin.symbol}")
                         except Exception as ds_error:
                             logging.warning(f"DeepSeek direct call failed for {coin.symbol}: {ds_error}")
                     
@@ -926,8 +887,22 @@ def get_favorites():
                             ml_result = ml_pipeline.predict_with_validation(features)
                             pred_pct = ml_result.get('prediction_percentage', 0)
                             
-                            direction = 'bullish' if pred_pct > 2 else 'bearish' if pred_pct < -2 else 'neutral'
-                            recommendation = 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID'
+                            # Individual recommendation based on multiple factors
+                            gem_score = coin_data.get('enhanced_score') or coin_data.get('score', 0)
+                            sentiment_score = coin_data.get('ai_sentiment', {}).get('score', 0) if coin_data.get('ai_sentiment') else 0
+                            
+                            rec_score = (pred_pct * 0.4) + (gem_score / 10 * 0.4) + (sentiment_score * 5 * 0.2)
+                            buy_threshold = 1.5 if gem_score < 60 else 0.8
+                            avoid_threshold = -1.5 if gem_score < 60 else -0.8
+                            
+                            if rec_score > buy_threshold:
+                                recommendation = 'BUY'
+                            elif rec_score < avoid_threshold:
+                                recommendation = 'AVOID'
+                            else:
+                                recommendation = 'HOLD'
+                            
+                            direction = 'bullish' if pred_pct > 1 else 'bearish' if pred_pct < -1 else 'neutral'
                             
                             coin_data['ai_analysis'] = {
                                 'recommendation': recommendation,
@@ -954,7 +929,7 @@ def get_favorites():
                         fetcher = LiveDataFetcher()
                         highlights = fetcher.generate_investment_highlights(coin_data_raw)
                         highlights_str = ' • '.join(highlights) if isinstance(highlights, list) else highlights
-                        logger.info(f"💡 Generated highlights for {symbol}: '{highlights[:50]}...'")
+                        logger.info(f"[INFO] Generated highlights for {symbol}: '{highlights[:50]}...'")
                         
                         coin_data = {
                             'symbol': coin_data_raw['symbol'],
@@ -987,7 +962,7 @@ def get_favorites():
                         if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                             try:
                                 gem_result = gem_detector.predict_hidden_gem(coin_dict)
-                                logger.info(f"🔍 Direct-fetch gem analysis for {symbol}: ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else 'NO RESULT'}")
+                                logger.info(f"[GEM] Direct-fetch gem analysis for {symbol}: ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else 'NO RESULT'}")
                                 if gem_result:
                                     gem_prob = gem_result.get('gem_probability', 0)
                                     is_gem = gem_prob > 0.6
@@ -995,30 +970,43 @@ def get_favorites():
                                     strengths = gem_result.get('key_strengths', [])
                                     weaknesses = gem_result.get('key_weaknesses', [])
                                     
+                                    # Extract DeepSeek ai_sentiment if present for individualized summary
+                                    ai_sentiment = gem_result.get('ai_sentiment')
+                                    if ai_sentiment:
+                                        coin_data['ai_sentiment'] = ai_sentiment
+                                    
+                                    # Build concise, individualized summary
                                     summary_parts = []
-                                    if is_gem:
-                                        summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
-                                    if strengths:
-                                        summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
-                                    if weaknesses:
-                                        summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
+                                    
+                                    # Use DeepSeek key_points for personalized insights (concise version)
+                                    if ai_sentiment and ai_sentiment.get('key_points'):
+                                        key_points = ai_sentiment['key_points']
+                                        # Show main insight and risk only
+                                        if is_gem:
+                                            summary_parts.append(f"🔥 {key_points[0]}")
+                                        else:
+                                            summary_parts.append(key_points[0])
+                                        # Add risk for context
+                                        if len(key_points) > 2:
+                                            summary_parts.append(f"⚠️ {key_points[2]}")
+                                    else:
+                                        # Fallback to generic if no DeepSeek data
+                                        if is_gem:
+                                            summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
+                                        if strengths:
+                                            summary_parts.append(f"{', '.join(strengths[:1])}")
+                                        if weaknesses:
+                                            summary_parts.append(f"⚠️ {weaknesses[0]}")
                                     
                                     coin_data['ai_analysis'] = {
                                         'recommendation': 'BUY' if is_gem else 'WATCH',
                                         'confidence': f"{gem_prob*100:.0f}%",
                                         'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
                                         'risk_level': gem_result.get('risk_level', 'Medium'),
-                                        'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                                        'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
                                         'analysis_type': 'Gem Detector'
                                     }
-                                    coin_data['enhanced_score'] = gem_result.get('gem_score', 5.0)
-                                    
-                                    # Extract DeepSeek ai_sentiment if present
-                                    if gem_result.get('ai_sentiment'):
-                                        coin_data['ai_sentiment'] = gem_result.get('ai_sentiment')
-                                        logger.info(f"✅ DeepSeek sentiment added for direct-fetch {symbol}: {coin_data['ai_sentiment'].get('score')}")
-                                    else:
-                                        logger.warning(f"⚠️ No DeepSeek sentiment for direct-fetch {symbol} (ai_enabled={gem_result.get('ai_enabled')})")
+                                    coin_data['enhanced_score'] = min(10, gem_result.get('gem_score', 50) / 10)
                                     
                                     analysis_done = True
                             except Exception as e:
@@ -1036,7 +1024,7 @@ def get_favorites():
                                         'key_points': sentiment.key_points,
                                         'reasoning': sentiment.reasoning
                                     }
-                                    logger.info(f"✅ DeepSeek sentiment (direct fallback) added for {symbol}")
+                                    logger.info(f"[SUCCESS] DeepSeek sentiment (direct fallback) added for {symbol}")
                             except Exception as ds_error:
                                 logging.debug(f"DeepSeek not available for direct-fetch {symbol}: {ds_error}")
                         
@@ -1058,7 +1046,7 @@ def get_favorites():
             logger.info(f"Missing favorite coins (could not fetch): {', '.join(missing_coins)}")
         
         ml_status = ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded
-        logger.info(f"🔍 Favorites API - ML Enhanced: {ml_status}, Favorite coins: {len(favorite_coins)}, Missing: {len(missing_coins)}")
+        logger.info(f"[INFO] Favorites API - ML Enhanced: {ml_status}, Favorite coins: {len(favorite_coins)}, Missing: {len(missing_coins)}")
         
         return jsonify({
             'favorites': favorite_coins,
@@ -1127,7 +1115,7 @@ def get_ml_status():
                 'ml_pipeline_exists': ml_pipeline is not None,
                 'suggestion': 'Click "Train ML Model" to initialize and train the model',
                 'gem_detector_available': GEM_DETECTOR_AVAILABLE,
-                'rl_detector_available': RL_DETECTOR_AVAILABLE
+                'rl_detector_available': False  # RL integrated into gem_detector
             }
             
             # Check if ML dependencies might be missing
@@ -1175,10 +1163,7 @@ def debug_ml_system():
             'gem_detector': {
                 'GEM_DETECTOR_AVAILABLE': GEM_DETECTOR_AVAILABLE,
                 'gem_detector_exists': gem_detector is not None,
-            },
-            'rl_detector': {
-                'RL_DETECTOR_AVAILABLE': RL_DETECTOR_AVAILABLE,
-                'rl_detector_exists': rl_detector is not None,
+                'rl_integrated': True,  # simple_rl integrated into gem_detector
             },
             'model_files': {
                 'models_dir_exists': os.path.exists(models_dir),
@@ -1327,13 +1312,13 @@ def get_enhanced_coins():
             coin_data = {
                 'symbol': coin.symbol,
                 'name': coin.name,
-                'score': coin.attractiveness_score,
+                'score': min(10, coin.attractiveness_score / 10),
                 'price': coin.price,
                 'price_change_24h': coin.price_change_24h or 0,
                 'market_cap_rank': coin.market_cap_rank,
                 'recently_added': coin.symbol in [c.symbol for c in recently_added_coins],
                 'ai_analysis': None,
-                'enhanced_score': coin.attractiveness_score
+                'enhanced_score': min(10, coin.attractiveness_score / 10)
             }
             
             # Prepare coin dict for AI analysis (same as favorites)
@@ -1359,7 +1344,7 @@ def get_enhanced_coins():
             analysis_done = False
             
             # Try RL analysis first
-            if RL_DETECTOR_AVAILABLE and rl_detector and not analysis_done:
+            if False:  # RL integrated into gem_detector
                 try:
                     def safe_float(val):
                         if isinstance(val, str):
@@ -1371,7 +1356,7 @@ def get_enhanced_coins():
                         'market_sentiment': 'neutral',
                         'btc_dominance': 45.0
                     }
-                    rl_analysis = rl_detector.analyze_live_coin(coin_dict, market_context)
+                    rl_analysis = None  # rl_detector removed(coin_dict, market_context)
                     
                     recommendation = rl_analysis.get('rl_recommendation', 'hold').upper()
                     confidence = rl_analysis.get('rl_confidence', 0) * 100
@@ -1386,7 +1371,7 @@ def get_enhanced_coins():
                         'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
                         'analysis_type': 'RL Enhanced'
                     }
-                    coin_data['enhanced_score'] = rl_analysis.get('gem_score', coin.attractiveness_score)
+                    coin_data['enhanced_score'] = min(10, rl_analysis.get('gem_score', coin.attractiveness_score / 10))
                     analysis_done = True
                 except Exception as e:
                     logger.warning(f"RL analysis failed for {coin.symbol}: {e}")
@@ -1415,10 +1400,10 @@ def get_enhanced_coins():
                             'confidence': f"{gem_prob*100:.0f}%",
                             'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
                             'risk_level': gem_result.get('risk_level', 'Medium'),
-                            'gem_score': f"{gem_result.get('gem_score', 0):.1f}/10",
+                            'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
                             'analysis_type': 'Gem Detector'
                         }
-                        coin_data['enhanced_score'] = gem_result.get('gem_score', coin.attractiveness_score)
+                        coin_data['enhanced_score'] = min(10, gem_result.get('gem_score', coin.attractiveness_score) / 10)
                         analysis_done = True
                 except Exception as e:
                     logger.warning(f"Gem detection failed for {coin.symbol}: {e}")
@@ -1440,8 +1425,22 @@ def get_enhanced_coins():
                     ml_result = ml_pipeline.predict_with_validation(features)
                     pred_pct = ml_result.get('prediction_percentage', 0)
                     
-                    direction = 'bullish' if pred_pct > 2 else 'bearish' if pred_pct < -2 else 'neutral'
-                    recommendation = 'BUY' if pred_pct > 5 else 'HOLD' if pred_pct > -5 else 'AVOID'
+                    # Individual recommendation based on multiple factors
+                    gem_score = coin_data.get('enhanced_score') or coin_data.get('score', 0)
+                    sentiment_score = coin_data.get('ai_sentiment', {}).get('score', 0) if coin_data.get('ai_sentiment') else 0
+                    
+                    rec_score = (pred_pct * 0.4) + (gem_score / 10 * 0.4) + (sentiment_score * 5 * 0.2)
+                    buy_threshold = 1.5 if gem_score < 60 else 0.8
+                    avoid_threshold = -1.5 if gem_score < 60 else -0.8
+                    
+                    if rec_score > buy_threshold:
+                        recommendation = 'BUY'
+                    elif rec_score < avoid_threshold:
+                        recommendation = 'AVOID'
+                    else:
+                        recommendation = 'HOLD'
+                    
+                    direction = 'bullish' if pred_pct > 1 else 'bearish' if pred_pct < -1 else 'neutral'
                     
                     coin_data['ai_analysis'] = {
                         'recommendation': recommendation,
@@ -2064,12 +2063,14 @@ def get_top_hidden_gems(count):
 
 # ========================================
 # RL-Enhanced Gem Detection Endpoints
+# Note: These endpoints are DEPRECATED - use /api/gems/scan instead
+# RL functionality now integrated into HiddenGemDetector via simple_rl
 # ========================================
 
 @app.route('/api/rl/analyze_coin/<symbol>', methods=['GET'])
 def rl_analyze_coin(symbol):
-    """Analyze a coin with RL-enhanced gem detection"""
-    if not RL_DETECTOR_AVAILABLE or not rl_detector:
+    """DEPRECATED: Use /api/gems/scan - RL integrated into gem_detector"""
+    if True:  # Always disabled - RL integrated into gem_detector
         return jsonify({
             'error': 'RL Detector not available',
             'message': 'RL system is not initialized'
@@ -2103,7 +2104,7 @@ def rl_analyze_coin(symbol):
         }
         
         # Analyze with RL
-        analysis = rl_detector.analyze_live_coin(coin_data, market_context)
+        analysis = None  # rl_detector removed(coin_data, market_context)
         
         return jsonify({
             'symbol': symbol.upper(),
@@ -2117,8 +2118,8 @@ def rl_analyze_coin(symbol):
 
 @app.route('/api/rl/scan_gems', methods=['GET'])
 def rl_scan_gems():
-    """Scan for hidden gems using RL-enhanced detection"""
-    if not RL_DETECTOR_AVAILABLE or not rl_detector:
+    """DEPRECATED: Use /api/gems/scan - RL integrated into gem_detector"""
+    if True:  # Always disabled - RL integrated into gem_detector
         return jsonify({
             'error': 'RL Detector not available', 
             'message': 'RL system is not initialized'
@@ -2152,7 +2153,7 @@ def rl_scan_gems():
                 }
                 
                 # Analyze with RL
-                analysis = rl_detector.analyze_live_coin(coin_data, market_context)
+                analysis = None  # rl_detector removed(coin_data, market_context)
                 
                 # Filter by RL recommendation and confidence
                 if (analysis['rl_recommendation'] == 'buy' and 
@@ -2204,8 +2205,8 @@ def rl_scan_gems():
 
 @app.route('/api/rl/performance', methods=['GET'])
 def rl_performance():
-    """Get RL agent performance metrics"""
-    if not RL_DETECTOR_AVAILABLE or not rl_detector:
+    """DEPRECATED: RL integrated into gem_detector via simple_rl"""
+    if True:  # Always disabled
         return jsonify({
             'error': 'RL Detector not available',
             'message': 'RL system is not initialized'
@@ -2216,7 +2217,7 @@ def rl_performance():
         
         return jsonify({
             'performance': performance,
-            'status': 'active' if RL_DETECTOR_AVAILABLE else 'inactive',
+            'status': 'inactive',  # RL integrated into gem_detector
             'timestamp': datetime.now().isoformat()
         })
         
@@ -2225,8 +2226,8 @@ def rl_performance():
 
 @app.route('/api/rl/record_trade', methods=['POST'])
 def rl_record_trade():
-    """Record a trade outcome for RL learning"""
-    if not RL_DETECTOR_AVAILABLE or not rl_detector:
+    """DEPRECATED: Use simple_rl via /api/simple_rl/record_outcome"""
+    if True:  # Always disabled
         return jsonify({
             'error': 'RL Detector not available',
             'message': 'RL system is not initialized'
@@ -2264,8 +2265,8 @@ def rl_record_trade():
 
 @app.route('/api/rl/train', methods=['POST'])
 def rl_train():
-    """Train RL agent on historical data"""
-    if not RL_DETECTOR_AVAILABLE or not rl_detector:
+    """DEPRECATED: RL training integrated into simple_rl"""
+    if True:  # Always disabled
         return jsonify({
             'error': 'RL Detector not available',
             'message': 'RL system is not initialized'  
@@ -2336,7 +2337,7 @@ def api_health():
             'analyzer': analyzer is not None,
             'ml_pipeline': ML_AVAILABLE,
             'gem_detector': GEM_DETECTOR_AVAILABLE,
-            'rl_detector': RL_DETECTOR_AVAILABLE
+            'rl_detector': False  # integrated into gem_detector
         },
         'uptime_hours': (time.time() - start_time) / 3600 if 'start_time' in globals() else 0
     }), 200
@@ -2357,7 +2358,7 @@ def api_metrics():
             'total_coins': len(analyzer.coins) if analyzer else 0,
             'ml_available': ML_AVAILABLE,
             'gem_detector_available': GEM_DETECTOR_AVAILABLE,
-            'rl_detector_available': RL_DETECTOR_AVAILABLE
+            'rl_detector_available': False  # integrated into gem_detector
         }
     }), 200
 

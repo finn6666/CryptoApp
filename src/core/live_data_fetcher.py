@@ -256,76 +256,87 @@ class LiveDataFetcher:
         return max(1.0, min(10.0, score))
     
     def generate_investment_highlights(self, coin_data: Dict) -> List[str]:
-        """Generate personable, varied investment highlights"""
+        """Generate aggressive, moonshot-focused investment highlights"""
         import random
         highlights = []
         
-        # Market cap analysis with personality
-        market_cap = coin_data.get('market_cap', 0) or 0
+        # Get data with proper fallbacks
+        market_cap_rank = coin_data.get('market_cap_rank', 999)
         price_change = coin_data.get('price_change_percentage_24h', 0) or 0
         volume = coin_data.get('total_volume', 0) or 0
+        market_cap = coin_data.get('market_cap', 0) or 0
         
-        # Micro caps (under $10M) - exciting language
-        if market_cap < 10_000_000:
+        # Market cap positioning - FAVOR LOW CAPS with aggressive language
+        if market_cap_rank > 400:
             highlights.append(random.choice([
-                "Absolute micro cap - huge upside potential",
-                "Hidden gem territory under $10M",
-                "Early-stage opportunity, high risk/reward",
-                "Tiny market cap = room to explode"
+                f"[NANO-CAP] Nano-cap #{market_cap_rank} - 100x moonshot territory",
+                f"Ultra micro-cap gem at #{market_cap_rank}",
+                f"Extreme spec play - rank #{market_cap_rank}",
+                f"Hidden nano-cap - rank #{market_cap_rank}"
             ]))
-        # Small caps ($10M-$50M)
-        elif market_cap < 50_000_000:
+        elif market_cap_rank > 200:
             highlights.append(random.choice([
-                "Small cap with growth runway",
-                "Under $50M - still early",
-                "Small enough to 10x, big enough to trust",
-                "Growing from small cap base"
+                f"[MICRO-CAP] Micro-cap #{market_cap_rank} - 50x potential",
+                f"Small cap sweet spot #{market_cap_rank}",
+                f"Early-stage gem at #{market_cap_rank}",
+                f"Low-cap opportunity #{market_cap_rank}"
             ]))
-        # Low caps ($50M-$100M)
-        elif market_cap < 100_000_000:
+        elif market_cap_rank > 100:
             highlights.append(random.choice([
-                "Low cap sweet spot under $100M",
-                "Established but room to run",
-                "Mid-tier cap with potential",
-                "Flying under radar at this cap"
+                f"[SMALL-CAP] Small-cap #{market_cap_rank} - 10x upside",
+                f"Emerging project at #{market_cap_rank}",
+                f"Growth-stage at #{market_cap_rank}",
+                f"Room to run from #{market_cap_rank}"
+            ]))
+        elif market_cap_rank > 50:
+            highlights.append(random.choice([
+                f"Mid-cap #{market_cap_rank} - solid 3-5x",
+                f"Established player #{market_cap_rank}",
+                f"Strong position at #{market_cap_rank}"
+            ]))
+        else:
+            highlights.append(random.choice([
+                f"Blue chip #{market_cap_rank} - safer play",
+                f"Top tier #{market_cap_rank}",
+                f"Market leader #{market_cap_rank}"
             ]))
         
-        # Price action with context
+        # Price action - FRAME EVERYTHING POSITIVELY
         if price_change > 50:
             highlights.append(random.choice([
-                f"Parabolic +{price_change:.0f}% move today",
-                f"Explosive +{price_change:.0f}% - late or early?",
-                f"+{price_change:.0f}% rocket - FOMO zone"
+                f"[EXPLOSIVE] Explosive +{price_change:.0f}% - momentum play",
+                f"+{price_change:.0f}% parabolic - ride or fade?",
+                f"Massive +{price_change:.0f}% breakout"
             ]))
         elif price_change > 20:
             highlights.append(random.choice([
-                f"Strong +{price_change:.0f}% momentum building",
-                f"Solid +{price_change:.0f}% pump in play",
-                f"+{price_change:.0f}% catching attention"
+                f"[STRONG] Strong +{price_change:.0f}% pump building",
+                f"+{price_change:.0f}% catching fire",
+                f"Hot +{price_change:.0f}% run"
             ]))
         elif price_change > 5:
             highlights.append(random.choice([
-                f"Healthy +{price_change:.1f}% gain",
-                f"Riding +{price_change:.1f}% wave",
-                f"Steady +{price_change:.1f}% climb"
+                f"[HEALTHY] Healthy +{price_change:.1f}% move",
+                f"+{price_change:.1f}% trending up",
+                f"Green +{price_change:.1f}% day"
             ]))
         elif price_change < -30:
             highlights.append(random.choice([
-                f"Brutal {price_change:.0f}% dump - bottom?",
-                f"{price_change:.0f}% bloodbath - contrarian play?",
-                f"Heavy {price_change:.0f}% drop - buy fear?"
+                f"[OPPORTUNITY] {abs(price_change):.0f}% dip - BUY THE BLOOD",
+                f"{abs(price_change):.0f}% dump = opportunity?",
+                f"MAJOR {abs(price_change):.0f}% discount - contrarian play"
             ]))
         elif price_change < -15:
             highlights.append(random.choice([
-                f"{price_change:.0f}% dip - accumulation zone?",
-                f"{price_change:.0f}% pullback - fishing for entry",
-                f"{price_change:.0f}% discount appearing"
+                f"[ENTRY] {abs(price_change):.0f}% pullback - entry zone",
+                f"{abs(price_change):.0f}% dip for the rip?",
+                f"{abs(price_change):.0f}% discount forming"
             ]))
         elif price_change < -5:
             highlights.append(random.choice([
-                f"Minor {price_change:.1f}% retrace",
-                f"{price_change:.1f}% cooling off",
-                f"{price_change:.1f}% healthy correction"
+                f"Minor {abs(price_change):.1f}% retrace - buy dip",
+                f"{abs(price_change):.1f}% healthy pullback",
+                f"{abs(price_change):.1f}% consolidation"
             ]))
         
         # Volume insights with personality
@@ -400,7 +411,7 @@ class LiveDataFetcher:
     
     def fetch_live_data(self) -> Dict[str, List[Coin]]:
         """Fetch comprehensive live cryptocurrency data"""
-        print("🔄 Fetching live cryptocurrency data...")
+        print("[INFO] Fetching live cryptocurrency data...")
         
         # Add small delays to respect API rate limits
         time.sleep(0.5)
@@ -469,10 +480,10 @@ class LiveDataFetcher:
             with open(filename, 'w') as f:
                 json.dump(json_data, f, indent=2)
             
-            print(f"✅ Live data saved to {filename}")
+            print(f"[SUCCESS] Live data saved to {filename}")
             
         except Exception as e:
-            print(f"❌ Error saving data: {e}")
+            print(f"[ERROR] Error saving data: {e}")
 
 
 def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
@@ -520,7 +531,7 @@ def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
         }
         
         # Debug logging to diagnose 24h change issue
-        print(f"📊 Fetched {symbol}: price={result['current_price']:.4f}, 24h_change={result['price_change_percentage_24h']:.2f}%")
+        print(f"[INFO] Fetched {symbol}: price={result['current_price']:.4f}, 24h_change={result['price_change_percentage_24h']:.2f}%")
         
         return result
         
@@ -538,7 +549,7 @@ def fetch_and_update_data(force_refresh: bool = False):
     if not force_refresh and os.path.exists("data/live_api.json"):
         file_time = datetime.fromtimestamp(os.path.getmtime("data/live_api.json"))
         if datetime.now() - file_time < timedelta(minutes=5):
-            print("📊 Using cached data (less than 5 minutes old)")
+            print("[INFO] Using cached data (less than 5 minutes old)")
             return True
     
     fetcher = LiveDataFetcher()
@@ -546,19 +557,19 @@ def fetch_and_update_data(force_refresh: bool = False):
     try:
         live_data = fetcher.fetch_live_data()
         
-        print(f"\n📊 Successfully fetched live data:")
-        print(f"• Top Coins: {len(live_data['top_coins'])}")
-        print(f"• Trending: {len(live_data['trending'])}")
-        print(f"• Gainers: {len(live_data['gainers'])}")
-        print(f"• New Coins: {len(live_data['new_coins'])}")
-        print(f"• Total: {len(live_data['all_coins'])}")
+        print(f"\n[SUCCESS] Successfully fetched live data:")
+        print(f"- Top Coins: {len(live_data['top_coins'])}")
+        print(f"- Trending: {len(live_data['trending'])}")
+        print(f"- Gainers: {len(live_data['gainers'])}")
+        print(f"- New Coins: {len(live_data['new_coins'])}")
+        print(f"- Total: {len(live_data['all_coins'])}")
         
         fetcher.save_to_json(live_data, "data/live_api.json")  # Update main data file
         
         return live_data
         
     except Exception as e:
-        print(f"❌ Error fetching live data: {e}")
+        print(f"[ERROR] Error fetching live data: {e}")
         return None
 
 

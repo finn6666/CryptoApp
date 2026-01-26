@@ -1,25 +1,26 @@
-# CryptoApp Documentation
+# 📖 CryptoApp Documentation
 
-AI-powered crypto gem detection using CoinMarketCap API, ML analysis, and Simple RL learning.
+Complete guide for CryptoApp - AI-powered crypto gem detection using CoinMarketCap API, ML analysis, and Simple RL learning.
 
 ---
 
 ## ⚡ Quick Start
 
-**Run locally:**
+### Run Locally
 ```bash
-python3 app.py  # http://localhost:5001
+python3 app.py  # Opens at http://localhost:5001
 ```
 
-**Update Azure VM:**
+### Update Azure VM
 ```bash
 cd ~/CryptoApp && git pull && sudo systemctl restart cryptoapp
 ```
 
-**Check status:**
+### Check Status
 ```bash
-sudo systemctl status cryptoapp
-sudo journalctl -u cryptoapp -f  # View logs
+sudo systemctl status cryptoapp      # Service status
+sudo journalctl -u cryptoapp -f      # Live logs
+sudo journalctl -u cryptoapp -n 50   # Last 50 lines
 ```
 
 ---
@@ -60,16 +61,22 @@ Gmail App Password: Google Account → Security → 2-Step Verification → App 
 
 ---
 
-## 📊 Trade Journal & RL
+## 📊 Trade Journal & RL Learning
 
-Visit `/trades` page to report your trading outcomes:
+Visit the `/trades` page to teach the RL system from your trading experience:
 
-1. Enter symbol (BTC, ETH, etc. - any symbol works)
-2. Entry price, exit price, days held
-3. Optional notes about why you made the trade
-4. RL system learns profit patterns (doesn't validate symbols)
+**How to Report Trades:**
+1. Enter symbol (BTC, ETH, etc.)
+2. Enter entry price, exit price, and days held
+3. Add optional notes about your reasoning
+4. Submit to train the RL model
 
-**How RL learns:** Tracks feature patterns that led to profitable vs unprofitable trades, adjusts future recommendations.
+**How It Learns:**
+- Analyzes feature patterns from profitable trades
+- Identifies characteristics of unsuccessful trades
+- Adjusts gem scores based on learned patterns
+- Persists learning in `models/rl_simple_learner.json`
+- No symbol validation - focuses on learning patterns
 
 ---
 

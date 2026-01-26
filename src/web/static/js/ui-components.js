@@ -1,6 +1,6 @@
 // UI Components and HTML Generators
 
-// Generate combined AI analysis HTML section (ML + DeepSeek)
+// Generate combined AI analysis HTML section (ML + DeepSeek) - Always visible, compact design
 function generateAISentimentHTML(coin, coinId) {
     // Only show if we have AI analysis or DeepSeek sentiment
     if (!coin.ai_analysis && !coin.ai_sentiment) {
@@ -10,75 +10,81 @@ function generateAISentimentHTML(coin, coinId) {
     const analysis = coin.ai_analysis;
     const sentiment = coin.ai_sentiment;
     
-    // Determine title based on what's available
-    let title = '🤖 AI Analysis';
-    if (analysis && sentiment) {
-        title = '🤖🧠 AI Analysis';
-    } else if (sentiment && !analysis) {
-        title = '🧠 AI Sentiment';
-    } else if (analysis) {
-        title = `🤖 ${analysis.analysis_type || 'AI Analysis'}`;
-    }
+    let content = '';
     
-    // Build ML analysis content
-    let mlContent = '';
-    if (analysis) {
+    // Build combined ML + DeepSeek analysis (use summary with individualized insights)
+    if (analysis && sentiment) {
         const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
                                    analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
         
-        mlContent = `
-            <div class="prediction-row">
-                <span class="label">Recommendation:</span>
-                <span class="value ${recommendationClass}"><strong>${analysis.recommendation}</strong></span>
+        let sentimentLabel = 'Neutral';
+        if (sentiment.score >= 0.3) sentimentLabel = 'Bullish';
+        else if (sentiment.score <= -0.3) sentimentLabel = 'Bearish';
+        
+        const scorePercent = sentiment.score ? ((sentiment.score + 1) * 5).toFixed(1) : 'N/A';
+        
+        // Use analysis.summary which now contains individualized DeepSeek key_points
+        const displayText = analysis.summary || sentiment.reasoning || '';
+        
+        content += `
+            <div class="deepseek-analysis-inline">
+                <div class="deepseek-header">
+                    <span>AI Analysis ${analysis.gem_score ? `(${analysis.gem_score})` : ''}</span>
+                    <span class="sentiment-badge ${recommendationClass}">${analysis.recommendation} · ${sentimentLabel} ${scorePercent}/10</span>
+                </div>
+                <div class="key-points-compact">
+                    <div class="key-point">${displayText}</div>
+                </div>
             </div>
-            <div class="prediction-row">
-                <span class="label">Confidence:</span>
-                <span class="value">${analysis.confidence}</span>
-            </div>
-            ${analysis.summary ? `
-                <div class="sentiment-reasoning">
-                    <strong>ML Analysis:</strong>
-                    <p>${analysis.summary}</p>
-                </div>
-            ` : ''}
-            ${analysis.risk_level ? `
-                <div class="prediction-row">
-                    <span class="label">Risk Level:</span>
-                    <span class="value">${analysis.risk_level}</span>
-                </div>
-            ` : ''}
-            ${analysis.timing_score ? `
-                <div class="prediction-row">
-                    <span class="label">Timing:</span>
-                    <span class="value">${analysis.timing_score}</span>
-                </div>
-            ` : ''}
-            ${analysis.position_size ? `
-                <div class="prediction-row">
-                    <span class="label">Position Size:</span>
-                    <span class="value">${analysis.position_size}</span>
-                </div>
-            ` : ''}
-            ${analysis.gem_score ? `
-                <div class="prediction-row">
-                    <span class="label">Gem Score:</span>
-                    <span class="value">${analysis.gem_score}</span>
-                </div>
-            ` : ''}
-            ${analysis.prediction ? `
-                <div class="prediction-row">
-                    <span class="label">Prediction:</span>
-                    <span class="value">${analysis.prediction}</span>
-                </div>
-            ` : ''}
         `;
     }
-    
-    // Build DeepSeek sentiment content
-    let sentimentContent = '';
-    if (sentiment && sentiment.key_points && sentiment.key_points.length > 0) {
+    // Show ML only if no DeepSeek sentiment with reasoning
+    else if (analysis) {
+        const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
+                                   analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
+        
+        // If we have sentiment without reasoning, show combined badge but use summary
+        if (sentiment) {
+            let sentimentLabel = 'Neutral';
+            if (sentiment.score >= 0.3) sentimentLabel = 'Bullish';
+            else if (sentiment.score <= -0.3) sentimentLabel = 'Bearish';
+            const scorePercent = sentiment.score ? ((sentiment.score + 1) * 5).toFixed(1) : 'N/A';
+            
+            content += `
+                <div class="deepseek-analysis-inline">
+                    <div class="deepseek-header">
+                        <span>AI Analysis</span>
+                        <span class="sentiment-badge ${recommendationClass}">${analysis.recommendation} · ${sentimentLabel} ${scorePercent}/10</span>
+                    </div>
+                    ${(sentiment.key_points && sentiment.key_points[0]) ? `
+                        <div class="key-points-compact">
+                            <div class="key-point">${sentiment.key_points[0]}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        } else {
+            // No sentiment at all, just show ML prediction
+            content += `
+                <div class="deepseek-analysis-inline">
+                    <div class="deepseek-header">
+                        <span>ML Prediction</span>
+                        <span class="sentiment-badge ${recommendationClass}">${analysis.recommendation}</span>
+                    </div>
+                    ${analysis.summary ? `
+                        <div class="key-points-compact">
+                            <div class="key-point">${analysis.summary}</div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+    }
+    // Show DeepSeek only if no ML analysis
+    else if (sentiment && sentiment.key_points && sentiment.key_points.length > 0) {
         let sentimentLabel = 'Neutral';
         let sentimentClass = 'neutral';
+        
         if (sentiment.score >= 0.3) {
             sentimentLabel = 'Bullish';
             sentimentClass = 'positive';
@@ -87,61 +93,43 @@ function generateAISentimentHTML(coin, coinId) {
             sentimentClass = 'negative';
         }
         
-        const scorePercent = sentiment.score ? (sentiment.score * 10).toFixed(0) : 'N/A';
-        const confidencePercent = sentiment.confidence ? (sentiment.confidence * 100).toFixed(0) : 'N/A';
+        const scorePercent = sentiment.score ? ((sentiment.score + 1) * 5).toFixed(1) : 'N/A';
         
-        sentimentContent = `
-            ${analysis ? '<hr style="margin: 15px 0; border: 0; border-top: 1px solid #333;">' : ''}
-            <div class="prediction-row">
-                <span class="label">AI Sentiment:</span>
-                <span class="value ${sentimentClass}"><strong>${sentimentLabel.toUpperCase()}</strong></span>
-            </div>
-            <div class="prediction-row">
-                <span class="label">Sentiment Score:</span>
-                <span class="value">${scorePercent}/10 (${confidencePercent}% confidence)</span>
-            </div>
-            ${sentiment.key_points && sentiment.key_points.length > 0 ? `
-                <div class="sentiment-points">
-                    <strong>Key Insights:</strong>
-                    <ul>
-                        ${sentiment.key_points.map(point => `<li>${point}</li>`).join('')}
-                    </ul>
+        content += `
+            <div class="deepseek-analysis-inline">
+                <div class="deepseek-header">
+                    <span>AI Sentiment</span>
+                    <span class="sentiment-badge ${sentimentClass}">${sentimentLabel}</span>
                 </div>
-            ` : ''}
-            ${sentiment.reasoning ? `
-                <div class="sentiment-reasoning">
-                    <strong>DeepSeek Analysis:</strong>
-                    <p>${sentiment.reasoning}</p>
+                <div class="deepseek-score">
+                    <span class="score-text">${scorePercent}/10</span>
                 </div>
-            ` : ''}
+                ${sentiment.key_points && sentiment.key_points.length > 0 ? `
+                    <div class="key-points-compact">
+                        ${sentiment.key_points.slice(0, 3).map(point => `
+                            <div class="key-point">• ${point}</div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
         `;
     }
     
-    // Combine everything into ONE section
     return `
-        <div class="ai-sentiment-section">
-            <button class="ml-reasoning-toggle" onclick="toggleAISentiment('${coinId}')">
-                <span>${title}</span>
-                <span class="arrow">▼</span>
-            </button>
-            <div id="ai-sentiment-${coinId}" class="ml-reasoning-content" style="display: none;">
-                <div class="ml-prediction-detail">
-                    ${mlContent}
-                    ${sentimentContent}
-                </div>
-            </div>
+        <div class="ai-analysis-container">
+            ${content}
         </div>
     `;
 }
 
-// Generate ML reasoning HTML section  
+// Generate ML reasoning HTML section - Always visible inline
 function generateMLReasoningHTML(coin, coinId, mlEnabled) {
     // Show investment highlights if available
     if (coin.investment_highlights && coin.investment_highlights.trim().length > 0) {
         return `
-            <div class="investment-highlights">
-                <div class="highlights-label">💡 ML Insights:</div>
-                <div class="highlights-text">${coin.investment_highlights}</div>
+            <div class="ml-insights-inline">
+                <div class="insights-label">ML Insights</div>
+                <div class="insights-text">${coin.investment_highlights}</div>
             </div>
         `;
     }

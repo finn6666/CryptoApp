@@ -94,21 +94,6 @@ class CryptoDataPipeline:
                     'market_cap': quote.get('market_cap', 0),
                     'percent_change_24h': quote.get('percent_change_24h', 0)
                 }]
-                market_caps = data.get('market_caps', [])
-                
-                result = []
-                for i, (timestamp, price) in enumerate(prices):
-                    volume = volumes[i][1] if i < len(volumes) else 0
-                    market_cap = market_caps[i][1] if i < len(market_caps) else 0
-                    
-                    result.append({
-                        'timestamp': timestamp,
-                        'close': price,
-                        'volume': volume,
-                        'market_cap': market_cap
-                    })
-                
-                return result
                 
         except Exception as e:
             logging.error(f"Error fetching {symbol}: {e}")

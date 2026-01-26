@@ -121,10 +121,10 @@ class CryptoAnalyzer:
             except Exception as e:
                 symbol = coin_item.get('item', {}).get('symbol', 'UNKNOWN')
                 skipped.append(symbol)
-                print(f"⚠️  Skipped coin {symbol} due to parsing error: {e}")
+                print(f"[WARNING] Skipped coin {symbol} due to parsing error: {e}")
         
         if skipped:
-            print(f"⚠️  Skipped {len(skipped)} coins during load: {', '.join(skipped)}")
+            print(f"[WARNING] Skipped {len(skipped)} coins during load: {', '.join(skipped)}")
         
         return coins
 

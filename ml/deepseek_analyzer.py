@@ -10,7 +10,7 @@ import logging
 import requests
 from typing import Dict, Optional, List
 from datetime import datetime, timedelta
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from dotenv import load_dotenv
 
 # Load environment variables to get API key
@@ -27,6 +27,7 @@ class SentimentAnalysis:
     reasoning: str
     timestamp: str
 
+
 class DeepSeekAnalyzer:
     """
     DeepSeek AI analyzer for cryptocurrency sentiment analysis
@@ -37,6 +38,9 @@ class DeepSeekAnalyzer:
     - Technology assessment
     - Risk evaluation
     """
+    
+    # Class-level cache to reduce redundant API calls
+    _analysis_cache = {}
     
     def __init__(self):
         self.api_key = os.getenv('DEEPSEEK_API_KEY', '')
@@ -69,16 +73,14 @@ class DeepSeekAnalyzer:
             SentimentAnalysis object or None if unavailable
         """
         if not self.is_available():
-            logger.debug("DeepSeek API not configured, skipping sentiment analysis")
             return None
         
         try:
             symbol = coin_data.get('symbol', 'UNKNOWN')
             
-            # Check cache first
+            # Check cache first (file and memory)
             cached_result = self._get_cached_sentiment(symbol)
             if cached_result:
-                logger.debug(f"Using cached sentiment for {symbol}")
                 return cached_result
             
             # Build analysis prompt
@@ -93,7 +95,7 @@ class DeepSeekAnalyzer:
             # Parse response into structured sentiment
             sentiment = self._parse_sentiment_response(response, symbol)
             
-            # Cache the result
+            # Cache the result (both file and memory)
             if sentiment:
                 self._cache_sentiment(symbol, sentiment)
             
@@ -104,44 +106,30 @@ class DeepSeekAnalyzer:
             return None
     
     def _build_analysis_prompt(self, coin_data: Dict) -> str:
-        """Build AI prompt for sentiment analysis"""
+        """Build optimized AI prompt for sentiment analysis"""
         symbol = coin_data.get('symbol', 'UNKNOWN')
         name = coin_data.get('name', 'Unknown')
         price = coin_data.get('price', 0)
         market_cap_rank = coin_data.get('market_cap_rank', 999)
         price_change_24h = coin_data.get('price_change_24h', 0)
         
-        prompt = f"""Analyze the cryptocurrency {name} ({symbol}) for investment potential.
+        # Concise, optimized prompt
+        prompt = f"""Analyze {name} ({symbol}) - Rank #{market_cap_rank}, ${price}, {price_change_24h:+.1f}% (24h).
 
-Current Data:
-- Price: ${price}
-- Market Cap Rank: #{market_cap_rank}
-- 24h Change: {price_change_24h}%
+Provide unique insight in ONE compelling sentence (max 15 words). No templates. Focus on what makes THIS coin different.
 
-Please provide:
-1. Overall Sentiment Score (-1.0 to 1.0, where -1 is very bearish, 0 is neutral, 1 is very bullish)
-2. Confidence Level (0.0 to 1.0)
-3. Three key points about this coin (technology, adoption, risks)
-4. Brief reasoning (2-3 sentences)
-
-Consider:
-- Market position and competition
-- Technology and use case
-- Recent developments
-- Risk factors for small-cap cryptos
-
-Respond in JSON format:
+JSON:
 {{
-    "sentiment_score": 0.5,
-    "confidence": 0.7,
-    "key_points": ["point1", "point2", "point3"],
-    "reasoning": "brief explanation"
+    "sentiment_score": 0.5,  // -1 to 1
+    "confidence": 0.7,  // 0 to 1
+    "key_points": ["Unique catalyst", "Competitive edge", "Key risk"],
+    "reasoning": "One unique, insightful sentence about THIS specific coin"
 }}"""
         
         return prompt
     
     def _call_deepseek_api(self, prompt: str) -> Optional[str]:
-        """Call DeepSeek API"""
+        """Call DeepSeek API with optimized settings"""
         try:
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -153,22 +141,22 @@ Respond in JSON format:
                 "messages": [
                     {
                         "role": "system",
-                        "content": "You are a cryptocurrency market analyst. Provide objective, data-driven analysis in JSON format."
+                        "content": "Expert crypto analyst. Give unique, specific insights for each coin. Avoid generic templates. Be insightful and concise."
                     },
                     {
                         "role": "user",
                         "content": prompt
                     }
                 ],
-                "temperature": 0.3,  # Lower temperature for more consistent analysis
-                "max_tokens": 500  # Keep costs down
+                "temperature": 0.5,
+                "max_tokens": 300  # Reduced from 500 to save costs
             }
             
             response = requests.post(
                 self.api_url,
                 headers=headers,
                 json=payload,
-                timeout=10
+                timeout=15
             )
             
             if response.status_code == 200:
@@ -176,7 +164,7 @@ Respond in JSON format:
                 content = result['choices'][0]['message']['content']
                 return content
             else:
-                logger.error(f"DeepSeek API error: {response.status_code} - {response.text}")
+                logger.error(f"DeepSeek API error: {response.status_code}")
                 return None
                 
         except Exception as e:
@@ -209,7 +197,18 @@ Respond in JSON format:
             return None
     
     def _get_cached_sentiment(self, symbol: str) -> Optional[SentimentAnalysis]:
-        """Get cached sentiment if available and not expired"""
+        """Get cached sentiment from memory or file if available and not expired"""
+        # Check memory cache first (fastest)
+        cache_key = f"{symbol.lower()}_sentiment"
+        if cache_key in self._analysis_cache:
+            cached_data, cached_time = self._analysis_cache[cache_key]
+            if datetime.now() - cached_time < timedelta(hours=self.cache_ttl_hours):
+                return cached_data
+            else:
+                # Remove expired from memory
+                del self._analysis_cache[cache_key]
+        
+        # Check file cache
         try:
             cache_file = os.path.join(self.cache_dir, f"{symbol.lower()}_sentiment.json")
             
@@ -219,19 +218,26 @@ Respond in JSON format:
             # Check if cache is expired
             file_time = datetime.fromtimestamp(os.path.getmtime(cache_file))
             if datetime.now() - file_time > timedelta(hours=self.cache_ttl_hours):
-                logger.debug(f"Cache expired for {symbol}")
                 return None
             
             with open(cache_file, 'r') as f:
                 data = json.load(f)
-                return SentimentAnalysis(**data)
+                sentiment = SentimentAnalysis(**data)
+                # Store in memory cache for faster access
+                self._analysis_cache[cache_key] = (sentiment, datetime.now())
+                return sentiment
                 
         except Exception as e:
             logger.debug(f"Cache read error for {symbol}: {e}")
             return None
     
     def _cache_sentiment(self, symbol: str, sentiment: SentimentAnalysis):
-        """Cache sentiment analysis result"""
+        """Cache sentiment analysis result to both memory and file"""
+        # Store in memory cache
+        cache_key = f"{symbol.lower()}_sentiment"
+        self._analysis_cache[cache_key] = (sentiment, datetime.now())
+        
+        # Store in file cache
         try:
             cache_file = os.path.join(self.cache_dir, f"{symbol.lower()}_sentiment.json")
             
@@ -268,13 +274,9 @@ Respond in JSON format:
                 'sentiment': None
             }
         
-        # Enhance score with sentiment
-        # Sentiment ranges from -1 to 1, weight it at 20% of total score
-        sentiment_boost = sentiment.score * 20 * sentiment.confidence
-        enhanced_score = base_score + sentiment_boost
-        
-        # Clamp to 0-100 range
-        enhanced_score = max(0, min(100, enhanced_score))
+        # Enhance score with sentiment (weighted at 15% instead of 20% to be more conservative)
+        sentiment_boost = sentiment.score * 15 * sentiment.confidence
+        enhanced_score = max(0, min(100, base_score + sentiment_boost))
         
         return {
             'enhanced_score': round(enhanced_score, 2),
@@ -293,13 +295,18 @@ Respond in JSON format:
         """Clear sentiment cache for a symbol or all symbols"""
         try:
             if symbol:
-                # Clear specific symbol
+                # Clear specific symbol from memory and file
+                cache_key = f"{symbol.lower()}_sentiment"
+                if cache_key in self._analysis_cache:
+                    del self._analysis_cache[cache_key]
+                
                 cache_file = os.path.join(self.cache_dir, f"{symbol.lower()}_sentiment.json")
                 if os.path.exists(cache_file):
                     os.remove(cache_file)
                     logger.info(f"Cleared cache for {symbol}")
             else:
                 # Clear all cache
+                self._analysis_cache.clear()
                 for file in os.listdir(self.cache_dir):
                     if file.endswith('_sentiment.json'):
                         os.remove(os.path.join(self.cache_dir, file))

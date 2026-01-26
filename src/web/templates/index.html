@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Low Cap Crypto Analyzer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=4">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260118b">
 </head>
 <body>
     <div class="container">
@@ -16,16 +16,19 @@
                     <div>Next: <span id="nextRefresh">-</span></div>
                 </div>
                 <button class="btn" onclick="window.location.href='/trades'">
-                    📊 Trade Journal
+                    Trade Journal
                 </button>
                 <button class="btn" onclick="toggleSymbolSearch()" id="symbolToggleBtn">
-                    ⭐ Add Favorite
+                    Add Favorite
+                </button>
+                <button class="btn" onclick="trainMLModel()" id="trainBtn">
+                    Train ML Model
                 </button>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">
-                    🔄 Refresh
+                    Refresh
                 </button>
             </div>
-            <h1>🚀 Crypto Investment Dashboard</h1>
+            <h1>Crypto Investment Dashboard</h1>
             <p>AI-powered analysis • Hidden gems • Low-cap focus • Auto-updates every 5 min</p>
         </div>
 
@@ -46,26 +49,9 @@
                 </div>
             </div>
 
-            <div class="ml-status-container" id="mlStatusContainer">
-                <div class="coins-header">
-                    <h2>🧠 ML Analysis Status</h2>
-                </div>
-                <div id="mlStatusContent">
-                    <div class="loading">🔄 Loading ML status...</div>
-                </div>
-                <div class="ml-controls">
-                    <button class="refresh-btn" onclick="trainMLModel()" id="trainBtn">
-                        🎯 Train ML Model
-                    </button>
-                    <button class="refresh-btn" onclick="refreshMLStatus()" id="refreshMLBtn">
-                        🔄 Refresh ML Status
-                    </button>
-                </div>
-            </div>
-
             <div class="symbol-search-container" id="symbolSearchContainer" style="display: none;">
                 <div class="coins-header">
-                    <h2>🔍 Add to Favorites</h2>
+                    <h2>Add to Favorites</h2>
                     <p>Search for any cryptocurrency and add it to your favorites</p>
                 </div>
                 
@@ -76,7 +62,7 @@
                            placeholder="Enter symbol (e.g., BTC, ETH, MATIC)"
                            maxlength="20">
                     <button class="symbol-search-btn" onclick="searchSymbols()" id="searchBtn">
-                        🔍 Search
+                        Search
                     </button>
                 </div>
                 
@@ -87,11 +73,11 @@
 
             <div class="coins-container">
                 <div class="coins-header">
-                    <h2>💎 Live Cryptocurrency Analysis</h2>
+                    <h2>Live Cryptocurrency Analysis</h2>
                     <p>Top opportunities under £1 with integrated hidden gem detection</p>
                 </div>
                 <div id="coinsContent">
-                    <div class="loading">🔄 Loading cryptocurrency data...</div>
+                    <div class="loading">Loading cryptocurrency data...</div>
                 </div>
                 <div class="last-updated" id="lastUpdated"></div>
             </div>
@@ -99,12 +85,12 @@
     </div>
 
     <!-- Modular JavaScript -->
-    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v=6"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260118"></script>
 </body>
 </html>

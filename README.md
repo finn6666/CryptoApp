@@ -13,10 +13,10 @@ AI-powered cryptocurrency analysis platform with hidden gem detection and weekly
 
 | Need to... | Go to |
 |------------|-------|
-| **Update code on Azure VM** ⭐ | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#-quick-update-most-common) |
-| **First time setup** | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
-| **Learn how to use** | [docs/GUIDE.md](docs/GUIDE.md) |
-| **Understand ML system** | [docs/ML_SYSTEM_COMPLETE.md](docs/ML_SYSTEM_COMPLETE.md) |
+| **Update code on Azure VM** ⭐ | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#updates-most-common) |
+| **First time setup & deployment** | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
+| **Setup Raspberry Pi SIEM** | [raspberry_pi/README.md](raspberry_pi/README.md) |
+| **Understand the architecture** | [docs/README.md](docs/README.md#-architecture) |
 
 ---
 
@@ -31,12 +31,14 @@ python app.py
 
 ## ✨ Features
 
-- 📊 **Real-time Analysis** - Live crypto data with ML predictions
-- 💎 **Hidden Gem Detection** - AI identifies undervalued coins
-- 🧠 **DeepSeek AI** - Sentiment analysis & reasoning
+- 📊 **Real-time Analysis** - CoinMarketCap API with 16+ alpha signals
+- 💎 **Hidden Gem Detection** - ML-powered ranking (1-10 score)
+- 🧠 **Inline ML Analysis** - Detailed predictions and reasoning displayed directly on each coin card
+- 🤖 **DeepSeek AI Sentiment** - Optional AI-powered sentiment scores with concise, formatted insights
+- 📈 **Simple RL Learning** - Learns from your trades via Trade Journal
 - 📧 **Weekly Reports** - Top 3 opportunities via email (Monday 9 AM)
 - ⭐ **Favorites** - Save and track your picks
-- 🎨 **Modern UI** - Clean, responsive dashboard
+- 🎨 **Modern UI** - Clean, responsive cards with inline analysis and auto-refresh
 
 ## 🚀 Update Azure VM
 

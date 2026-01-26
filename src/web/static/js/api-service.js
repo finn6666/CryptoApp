@@ -194,11 +194,10 @@ async function trainMLModel() {
             throw new Error(data.error || 'Training failed');
         }
         
-        showStatus(`✅ ${data.message} (Trained on ${data.rows_trained || 'multiple'} data points)`, 'success', 8000);
+        showStatus(`${data.message} (Trained on ${data.rows_trained || 'multiple'} data points)`, 'success', 8000);
         console.log('Training result:', data.training_result);
         
         // Reload data to show ML predictions
-        await loadMLStatus();
         await loadCoins();
         await loadFavorites();
         

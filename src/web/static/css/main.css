@@ -512,8 +512,8 @@ body::before {
 .coin-card {
     background: var(--card-bg);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
+    border-radius: 14px;
+    padding: 18px;
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
@@ -600,16 +600,17 @@ body::before {
 }
 
 .coin-symbol-large {
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--text-primary);
     letter-spacing: 0.5px;
 }
 
 .coin-name-small {
-    font-size: 13px;
+    font-size: 14px;
     color: var(--text-secondary);
-    margin-top: 2px;
+    margin-top: 3px;
+    font-weight: 500;
 }
 
 .badges {
@@ -639,26 +640,27 @@ body::before {
 .coin-card-body {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
 }
 
 .price-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.03);
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.04);
     border-radius: 10px;
 }
 
 .price-large {
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 700;
     color: var(--text-primary);
+    letter-spacing: -0.5px;
 }
 
 .price-change {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     padding: 6px 12px;
     border-radius: 8px;
@@ -677,15 +679,15 @@ body::before {
 }
 
 .score-label {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
 }
 
 .score-value {
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text-primary);
 }
@@ -821,6 +823,188 @@ body::before {
     line-height: 1.5;
     font-size: 11px;
 }
+
+/* ===== NEW INLINE ML/AI ANALYSIS STYLES ===== */
+.ai-analysis-container {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* ML Analysis Inline */
+.ml-analysis-inline {
+    padding: 10px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(102, 126, 234, 0.05) 100%);
+    border-radius: 6px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.ml-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent-primary);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ml-compact-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.ml-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ml-metric-label {
+    font-size: 9px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    font-weight: 600;
+}
+
+.ml-metric-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.ml-metric-value.positive {
+    color: #68d391;
+}
+
+.ml-metric-value.negative {
+    color: #fc8181;
+}
+
+.ml-metric-value.neutral {
+    color: #a0aec0;
+}
+
+.ml-summary {
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    padding-top: 6px;
+    border-top: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+/* DeepSeek Analysis Inline */
+.deepseek-analysis-inline {
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(118, 75, 162, 0.12) 0%, rgba(118, 75, 162, 0.06) 100%);
+    border-radius: 10px;
+    border: 1px solid rgba(118, 75, 162, 0.25);
+}
+
+.deepseek-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.deepseek-header span:first-child {
+    color: var(--accent-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-size: 11px;
+}
+
+.sentiment-badge {
+    padding: 5px 11px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.sentiment-badge.positive {
+    background: rgba(104, 211, 145, 0.25);
+    color: #68d391;
+    border: 1px solid rgba(104, 211, 145, 0.4);
+}
+
+.sentiment-badge.negative {
+    background: rgba(252, 129, 129, 0.25);
+    color: #fc8181;
+    border: 1px solid rgba(252, 129, 129, 0.4);
+}
+
+.sentiment-badge.neutral {
+    background: rgba(160, 174, 192, 0.25);
+    color: #a0aec0;
+    border: 1px solid rgba(160, 174, 192, 0.4);
+}
+
+.deepseek-score {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.score-text {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+}
+
+.confidence-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.key-points-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.key-point {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    padding-left: 4px;
+    font-weight: 400;
+}
+
+/* ML Insights Inline */
+.ml-insights-inline {
+    margin-top: 12px;
+    padding: 10px;
+    background: linear-gradient(135deg, rgba(246, 213, 92, 0.08) 0%, rgba(246, 213, 92, 0.04) 100%);
+    border-left: 3px solid var(--accent-gold);
+    border-radius: 6px;
+}
+
+.insights-label {
+    font-weight: 700;
+    color: var(--accent-gold);
+    margin-bottom: 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.insights-text {
+    color: var(--text-secondary);
+    line-height: 1.5;
+    font-size: 11px;
+}
+
+/* ===== END NEW INLINE STYLES ===== */
 
 .confidence-bar {
     flex: 1;

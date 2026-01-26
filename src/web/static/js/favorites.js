@@ -44,7 +44,7 @@ function updateFavoriteButtons() {
         const isFavorited = userFavorites.includes(symbol);
         
         btn.classList.toggle('active', isFavorited);
-        btn.textContent = isFavorited ? '⭐' : '☆';
+        btn.textContent = isFavorited ? '★' : '☆';
         btn.title = isFavorited ? 'Remove from favorites' : 'Add to favorites';
     });
 }

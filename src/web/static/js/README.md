@@ -1,19 +1,21 @@
-# JavaScript Module Structure
+# 📦 JavaScript Module Structure
 
-The JavaScript codebase has been refactored from a single 1000+ line file into focused, maintainable modules.
+Modular JavaScript architecture for maintainability and clarity.
 
-## File Structure
+> **Refactored:** Previously a single 1000+ line file, now organized into focused modules.
+
+## 📁 File Structure
 
 ```
 js/
-├── main.js                  # Entry point & initialization (25 lines)
-├── ui-components.js         # UI helpers & HTML generators (200 lines)
-├── coin-display.js          # Coin card rendering (140 lines)
-├── api-service.js           # API calls & data loading (220 lines)
-├── favorites.js             # Favorites management (50 lines)
-├── symbol-search.js         # Symbol search functionality (110 lines)
-├── utils.js                 # Utility functions (40 lines)
-└── main-old-backup.js       # Original monolithic file (backup)
+├── main.js                  # Entry point & initialization (~25 lines)
+├── ui-components.js         # UI helpers & HTML generators (~200 lines)
+├── coin-display.js          # Coin card rendering (~140 lines)
+├── api-service.js           # API calls & data loading (~220 lines)
+├── favorites.js             # Favorites management (~50 lines)
+├── symbol-search.js         # Symbol search functionality (~110 lines)
+├── utils.js                 # Utility functions (~40 lines)
+└── main-old-backup.js       # Original file (backup only)
 ```
 
 ## Module Descriptions
@@ -62,25 +64,26 @@ js/
 - `startRefreshTimer()` - Auto-refresh setup
 - `updateMLStatus()` - Update ML badges
 
-## Benefits
+## ✨ Benefits
 
-✅ **Better Organization** - Each file has a clear purpose
-✅ **Easier Maintenance** - Find and fix code faster
-✅ **Better Testing** - Test modules independently
-✅ **Reduced Complexity** - Smaller, focused files
-✅ **Team Collaboration** - Less merge conflicts
-✅ **Code Reuse** - Share functions across files
+- ✅ **Better Organization** - Each file has a clear, single purpose
+- ✅ **Easier Maintenance** - Find and fix code faster
+- ✅ **Better Testing** - Test modules independently
+- ✅ **Reduced Complexity** - Smaller, focused files (~40-220 lines each)
+- ✅ **Team Collaboration** - Fewer merge conflicts
+- ✅ **Code Reuse** - Share functions across modules
 
-## Loading Order
+## 📋 Loading Order
 
-Scripts are loaded in dependency order in `index.html`:
-1. ui-components.js (base UI functions)
-2. coin-display.js (uses UI components)
-3. api-service.js (uses coin display)
-4. favorites.js (uses API service)
-5. symbol-search.js (uses API service)
-6. utils.js (standalone utilities)
-7. main.js (initializes everything)
+Scripts load in dependency order in [index.html](../../templates/index.html):
+
+1. **ui-components.js** - Base UI functions (no dependencies)
+2. **coin-display.js** - Uses UI components
+3. **api-service.js** - Uses coin display
+4. **favorites.js** - Uses API service
+5. **symbol-search.js** - Uses API service
+6. **utils.js** - Standalone utilities
+7. **main.js** - Initializes everything (entry point)
 
 ## Migration Notes
 
