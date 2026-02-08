@@ -1,0 +1,366 @@
+"""
+Shared application state and helper functions.
+All blueprints import from here to access global state (analyzer, ML, etc.).
+"""
+
+import os
+import re
+import json
+import asyncio
+import logging
+import time
+import signal
+import threading
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+# ─── Project root ─────────────────────────────────────────────
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# ─── Globals ──────────────────────────────────────────────────
+ml_pipeline = None
+ml_service = None
+ML_AVAILABLE = False
+
+gem_detector = None
+GEM_DETECTOR_AVAILABLE = False
+
+data_pipeline = None
+SYMBOLS_AVAILABLE = False
+
+official_adk_available = False
+analyze_crypto_adk = None
+
+agent_analysis_cache = {}
+CACHE_EXPIRY_SECONDS = 14400  # 4 hours
+
+analyzer = None  # set during init_app()
+
+# ─── Constants ────────────────────────────────────────────────
+STABLECOINS = {
+    'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX',
+    'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1',
+    'C1USD', 'BUIDL', 'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC',
+}
+MIN_PRICE = 0.00000001
+MAX_PRICE = 1.25
+FAVORITES_FILE = "data/favorites.json"
+
+# Idle / auto-shutdown
+IDLE_TIMEOUT = 300  # 5 minutes
+start_time = time.time()
+last_request_time = time.time()
+shutdown_enabled = os.environ.get('AUTO_SHUTDOWN', 'true').lower() in ('1', 'true', 'yes')
+
+
+# ─── Initializers ─────────────────────────────────────────────
+
+def initialize_official_adk():
+    global official_adk_available, analyze_crypto_adk
+    logger.info("Attempting to initialize Official Google ADK...")
+    try:
+        from ml.agents.official import analyze_crypto
+        analyze_crypto_adk = analyze_crypto
+        official_adk_available = True
+        logger.info("✅ Official Google ADK initialized successfully")
+        return True
+    except Exception as e:
+        logger.warning(f"Official ADK not available: {e}")
+        official_adk_available = False
+        return False
+
+
+def initialize_ml():
+    global ml_pipeline, ml_service, ML_AVAILABLE
+    logger.info("Attempting to initialize ML components...")
+    try:
+        from ml.training_pipeline import CryptoMLPipeline
+        ml_pipeline = CryptoMLPipeline()
+        ml_service = None
+        ML_AVAILABLE = True
+        try:
+            ml_pipeline.load_existing_model()
+            logger.info("ML model loaded successfully")
+        except Exception as e:
+            logger.warning(f"ML model not available: {e}")
+        logger.info("ML components initialized successfully")
+        return True
+    except Exception as e:
+        logger.error(f"ML components not available: {e}")
+        ML_AVAILABLE = False
+        ml_pipeline = None
+        ml_service = None
+        return False
+
+
+def initialize_data_pipeline():
+    global data_pipeline, SYMBOLS_AVAILABLE
+    logger.info("Attempting to initialize data pipeline...")
+    try:
+        from ml.data_pipeline import CryptoDataPipeline
+        data_pipeline = CryptoDataPipeline()
+        SYMBOLS_AVAILABLE = True
+        logger.info("Data pipeline initialized successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Data pipeline not available: {e}")
+        SYMBOLS_AVAILABLE = False
+        return False
+
+
+def initialize_gem_detector():
+    global gem_detector, GEM_DETECTOR_AVAILABLE
+    logger.info("Attempting to initialize Enhanced Hidden Gem Detector...")
+    try:
+        from ml.enhanced_gem_detector import HiddenGemDetector
+        gem_detector = HiddenGemDetector()
+        if gem_detector.load_model():
+            logger.info("Hidden Gem Detector model loaded successfully")
+        else:
+            logger.info("No existing model found, will train on first use...")
+        GEM_DETECTOR_AVAILABLE = True
+        logger.info("Enhanced Hidden Gem Detector initialized successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Hidden Gem Detector not available: {e}")
+        GEM_DETECTOR_AVAILABLE = False
+        return False
+
+
+def init_all():
+    """Run all startup initializers and create the analyzer."""
+    global analyzer
+    from src.core.crypto_analyzer import CryptoAnalyzer
+    logger.info("Starting CryptoApp...")
+
+    for fn in (initialize_ml, initialize_data_pipeline, initialize_gem_detector, initialize_official_adk):
+        try:
+            fn()
+        except Exception as e:
+            logger.warning(f"Startup {fn.__name__} failed: {e}")
+
+    analyzer = CryptoAnalyzer(data_file='data/live_api.json')
+    logger.info(
+        f"System ready - ML: {ML_AVAILABLE}, Gem Detector: {GEM_DETECTOR_AVAILABLE}, "
+        f"ADK: {official_adk_available}, Coins: {len(analyzer.coins)}"
+    )
+
+
+# ─── Helper functions ─────────────────────────────────────────
+
+def run_async(coro):
+    """Run an async coroutine from synchronous Flask context."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+def safe_float(val):
+    """Convert string value to float (handles currency symbols)."""
+    if isinstance(val, str):
+        return float(val.replace('£', '').replace('$', '').replace(',', ''))
+    return float(val or 0)
+
+
+def coin_to_dict(coin, include_highlights=False):
+    """Convert Coin object to dictionary for analysis."""
+    coin_dict = {
+        'symbol': coin.symbol,
+        'name': coin.name,
+        'price': coin.price or 0,
+        'market_cap': safe_float(getattr(coin, 'market_cap', 0)),
+        'volume_24h': safe_float(getattr(coin, 'total_volume', 0)),
+        'price_change_24h': coin.price_change_24h or 0,
+        'market_cap_rank': coin.market_cap_rank,
+    }
+    if include_highlights:
+        highlights = coin.investment_highlights
+        coin_dict['investment_highlights'] = ' • '.join(highlights) if isinstance(highlights, list) else highlights
+    return coin_dict
+
+
+def _sanitize_ai_text(text):
+    """Remove raw JSON objects/fragments from text meant for UI display."""
+    if not text or not isinstance(text, str):
+        return text or ''
+    cleaned = re.sub(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', text)
+    cleaned = re.sub(r'```(?:json)?\s*', '', cleaned)
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+    if not cleaned or len(cleaned) < 10:
+        return None
+    return cleaned
+
+
+def _build_gem_analysis(gem_result):
+    """Build a standardised analysis dict from a gem_detector result.
+    Returns (analysis_dict, ai_sentiment, enhanced_score) or (None, None, None).
+    """
+    if not gem_result:
+        return None, None, None
+
+    gem_prob = gem_result.get('gem_probability', 0)
+    is_gem = gem_prob > 0.6
+    strengths = gem_result.get('key_strengths', [])
+    weaknesses = gem_result.get('key_weaknesses', [])
+    ai_sentiment = gem_result.get('ai_sentiment')
+
+    summary_parts = []
+    if ai_sentiment and ai_sentiment.get('key_points'):
+        key_points = ai_sentiment['key_points']
+        summary_parts.append(f"🔥 {key_points[0]}" if is_gem else key_points[0])
+        if len(key_points) > 2:
+            summary_parts.append(f"⚠️ {key_points[2]}")
+    else:
+        if is_gem:
+            summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
+        if strengths:
+            summary_parts.append(f"{', '.join(strengths[:1])}")
+        if weaknesses:
+            summary_parts.append(f"⚠️ {weaknesses[0]}")
+
+    raw_summary = ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...')
+    clean_summary = _sanitize_ai_text(raw_summary) or 'Monitoring...'
+
+    analysis = {
+        'recommendation': 'BUY' if is_gem else 'WATCH',
+        'confidence': f"{gem_prob*100:.0f}%",
+        'summary': clean_summary,
+        'risk_level': gem_result.get('risk_level', 'Medium'),
+        'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
+        'analysis_type': 'Gem Detector',
+    }
+    enhanced_score = min(10, gem_result.get('gem_score', 0) / 10)
+    return analysis, ai_sentiment, enhanced_score
+
+
+def parse_market_cap(value):
+    """Parse a market cap value that may be a string with currency symbols."""
+    if isinstance(value, str):
+        return float(value.replace('£', '').replace('$', '').replace(',', '').replace('N/A', '0'))
+    return float(value or 0)
+
+
+def parse_volume(value):
+    """Parse a volume value that may be a string with currency symbols."""
+    return parse_market_cap(value)
+
+
+def load_favorites():
+    """Load user's favorite coins from JSON file."""
+    try:
+        if os.path.exists(FAVORITES_FILE):
+            with open(FAVORITES_FILE, 'r') as f:
+                return json.load(f)
+        return []
+    except Exception as e:
+        logger.error(f"Error loading favorites: {e}")
+        return []
+
+
+def save_favorites(favorites):
+    """Save user's favorite coins to JSON file."""
+    try:
+        os.makedirs(os.path.dirname(FAVORITES_FILE), exist_ok=True)
+        with open(FAVORITES_FILE, 'w') as f:
+            json.dump(favorites, f, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Error saving favorites: {e}")
+        return False
+
+
+def fetch_and_add_new_symbol_data(symbol: str):
+    """Fetch data for a newly added symbol and add it to the live data."""
+    import requests
+
+    cmc_api_key = os.getenv('COINMARKETCAP_API_KEY')
+    logger.info(f"Fetching data for new symbol: {symbol}")
+
+    if not data_pipeline:
+        raise Exception("Data pipeline not available")
+
+    cmc_url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
+    headers = {'X-CMC_PRO_API_KEY': cmc_api_key}
+    params = {'symbol': symbol.upper(), 'convert': 'USD'}
+
+    response = requests.get(cmc_url, headers=headers, params=params, timeout=10)
+    response.raise_for_status()
+    data = response.json()
+
+    coin_data = data.get('data', {}).get(symbol.upper())
+    if not coin_data:
+        raise Exception(f"Symbol {symbol} not found on CoinMarketCap")
+
+    quote = coin_data.get('quote', {}).get('USD', {})
+    price = quote.get('price', 0)
+
+    new_coin_data = {
+        "item": {
+            "id": str(coin_data.get('id')),
+            "name": coin_data.get('name', symbol),
+            "symbol": symbol.upper(),
+            "status": "current",
+            "attractiveness_score": 6.0,
+            "investment_highlights": ["Recently added symbol"],
+            "risk_level": "medium",
+            "market_cap_rank": coin_data.get('cmc_rank'),
+            "price_btc": None,
+            "data": {
+                "price": price,
+                "price_btc": None,
+                "price_change_percentage_24h": {"usd": quote.get('percent_change_24h', 0)},
+                "market_cap": f"${quote.get('market_cap', 0):,}" if quote.get('market_cap') else "N/A",
+                "total_volume": f"${quote.get('volume_24h', 0):,}" if quote.get('volume_24h') else "N/A",
+                "content": None,
+                "source": "coinmarketcap",
+            },
+        }
+    }
+
+    live_data_file = "data/live_api.json"
+    try:
+        with open(live_data_file, 'r') as f:
+            live_data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        live_data = {"last_updated": datetime.now().isoformat(), "sources": ["coinmarketcap"], "coins": []}
+
+    existing_symbols = [coin["item"]["symbol"] for coin in live_data.get("coins", [])]
+    if symbol.upper() not in existing_symbols:
+        live_data["coins"].append(new_coin_data)
+        live_data["last_updated"] = datetime.now().isoformat()
+        with open(live_data_file, 'w') as f:
+            json.dump(live_data, f, indent=2)
+        analyzer.load_data()
+        logger.info(f"Successfully added {symbol} data to live data file")
+    else:
+        logger.info(f"Symbol {symbol} already exists in live data")
+
+
+def update_activity():
+    """Update last activity time."""
+    global last_request_time
+    last_request_time = time.time()
+
+
+def start_idle_monitor():
+    """Start the background idle-shutdown monitor thread."""
+    if not shutdown_enabled:
+        return
+
+    def _monitor():
+        global last_request_time
+        while True:
+            time.sleep(30)
+            idle_time = time.time() - last_request_time
+            if idle_time > IDLE_TIMEOUT:
+                logger.info(f"🛑 No activity for {int(idle_time)}s. Shutting down to save resources...")
+                os.kill(os.getpid(), signal.SIGTERM)
+                break
+
+    thread = threading.Thread(target=_monitor, daemon=True)
+    thread.start()
+    logger.info(f"⏰ Auto-shutdown enabled: will stop after {IDLE_TIMEOUT}s ({IDLE_TIMEOUT//60} min) of idle time")
