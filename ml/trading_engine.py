@@ -89,7 +89,9 @@ class TradingEngine:
         self.kill_switch = False  # Emergency stop
 
         # Email config (from env)
-        self.email_to = os.getenv("TRADE_NOTIFICATION_EMAIL", "finnbryant90@gmail.com")
+        self.email_to = os.getenv("TRADE_NOTIFICATION_EMAIL", "")
+        if not self.email_to:
+            logger.warning("⚠️  TRADE_NOTIFICATION_EMAIL not set — trade approval emails will not be sent")
         self.smtp_user = os.getenv("SMTP_USER", "")
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")  # Gmail app password
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")

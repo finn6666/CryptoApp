@@ -3,6 +3,7 @@
 ## API Keys & Environment Variables
 .env
 .env.*
+!.env.example
 *.api
 data/Coinmarketcap.api
 secrets/

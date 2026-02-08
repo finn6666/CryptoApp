@@ -26,6 +26,10 @@ app = Flask(__name__,
             template_folder='src/web/templates',
             static_folder='src/web/static')
 
+app.secret_key = os.environ.get('SECRET_KEY') or os.urandom(32)
+if not os.environ.get('SECRET_KEY'):
+    logger.warning('⚠️  No SECRET_KEY set — using random key (sessions won\'t persist across restarts)')
+
 # ---------------------------------------------------------------------------
 # Shared state — initialise all ML / data components
 # ---------------------------------------------------------------------------
@@ -72,10 +76,11 @@ def legacy():
 # Runner
 # ---------------------------------------------------------------------------
 if __name__ == '__main__':
-    host = os.environ.get('HOST', '0.0.0.0')
+    host = os.environ.get('HOST', '127.0.0.1')
     try:
         port = int(os.environ.get('PORT', '5001'))
     except ValueError:
         port = 5001
     debug = os.environ.get('DEBUG', 'false').lower() in ('1', 'true', 'yes')
+    logger.info(f'Starting on {host}:{port} (debug={debug})')
     app.run(host=host, port=port, debug=debug)
