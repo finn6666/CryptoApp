@@ -51,8 +51,8 @@ pip install flask requests psutil
 echo "📋 Creating SIEM configuration..."
 cat > siem_config.json << 'EOF'
 {
-  "azure_vm": {
-    "url": "http://YOUR-VM-IP:5001",
+  "cryptoapp_server": {
+    "url": "http://localhost:5001",
     "check_interval": 60,
     "timeout": 10
   },
@@ -80,7 +80,7 @@ cat > siem_config.json << 'EOF'
 }
 EOF
 
-echo "⚠️  IMPORTANT: Edit siem_config.json and set your Azure VM IP address!"
+echo "⚠️  IMPORTANT: Edit siem_config.json and set your Local Server IP address!"
 
 # Create systemd service for auto-start
 echo "🔧 Creating systemd service..."
@@ -126,7 +126,7 @@ echo "   - templates/siem_dashboard.html"
 echo ""
 echo "2. Edit configuration:"
 echo "   nano $PROJECT_DIR/siem_config.json"
-echo "   (Set your Azure VM IP address)"
+echo "   (Set your Local Server IP address)"
 echo ""
 echo "3. Enable and start the service:"
 echo "   sudo systemctl enable cryptoapp-siem"

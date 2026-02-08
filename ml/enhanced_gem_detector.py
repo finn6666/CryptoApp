@@ -2,6 +2,7 @@
 Enhanced ML model specifically designed to identify cryptocurrency hidden gems
 Focuses on patterns and signals that indicate undervalued opportunities with high potential
 Now includes advanced alpha detection features that others typically miss
+PHASE 4: Now integrated with multi-agent analysis system
 """
 
 import pandas as pd
@@ -14,15 +15,24 @@ from datetime import datetime, timedelta
 import joblib
 import json
 import os
+import asyncio
+import logging
 from typing import Dict, List, Optional, Tuple
 import warnings
 warnings.filterwarnings('ignore')
 
+logger = logging.getLogger(__name__)
+
 # Import our advanced alpha features
 from .advanced_alpha_features import AdvancedAlphaFeatures
 
-# Import DeepSeek AI sentiment analyzer
-from .deepseek_analyzer import deepseek_analyzer
+# Import Multi-Agent System (Official Google ADK)
+try:
+    from .agents.official import analyze_crypto
+    MULTI_AGENT_AVAILABLE = True
+except ImportError:
+    MULTI_AGENT_AVAILABLE = False
+    analyze_crypto = None
 
 # Import Simple RL (optional, lightweight learning)
 try:
@@ -31,6 +41,49 @@ try:
 except ImportError:
     SIMPLE_RL_AVAILABLE = False
     simple_rl_learner = None
+
+
+class OrchestratorWrapper:
+    """
+    Wrapper to provide orchestrator interface for PortfolioManager
+    Uses the official Google ADK's analyze_crypto function
+    """
+    def __init__(self, analyze_crypto_func):
+        self.analyze_crypto_func = analyze_crypto_func
+        self.agents = ['Research', 'Technical', 'Risk', 'Sentiment']  # For status reporting
+    
+    async def analyze_coin(self, symbol: str, coin_data: Dict) -> Dict:
+        """
+        Analyze coin using official ADK analyze_crypto function
+        
+        Args:
+            symbol: Coin symbol
+            coin_data: Coin market data
+            
+        Returns:
+            Analysis result dictionary
+        """
+        if not self.analyze_crypto_func:
+            return {'error': 'Multi-agent not available'}
+        
+        try:
+            result = await self.analyze_crypto_func(
+                symbol=symbol,
+                coin_data=coin_data,
+                session_id=f"portfolio_{symbol}",
+                use_memory=False  # Don't use memory for portfolio batch analysis
+            )
+            return result
+        except Exception as e:
+            return {'error': str(e)}
+    
+    def get_metrics(self) -> Dict:
+        """Return basic metrics for compatibility"""
+        return {
+            'agents': len(self.agents),
+            'available': True
+        }
+
 
 class HiddenGemDetector:
     """
@@ -58,20 +111,20 @@ class HiddenGemDetector:
         # Initialize advanced alpha feature extractor
         self.alpha_features = AdvancedAlphaFeatures()
         
-        # Check AI sentiment availability
-        self.ai_enabled = deepseek_analyzer.is_available()
-        if self.ai_enabled:
-            print("AI Sentiment Analysis: ENABLED (DeepSeek)")
-        else:
-            print("AI Sentiment Analysis: Disabled (using ML scores only)")
+        # Initialize Multi-Agent System (PHASE 4)
+        self.multi_agent_enabled = MULTI_AGENT_AVAILABLE
+        self.orchestrator = None  # Will be set if multi-agent is available
+        if self.multi_agent_enabled:
+            try:
+                # Using Official Google ADK - create orchestrator wrapper
+                self.orchestrator = OrchestratorWrapper(analyze_crypto)
+                # Multi-agent initialized successfully
+            except Exception as e:
+                logger.warning(f"Multi-Agent System: Failed to initialize - {e}")
+                self.multi_agent_enabled = False
         
         # Check Simple RL availability
         self.rl_enabled = SIMPLE_RL_AVAILABLE and simple_rl_learner is not None
-        if self.rl_enabled:
-            stats = simple_rl_learner.get_stats()
-            print(f"Simple RL Learning: ENABLED ({stats['total_trades']} trades, {stats['success_rate']:.1f}% success)")
-        else:
-            print("Simple RL Learning: Disabled")
         
         # Create models directory if it doesn't exist
         os.makedirs(model_dir, exist_ok=True)
@@ -724,13 +777,13 @@ class HiddenGemDetector:
             # BOOST probability for low-cap coins (favor speculation)
             raw_probability = float(probability[1])
             
-            # Apply aggressive boost for low caps
+            # Apply AGGRESSIVE boost for low caps (user prefers high risk/reward)
             if features.get('is_nano_cap', 0):
-                boosted_probability = min(raw_probability + 0.25, 0.95)  # +25% boost for nano-caps
+                boosted_probability = min(raw_probability + 0.35, 0.98)  # +35% boost for nano-caps (rank >500)
             elif features.get('is_micro_cap', 0):
-                boosted_probability = min(raw_probability + 0.20, 0.90)  # +20% boost for micro-caps
+                boosted_probability = min(raw_probability + 0.30, 0.95)  # +30% boost for micro-caps (rank >300)
             elif features.get('is_low_cap', 0):
-                boosted_probability = min(raw_probability + 0.15, 0.85)  # +15% boost for small-caps
+                boosted_probability = min(raw_probability + 0.25, 0.90)  # +25% boost for small-caps (rank >100)
             else:
                 boosted_probability = raw_probability
             
@@ -742,8 +795,11 @@ class HiddenGemDetector:
             # Base gem score from BOOSTED probability
             base_gem_score = float(boosted_probability * 100)
             
-            # Enhance with AI sentiment analysis
-            enhanced_data = deepseek_analyzer.enhance_gem_score(base_gem_score, coin_data)
+            # Build enhanced data structure (without DeepSeek)
+            enhanced_data = {
+                'enhanced_score': base_gem_score,
+                'sentiment_boost': 0
+            }
             
             # Apply RL boost if enabled
             rl_data = {}
@@ -784,7 +840,8 @@ class HiddenGemDetector:
                 'rl_recommendation': rl_data.get('action') if self.rl_enabled else None,
                 'rl_confidence': rl_data.get('confidence') if self.rl_enabled else None,
                 'rl_boost': rl_data.get('rl_boost', 0) if self.rl_enabled else 0,
-                'rl_enabled': self.rl_enabled
+                'rl_enabled': self.rl_enabled,
+                'summary': None  # Personalized summary comes from agent analysis
             }
             
             return result
@@ -830,11 +887,10 @@ class HiddenGemDetector:
         elif features['technology_score'] < 0.4:
             weaknesses.append("Limited innovation or technological differentiation")
         
-        # Risk factors
-        if features['whale_concentration_risk'] > 0.7:
-            weaknesses.append("High whale concentration increases volatility risk")
+        # Considerations\n        if features['whale_concentration_risk'] > 0.7:
+            weaknesses.append("Whale-heavy distribution — watch for large moves")
         if features['exchange_diversity_score'] < 0.4:
-            weaknesses.append("Limited exchange listings reduce liquidity")
+            weaknesses.append("Few exchange listings — early stage, watch liquidity")
         
         return {
             'strengths': strengths[:5],  # Top 5 strengths
@@ -864,42 +920,42 @@ class HiddenGemDetector:
         return contributions[:5]
     
     def _assess_investment_risk(self, features: Dict) -> Dict:
-        """Assess investment risk level - frame as opportunity for gem hunters"""
-        risk_score = 0
+        """Assess opportunity level - higher score = more upside potential"""
+        opportunity_score = 0
         
-        # Market cap "risk" = upside potential for gem hunters
+        # Market cap = upside potential (smaller = more room to grow)
         if features['is_nano_cap']:
-            risk_score += 0.35  # Reduced from 0.4 - high risk = high reward
+            opportunity_score += 0.35
         elif features['is_micro_cap']:
-            risk_score += 0.25  # Reduced from 0.3
+            opportunity_score += 0.25
         elif features['is_low_cap']:
-            risk_score += 0.15  # Reduced from 0.2
+            opportunity_score += 0.15
         
-        # Liquidity risk
+        # Low liquidity = early entry opportunity
         if features['liquidity_score'] < 0.3:
-            risk_score += 0.2
+            opportunity_score += 0.2
         elif features['exchange_diversity_score'] < 0.4:
-            risk_score += 0.15
+            opportunity_score += 0.15
         
-        # Volatility risk
+        # High volatility = swing opportunity
         if features['volatility_score'] > 0.8:
-            risk_score += 0.1
+            opportunity_score += 0.1
         
-        # Whale concentration risk
-        risk_score += features['whale_concentration_risk'] * 0.2
+        # Low whale concentration = healthier distribution
+        opportunity_score += features['whale_concentration_risk'] * 0.2
         
-        # Determine risk level - frame as opportunity
-        if risk_score > 0.7:
-            level = "Extreme Moonshot"  # Was "Very High" - sounds more exciting
-        elif risk_score > 0.5:
-            level = "High Volatility"  # Was "High" - volatility = opportunity
-        elif risk_score > 0.3:
-            level = "Moderate Risk"
+        # Determine opportunity level
+        if opportunity_score > 0.7:
+            level = "Extreme Moonshot"
+        elif opportunity_score > 0.5:
+            level = "High Upside"
+        elif opportunity_score > 0.3:
+            level = "Growth Play"
         else:
-            level = "Conservative"
+            level = "Stable"
         
         return {
-            'score': risk_score,
+            'score': opportunity_score,
             'level': level
         }
     
@@ -1031,25 +1087,33 @@ class HiddenGemDetector:
         base_score = min(base_score, 95.0)
         gem_probability = base_score / 100.0
         
-        # Get AI sentiment boost
-        enhanced_data = deepseek_analyzer.enhance_gem_score(base_score, coin_data)
+        # Build aggressive result (DeepSeek integration removed - using Gemini agents instead)
+        cap_label = ('Nano' if features.get('is_nano_cap') else 
+                     'Micro' if features.get('is_micro_cap') else 
+                     'Small' if features.get('is_low_cap') else None)
         
-        # Build aggressive result
+        if cap_label:
+            cap_strength = f"{cap_label}-cap moonshot opportunity"
+            risk_label = "Extreme Moonshot" if features.get('is_nano_cap') else "High Volatility"
+        else:
+            cap_strength = "Established market position"
+            risk_label = "Moderate Risk"
+        
         return {
             'is_hidden_gem': gem_probability > 0.40,  # Low threshold
             'gem_probability': gem_probability,
             'confidence': max(0.6, gem_probability),  # Always show decent confidence
-            'gem_score': enhanced_data['enhanced_score'],
+            'gem_score': base_score,
             'base_gem_score': base_score,
-            'sentiment_boost': enhanced_data.get('sentiment_boost', 0),
-            'risk_level': "Extreme Moonshot" if features.get('is_nano_cap') else "High Volatility",
-            'risk_score': 0.7,  # High risk = high reward
+            'sentiment_boost': 0,
+            'risk_level': risk_label,
+            'risk_score': 0.7 if cap_label else 0.3,
             'key_strengths': [
-                f"{'Nano' if features.get('is_nano_cap') else 'Micro' if features.get('is_micro_cap') else 'Small'}-cap moonshot opportunity",
+                cap_strength,
                 f"{abs(price_change):.1f}% 24h price action",
-                "Early positioning opportunity - get in before the crowd"
+                "Early positioning opportunity - get in before the crowd" if cap_label else "Proven track record and liquidity"
             ],
-            'key_weaknesses': ["High volatility", "Speculative play"],
+            'key_weaknesses': ["High volatility", "Speculative play"] if cap_label else ["Limited upside vs small-caps"],
             'top_features': [],
             'recommendation': self._generate_recommendation(features, gem_probability),
             'feature_breakdown': {
@@ -1059,11 +1123,231 @@ class HiddenGemDetector:
                 'innovation_score': features.get('technology_score', 0.5),
                 'community_strength': features.get('community_growth', 0.5)
             },
-            'ai_sentiment': enhanced_data.get('sentiment'),
-            'ai_enabled': enhanced_data.get('ai_enabled', False),
+            'ai_sentiment': None,
+            'ai_enabled': False,
             'rl_enabled': False,
-            'heuristic_mode': True  # Flag to indicate heuristic scoring
+            'heuristic_mode': True,  # Flag to indicate heuristic scoring
+            'summary': None  # No personalized summary in heuristic mode
         }
+    
+    async def analyze_with_agents(self, coin_data: Dict) -> Dict:
+        """
+        PHASE 4: Analyze coin using multi-agent system
+        
+        This is the new comprehensive analysis method that replaces heuristic scoring
+        with AI-powered multi-agent analysis.
+        
+        Only analyzes coins under £1 (to focus on low-cap opportunities).
+        Exception: Favorites are always analyzed regardless of price.
+        
+        Args:
+            coin_data: Coin market data
+            
+        Returns:
+            Comprehensive analysis from all agents
+        """
+        if not self.multi_agent_enabled or not analyze_crypto:
+            # Fallback to heuristic if multi-agent not available
+            features = self.extract_advanced_features(coin_data)
+            return self._heuristic_gem_score(coin_data)
+        
+        # Price filter: Only analyze coins under £1 (unless favorite)
+        current_price = coin_data.get('price', 0) or coin_data.get('current_price', 0)
+        is_favorite = coin_data.get('is_favorite', False) or coin_data.get('status') == 'favorite'
+        
+        if current_price > 1.0 and not is_favorite:
+            logger.info(f"Skipping ADK analysis for {coin_data.get('symbol')} - price £{current_price:.2f} exceeds £1 limit (not a favorite)")
+            # Return basic heuristic analysis instead
+            return self._heuristic_gem_score(coin_data)
+        
+        try:
+            # Run multi-agent analysis using Official Google ADK
+            result = await analyze_crypto(
+                symbol=coin_data.get('symbol', 'UNKNOWN'),
+                coin_data=coin_data,
+                session_id=f"gem_{coin_data.get('symbol', 'UNKNOWN')}",
+                use_memory=True
+            )
+            
+            if not result.get('success', False):
+                logger.warning(f"Agent analysis returned error for {coin_data.get('symbol')}: {result.get('error')}")
+                return self._heuristic_gem_score(coin_data)
+            
+            # Parse the analysis text — orchestrator returns CryptoAnalysisOutput JSON
+            parsed = self._parse_agent_analysis(result, coin_data)
+            return parsed
+            
+        except Exception as e:
+            logger.warning(f"Multi-agent analysis failed for {coin_data.get('symbol')}: {e}")
+            # Fallback to heuristic
+            return self._heuristic_gem_score(coin_data)
+    
+    def _parse_agent_analysis(self, result: Dict, coin_data: Dict) -> Dict:
+        """Parse the raw orchestrator response into structured gem detector format."""
+        import json as _json
+        import re
+        
+        analysis_text = result.get('analysis', '')
+        confidence_raw = result.get('confidence', 50)
+        symbol = coin_data.get('symbol', 'UNKNOWN')
+        
+        # Try to parse structured JSON from the analysis text
+        parsed_json = None
+        if analysis_text:
+            # Try to extract JSON from the text (may be wrapped in markdown code blocks)
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', analysis_text, re.DOTALL)
+            if json_match:
+                try:
+                    parsed_json = _json.loads(json_match.group(1))
+                except _json.JSONDecodeError:
+                    pass
+            
+            if not parsed_json:
+                # Try parsing the whole text as JSON
+                try:
+                    parsed_json = _json.loads(analysis_text)
+                except _json.JSONDecodeError:
+                    pass
+        
+        if parsed_json:
+            # Successfully parsed structured output from CryptoAnalysisOutput schema
+            recommendation = parsed_json.get('overall_recommendation', 'HOLD')
+            confidence = parsed_json.get('confidence', confidence_raw)
+            gem_score = parsed_json.get('consensus_score', confidence)
+            key_insights = parsed_json.get('key_insights', [])
+            action_plan = parsed_json.get('action_plan', '')
+            risk_summary = parsed_json.get('risk_summary', '')
+            
+            # Build strengths from insights and summaries
+            strengths = []
+            if parsed_json.get('research_summary'):
+                strengths.append(parsed_json['research_summary'][:120])
+            if parsed_json.get('technical_summary'):
+                strengths.append(parsed_json['technical_summary'][:120])
+            if parsed_json.get('sentiment_summary'):
+                strengths.append(parsed_json['sentiment_summary'][:120])
+            for insight in key_insights[:2]:
+                if insight not in strengths:
+                    strengths.append(insight[:120])
+            
+            # Weaknesses from risk
+            weaknesses = []
+            if risk_summary:
+                weaknesses.append(risk_summary[:120])
+            
+            # Derive risk level from risk summary text
+            risk_text = risk_summary.lower()
+            if any(w in risk_text for w in ['very high', 'extreme', 'critical']):
+                risk_level = 'Very High'
+            elif any(w in risk_text for w in ['high', 'significant']):
+                risk_level = 'High'
+            elif any(w in risk_text for w in ['moderate', 'medium']):
+                risk_level = 'Moderate'
+            else:
+                risk_level = 'Low'
+            
+            # Build summary from action plan or key insights
+            # Clean any embedded JSON from summaries
+            def _clean_agent_text(text):
+                if not text or not isinstance(text, str):
+                    return text or ''
+                text = re.sub(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', text)
+                text = re.sub(r'```(?:json)?\s*', '', text)
+                return re.sub(r'\s{2,}', ' ', text).strip()
+            
+            summary = _clean_agent_text(action_plan) if action_plan else ' | '.join(key_insights[:2]) if key_insights else _clean_agent_text(analysis_text[:200])
+            # Also clean strengths and weaknesses
+            strengths = [_clean_agent_text(s) for s in strengths if _clean_agent_text(s)]
+            weaknesses = [_clean_agent_text(w) for w in weaknesses if _clean_agent_text(w)]
+            
+        else:
+            # Fallback: extract useful info from raw text
+            recommendation = 'HOLD'
+            if re.search(r'\b(STRONG\s+)?BUY\b', analysis_text, re.IGNORECASE):
+                recommendation = 'BUY'
+            elif re.search(r'\bSELL\b', analysis_text, re.IGNORECASE):
+                recommendation = 'SELL'
+            
+            confidence = confidence_raw
+            gem_score = confidence_raw
+            
+            # Strip embedded JSON from raw text before extracting sentences
+            cleaned_text = re.sub(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', analysis_text)
+            cleaned_text = re.sub(r'```(?:json)?\s*', '', cleaned_text)
+            cleaned_text = re.sub(r'\s{2,}', ' ', cleaned_text).strip()
+            
+            # Extract sentences as insights (from cleaned text)
+            sentences = [s.strip() for s in re.split(r'[.!]', cleaned_text) if len(s.strip()) > 20]
+            # Filter out sentences that still look like JSON fragments
+            sentences = [s for s in sentences if not s.strip().startswith('{') and '": ' not in s]
+            strengths = sentences[:3] if sentences else [f"Agent analysis completed for {symbol}"]
+            weaknesses = ["See full analysis for risk details"]
+            risk_level = 'Moderate'
+            summary = cleaned_text[:300] if cleaned_text else f"Multi-agent analysis for {symbol}"
+        
+        return {
+            'is_hidden_gem': gem_score > 60,
+            'gem_probability': gem_score / 100.0,
+            'confidence': confidence,
+            'gem_score': gem_score,
+            'base_gem_score': gem_score,
+            'sentiment_boost': 0,
+            'risk_level': risk_level,
+            'risk_score': {'Very High': 0.9, 'High': 0.7, 'Moderate': 0.5, 'Low': 0.3}.get(risk_level, 0.5),
+            'key_strengths': [s for s in strengths if s][:5],
+            'key_weaknesses': [w for w in weaknesses if w][:3],
+            'top_features': [],
+            'recommendation': recommendation,
+            'summary': summary,
+            'feature_breakdown': {},
+            'multi_agent_analysis': result,
+            'ai_enabled': True,
+            'multi_agent_enabled': True,
+            'heuristic_mode': False
+        }
+    
+    def _extract_strengths_from_agents(self, agent_result: Dict) -> List[str]:
+        """Extract key strengths from multi-agent analysis"""
+        strengths = []
+        
+        # From sentiment
+        if 'sentiment' in agent_result:
+            sent = agent_result['sentiment']
+            if sent.get('sentiment_score', 0) > 0.5:
+                strengths.append(f"Positive sentiment: {sent.get('signal', 'Bullish')}")
+        
+        # From research
+        if 'research' in agent_result:
+            res = agent_result['research']
+            if res.get('score', 0) > 0.7:
+                strengths.append("Strong fundamentals")
+        
+        # From technical
+        if 'technical' in agent_result:
+            tech = agent_result['technical']
+            if tech.get('score', 0) > 0.7:
+                strengths.append("Bullish technical setup")
+        
+        return strengths if strengths else ["Comprehensive analysis available"]
+    
+    def _extract_weaknesses_from_agents(self, agent_result: Dict) -> List[str]:
+        """Extract key weaknesses from multi-agent analysis"""
+        weaknesses = []
+        
+        # From risk
+        if 'risk' in agent_result:
+            risk = agent_result['risk']
+            risk_level = risk.get('risk_level', '')
+            if 'HIGH' in risk_level or 'VERY_HIGH' in risk_level:
+                weaknesses.append(f"High risk: {risk_level}")
+        
+        # From sentiment
+        if 'sentiment' in agent_result:
+            sent = agent_result['sentiment']
+            if sent.get('sentiment_score', 0) < -0.2:
+                weaknesses.append("Negative market sentiment")
+        
+        return weaknesses if weaknesses else ["Standard crypto volatility"]
 
     def learn_from_outcome(self, symbol: str, entry_price: float, 
                           current_price: float, days_held: int,

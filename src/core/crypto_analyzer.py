@@ -161,7 +161,7 @@ class CryptoAnalyzer:
                 return float(clean_str.replace('M', '')) * 1_000_000
             else:
                 return float(clean_str)
-        except:
+        except (ValueError, TypeError):
             return 0
 
     def get_low_cap_coins(self, limit: int = 15) -> List[Coin]:
@@ -185,3 +185,7 @@ class CryptoAnalyzer:
     def get_high_potential_coins(self, min_score: float = 6.0) -> List[Coin]:
         """Get coins with high potential (attractiveness score above threshold)"""
         return [coin for coin in self.coins if coin.attractiveness_score >= min_score]
+
+    def get_all_coins(self) -> List[Coin]:
+        """Get all loaded coins"""
+        return self.coins.copy()

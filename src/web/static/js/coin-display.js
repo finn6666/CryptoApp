@@ -15,11 +15,10 @@ function generateCoinsTable(coins, mlEnabled = false) {
         const { displayScore, scorePercentage, scoreClass, scoreLabel } = getScoreInfo(coin.enhanced_score || coin.score);
         const price = formatPrice(coin.price);
         
-        const aiSentimentHtml = generateAISentimentHTML(coin, index);
-        const mlReasoningHtml = generateMLReasoningHTML(coin, index, mlEnabled);
+        const unifiedAIHtml = generateUnifiedAIAnalysis(coin, index);
         
         html += `
-            <div class="coin-card ${scoreClass}">
+            <div class="coin-card ${scoreClass}" data-symbol="${coin.symbol}" data-coin-id="${index}">
                 <div class="coin-card-header">
                     <div class="coin-info">
                         <button class="favorite-btn-card ${userFavorites.includes(coin.symbol) ? 'active' : ''}" 
@@ -50,8 +49,7 @@ function generateCoinsTable(coins, mlEnabled = false) {
                         </div>
                     </div>
                     
-                    ${aiSentimentHtml}
-                    ${mlReasoningHtml}
+                    ${unifiedAIHtml}
                 </div>
             </div>
         `;
@@ -76,11 +74,10 @@ function generateFavoritesTable(favorites, mlEnabled = false) {
         const { displayScore, scorePercentage, scoreClass, scoreLabel } = getScoreInfo(coin.enhanced_score || coin.score);
         const price = formatPrice(coin.price);
         
-        const aiSentimentHtml = generateAISentimentHTML(coin, `fav-${index}`);
-        const mlReasoningHtml = generateMLReasoningHTML(coin, `fav-${index}`, mlEnabled);
+        const unifiedAIHtml = generateUnifiedAIAnalysis(coin, `fav-${index}`);
         
         html += `
-            <div class="coin-card ${scoreClass}">
+            <div class="coin-card ${scoreClass}" data-symbol="${coin.symbol}" data-coin-id="fav-${index}">
                 <div class="coin-card-header">
                     <div class="coin-info">
                         <button class="favorite-btn-card active" onclick="removeFavorite('${coin.symbol}')" title="Remove from favorites">×</button>
@@ -110,8 +107,7 @@ function generateFavoritesTable(favorites, mlEnabled = false) {
                         </div>
                     </div>
                     
-                    ${aiSentimentHtml}
-                    ${mlReasoningHtml}
+                    ${unifiedAIHtml}
                 </div>
             </div>
         `;

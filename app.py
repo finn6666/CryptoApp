@@ -38,11 +38,35 @@ ML_AVAILABLE = False
 
 # Initialize enhanced hidden gem detector
 gem_detector = None
+
+# Agent analysis cache (to avoid quota exhaustion)
+agent_analysis_cache = {}
+CACHE_EXPIRY_SECONDS = 14400  # 4 hours — reduces repeat API calls
 GEM_DETECTOR_AVAILABLE = False
 
 # Initialize data pipeline for symbol management
 data_pipeline = None
 SYMBOLS_AVAILABLE = False
+
+# Initialize official Google ADK agents
+official_adk_available = False
+analyze_crypto_adk = None
+
+def initialize_official_adk():
+    """Initialize official Google ADK multi-agent system"""
+    global official_adk_available, analyze_crypto_adk
+    logger.info("Attempting to initialize Official Google ADK...")
+    try:
+        from ml.agents.official import analyze_crypto
+        
+        analyze_crypto_adk = analyze_crypto
+        official_adk_available = True
+        logger.info("✅ Official Google ADK initialized successfully")
+        return True
+    except Exception as e:
+        logger.warning(f"Official ADK not available: {e}")
+        official_adk_available = False
+        return False
 
 def initialize_ml():
     """Try to initialize ML components in a separate function"""
@@ -125,12 +149,7 @@ def fetch_and_add_new_symbol_data(symbol: str):
     """Fetch data for a newly added symbol and add it to the live data"""
     try:
         import requests
-        import json
-        import os
-        from datetime import datetime
-        from dotenv import load_dotenv
         
-        load_dotenv()
         cmc_api_key = os.getenv('COINMARKETCAP_API_KEY')
         
         logger.info(f"Fetching data for new symbol: {symbol}")
@@ -284,6 +303,15 @@ def save_favorites(favorites):
         return False
 
 # Helper Functions
+def run_async(coro):
+    """Run an async coroutine from synchronous Flask context."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
 def safe_float(val):
     """Convert string value to float (handles currency symbols)"""
     if isinstance(val, str):
@@ -306,6 +334,67 @@ def coin_to_dict(coin, include_highlights=False):
         coin_dict['investment_highlights'] = ' • '.join(highlights) if isinstance(highlights, list) else highlights
     return coin_dict
 
+def _sanitize_ai_text(text):
+    """Remove raw JSON objects/fragments from text meant for UI display."""
+    import re
+    if not text or not isinstance(text, str):
+        return text or ''
+    # Remove JSON objects like {"key": "value", ...}
+    cleaned = re.sub(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', text)
+    # Remove markdown code block wrappers
+    cleaned = re.sub(r'```(?:json)?\s*', '', cleaned)
+    # Clean up extra whitespace
+    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
+    # If we stripped everything, return a short fallback
+    if not cleaned or len(cleaned) < 10:
+        return None
+    return cleaned
+
+
+def _build_gem_analysis(gem_result):
+    """Build a standardised analysis dict from a gem_detector result.
+
+    Returns (analysis_dict, ai_sentiment, enhanced_score) or (None, None, None)
+    if gem_result is falsy.
+    """
+    if not gem_result:
+        return None, None, None
+
+    gem_prob = gem_result.get('gem_probability', 0)
+    is_gem = gem_prob > 0.6
+    strengths = gem_result.get('key_strengths', [])
+    weaknesses = gem_result.get('key_weaknesses', [])
+    ai_sentiment = gem_result.get('ai_sentiment')
+
+    # Build concise, individualized summary
+    summary_parts = []
+    if ai_sentiment and ai_sentiment.get('key_points'):
+        key_points = ai_sentiment['key_points']
+        summary_parts.append(f"🔥 {key_points[0]}" if is_gem else key_points[0])
+        if len(key_points) > 2:
+            summary_parts.append(f"⚠️ {key_points[2]}")
+    else:
+        if is_gem:
+            summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
+        if strengths:
+            summary_parts.append(f"{', '.join(strengths[:1])}")
+        if weaknesses:
+            summary_parts.append(f"⚠️ {weaknesses[0]}")
+
+    raw_summary = ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...')
+    clean_summary = _sanitize_ai_text(raw_summary) or 'Monitoring...'
+
+    analysis = {
+        'recommendation': 'BUY' if is_gem else 'WATCH',
+        'confidence': f"{gem_prob*100:.0f}%",
+        'summary': clean_summary,
+        'risk_level': gem_result.get('risk_level', 'Medium'),
+        'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
+        'analysis_type': 'Gem Detector'
+    }
+    enhanced_score = min(10, gem_result.get('gem_score', 0) / 10)
+    return analysis, ai_sentiment, enhanced_score
+
 def analyze_coin_with_ai(coin_dict, coin=None):
     """Run comprehensive AI analysis on a coin (Gem Detector with integrated RL -> ML fallback)"""
     result = {'ai_analysis': None, 'ai_sentiment': None, 'enhanced_score': coin.attractiveness_score if coin else 5.0}
@@ -314,29 +403,12 @@ def analyze_coin_with_ai(coin_dict, coin=None):
     if GEM_DETECTOR_AVAILABLE and gem_detector:
         try:
             gem_result = gem_detector.predict_hidden_gem(coin_dict)
-            if gem_result:
-                gem_prob = gem_result.get('gem_probability', 0)
-                strengths = gem_result.get('key_strengths', [])
-                weaknesses = gem_result.get('key_weaknesses', [])
-                summary_parts = []
-                if gem_prob > 0.6:
-                    summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
-                if strengths:
-                    summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
-                if weaknesses:
-                    summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
-                
-                result['ai_analysis'] = {
-                    'recommendation': 'BUY' if gem_prob > 0.6 else 'WATCH',
-                    'confidence': f"{gem_prob*100:.0f}%",
-                    'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
-                    'risk_level': gem_result.get('risk_level', 'Medium'),
-                    'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-                    'analysis_type': 'Gem Detector'
-                }
-                result['enhanced_score'] = min(10, gem_result.get('gem_score', result['enhanced_score']) / 10)
-                if gem_result.get('ai_sentiment'):
-                    result['ai_sentiment'] = gem_result.get('ai_sentiment')
+            analysis, ai_sentiment, enhanced_score = _build_gem_analysis(gem_result)
+            if analysis:
+                result['ai_analysis'] = analysis
+                result['enhanced_score'] = enhanced_score
+                if ai_sentiment:
+                    result['ai_sentiment'] = ai_sentiment
                 return result
         except Exception as e:
             logger.warning(f"Gem detection failed: {e}")
@@ -386,39 +458,37 @@ def analyze_coin_with_ai(coin_dict, coin=None):
     
     return result
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-
 # Initialize ML components immediately
 # Try to initialize ML components on startup
-print("[INFO] Starting CryptoApp...")
+logger.info("Starting CryptoApp...")
 try:
     initialize_ml()
 except Exception as e:
-    print(f"[WARNING] Startup ML initialization failed: {e}")
+    logger.warning(f"Startup ML initialization failed: {e}")
 
 # Try to initialize data pipeline on startup
 try:
     initialize_data_pipeline()
 except Exception as e:
-    print(f"[WARNING] Startup data pipeline initialization failed: {e}")
+    logger.warning(f"Startup data pipeline initialization failed: {e}")
 
 # Try to initialize gem detector on startup
 try:
     initialize_gem_detector()
 except Exception as e:
-    print(f"[WARNING] Startup gem detector initialization failed: {e}")
+    logger.warning(f"Startup gem detector initialization failed: {e}")
+
+# Try to initialize official Google ADK on startup
+try:
+    initialize_official_adk()
+except Exception as e:
+    logger.warning(f"Startup official ADK initialization failed: {e}")
 
 # Note: RL functionality integrated into gem_detector via simple_rl
 
 # Initialize analyzer with live data (after all other components)
 analyzer = CryptoAnalyzer(data_file='data/live_api.json')
-print(f"[INFO] ML_AVAILABLE: {ML_AVAILABLE}")
-print(f"[INFO] ml_pipeline: {ml_pipeline}")
-print(f"[INFO] ml_service: {ml_service}")
-print(f"[INFO] GEM_DETECTOR_AVAILABLE: {GEM_DETECTOR_AVAILABLE}")
-print(f"[INFO] gem_detector: {gem_detector}")
-print(f"[INFO] Analyzer loaded {len(analyzer.coins)} coins from data/live_api.json")
+logger.info(f"System ready - ML: {ML_AVAILABLE}, Gem Detector: {GEM_DETECTOR_AVAILABLE}, ADK: {official_adk_available}, Coins: {len(analyzer.coins)}")
 
 # Print RL status
 
@@ -452,8 +522,12 @@ def get_stats():
 
 @app.route('/api/coins')
 def get_coins():
-    """Get coins data (excluding favorites)"""
+    """Get coins data (excluding favorites) with integrated multi-agent analysis"""
     try:
+        # Check if agent analysis is requested
+        run_agents = request.args.get('agents', 'true').lower() == 'true'
+        limit = int(request.args.get('limit', 20))
+        
         favorites = load_favorites()
         favorites_upper = [f.upper() for f in favorites]
         logger.info(f"Excluding favorites: {favorites_upper}")
@@ -468,7 +542,7 @@ def get_coins():
                     recently_added_coins.append(matching_coin)
         
         # Get more coins initially to account for price filtering
-        low_cap_coins = analyzer.get_low_cap_coins(25)
+        low_cap_coins = analyzer.get_low_cap_coins(50)
         
         # Combine recently added coins with low cap coins (prioritize recently added)
         selected_coins = []
@@ -481,7 +555,7 @@ def get_coins():
             if (coin not in selected_coins and 
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
-                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
+                coin.price <= MAX_PRICE):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
         # Then add low cap coins under £1 (avoiding duplicates, favorites, stablecoins, and very low prices)
@@ -489,31 +563,30 @@ def get_coins():
             if coin.symbol.upper() in favorites_upper:
                 logger.debug(f"Skipping {coin.symbol} - in favorites")
                 continue
-            if (coin not in selected_coins and len(selected_coins) < 25 and
+            if (coin not in selected_coins and len(selected_coins) < 50 and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
-                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
+                coin.price <= MAX_PRICE):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
         # If still need more coins, get affordable top coins by score (excluding favorites)
-        if len(selected_coins) < 15:
+        if len(selected_coins) < 20:
             # Get all coins sorted by attractiveness score
             all_affordable_coins = [coin for coin in analyzer.coins 
                                   if (coin.symbol.upper() not in favorites_upper and
                                       coin.symbol not in STABLECOINS and
                                       coin.price and coin.price >= MIN_PRICE and 
-                                      coin.price <= 1.25)]
+                                      coin.price <= MAX_PRICE)]
             all_affordable_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
             
             for coin in all_affordable_coins:
-                if coin not in selected_coins and len(selected_coins) < 25:
+                if coin not in selected_coins and len(selected_coins) < 50:
                     selected_coins.append(coin)
-                if len(selected_coins) >= 25:
+                if len(selected_coins) >= 50:
                     break
         
         coins_data = []
-        for coin in selected_coins[:8]:  # Show only 8 coins for dashboard layout
-                
+        for coin in selected_coins[:limit]:  # Use requested limit
             coins_data.append({
                 'symbol': coin.symbol,
                 'name': coin.name,
@@ -523,7 +596,8 @@ def get_coins():
                 'market_cap_rank': coin.market_cap_rank,
                 'recently_added': coin.symbol in [c.symbol for c in recently_added_coins],  # Flag for UI
                 'ai_analysis': None,  # Will be populated below
-                'ai_sentiment': None  # DeepSeek sentiment
+                'ai_sentiment': None,  # AI sentiment from multi-agent
+                'agent_analysis': None  # PHASE 4: Multi-agent analysis
             })
         
         # Add comprehensive AI analysis to each coin
@@ -560,61 +634,17 @@ def get_coins():
             ai_score = min(10, matching_coin.attractiveness_score / 10)  # Normalize from 0-100 to 0-10
             analysis_done = False
             
-            # 1. Gem Detector Analysis (includes integrated simple_rl)
-            # Note: RL_DETECTOR removed - simple_rl is now integrated in gem_detector
-            
-            # 2. Gem Detector Analysis (includes simple_rl)
+            # Gem Detector Analysis (includes simple_rl)
             if GEM_DETECTOR_AVAILABLE and gem_detector:
                 try:
                     gem_result = gem_detector.predict_hidden_gem(coin_dict)
-                    if gem_result:
-                        gem_prob = gem_result.get('gem_probability', 0)
-                        is_gem = gem_prob > 0.6
-                        
-                        # Build insights from gem detector
-                        strengths = gem_result.get('key_strengths', [])
-                        weaknesses = gem_result.get('key_weaknesses', [])
-                        
-                        # Extract DeepSeek ai_sentiment if present for individualized summary
-                        ai_sentiment = gem_result.get('ai_sentiment')
+                    analysis, ai_sentiment, enhanced = _build_gem_analysis(gem_result)
+                    if analysis:
+                        coin_data['ai_analysis'] = analysis
                         if ai_sentiment:
                             coin_data['ai_sentiment'] = ai_sentiment
-                        
-                        # Build concise, individualized summary
-                        summary_parts = []
-                        
-                        # Use DeepSeek key_points for personalized insights (concise version)
-                        if ai_sentiment and ai_sentiment.get('key_points'):
-                            key_points = ai_sentiment['key_points']
-                            # Show main insight and risk only
-                            if is_gem:
-                                summary_parts.append(f"🔥 {key_points[0]}")
-                            else:
-                                summary_parts.append(key_points[0])
-                            # Add risk for context
-                            if len(key_points) > 2:
-                                summary_parts.append(f"⚠️ {key_points[2]}")
-                        else:
-                            # Fallback to generic if no DeepSeek data
-                            if is_gem:
-                                summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
-                            if strengths:
-                                summary_parts.append(f"{', '.join(strengths[:1])}")
-                            if weaknesses:
-                                summary_parts.append(f"⚠️ {weaknesses[0]}")
-                        
-                        coin_data['ai_analysis'] = {
-                            'recommendation': 'BUY' if is_gem else 'WATCH',
-                            'confidence': f"{gem_prob*100:.0f}%",
-                            'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
-                            'risk_level': gem_result.get('risk_level', 'Medium'),
-                            'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-                            'analysis_type': 'Gem Detector'
-                        }
-                        
                         analysis_done = True
-                        ai_score = min(10, gem_result.get('gem_score', ai_score) / 10)  # Ensure 0-10 scale
-                        # Don't continue - let DeepSeek run if no sentiment yet
+                        ai_score = enhanced
                 except Exception as e:
                     logging.warning(f"Gem detection failed for {symbol}: {e}")
             
@@ -648,24 +678,36 @@ def get_coins():
                 except Exception as e:
                     logging.warning(f"ML prediction failed for {symbol}: {e}")
             
-            # If no sentiment from gem_detector, try DeepSeek directly
-            if coin_data.get('ai_sentiment') is None:
-                try:
-                    from ml.deepseek_analyzer import deepseek_analyzer
-                    sentiment = deepseek_analyzer.analyze_coin_sentiment(coin_dict)
-                    if sentiment:
-                        coin_data['ai_sentiment'] = {
-                            'score': sentiment.score,
-                            'confidence': sentiment.confidence,
-                            'key_points': sentiment.key_points,
-                            'reasoning': sentiment.reasoning
-                        }
-                        logger.info(f"[SUCCESS] DeepSeek sentiment (direct) added for live coin {symbol}")
-                except Exception as ds_error:
-                    logger.warning(f"DeepSeek not available for {symbol}: {ds_error}")
-            
             # Update score with AI insights (ensure it's 0-10 scale)
             coin_data['enhanced_score'] = min(10, ai_score)
+            
+            # PHASE 4: Add multi-agent analysis if enabled and available
+            if run_agents and GEM_DETECTOR_AVAILABLE and gem_detector and gem_detector.multi_agent_enabled:
+                try:
+                    import asyncio
+                    
+                    # Prepare comprehensive coin data for agent analysis
+                    agent_coin_data = {
+                        'symbol': matching_coin.symbol,
+                        'name': matching_coin.name,
+                        'price': matching_coin.price or 0,
+                        'price_change_24h': matching_coin.price_change_24h or 0,
+                        'price_change_7d': 0,
+                        'market_cap_rank': matching_coin.market_cap_rank or 999,
+                        'market_cap': market_cap_value or 0,
+                        'volume_24h': volume_value or 0,
+                        'attractiveness_score': matching_coin.attractiveness_score or 5.0,
+                        'status': getattr(matching_coin, 'status', 'current')
+                    }
+                    
+                    # Run async multi-agent analysis
+                    agent_result = run_async(gem_detector.analyze_with_agents(agent_coin_data))
+                    if agent_result:
+                        coin_data['agent_analysis'] = agent_result
+                        logger.info(f"Multi-agent analysis completed for {symbol}: {agent_result.get('gem_score')}%")
+                        
+                except Exception as agent_error:
+                    logger.warning(f"Multi-agent analysis failed for {symbol}: {agent_error}")
 
         returned_symbols = [c['symbol'] for c in coins_data]
         logger.info(f"Returning {len(coins_data)} live coins (excluded {len(favorites)} favorites): {returned_symbols}")
@@ -739,8 +781,7 @@ def get_favorites():
                         'market_cap_rank': coin.market_cap_rank,
                         'ai_analysis': None,
                         'enhanced_score': min(10, coin.attractiveness_score / 10),
-                        'ai_sentiment': None,
-                        'investment_highlights': ' • '.join(coin.investment_highlights) if isinstance(coin.investment_highlights, list) else coin.investment_highlights
+                        'ai_sentiment': None
                     }
                     
                     # Prepare coin dict for analysis
@@ -765,110 +806,21 @@ def get_favorites():
                         'market_cap_rank': coin.market_cap_rank
                     }
                     
-                    # Try RL analysis first (most comprehensive)
                     analysis_done = False
-                    if False:  # RL integrated into gem_detector
-                        try:
-                            # Calculate total market cap with string handling
-                            def safe_float(val):
-                                if isinstance(val, str):
-                                    return float(val.replace('£', '').replace('$', '').replace(',', ''))
-                                return float(val or 0)
-                            
-                            market_context = {
-                                'total_market_cap': sum(safe_float(c.market_cap) for c in analyzer.coins if c.market_cap),
-                                'market_sentiment': 'neutral',
-                                'btc_dominance': 45.0
-                            }
-                            rl_analysis = None  # rl_detector removed(coin_dict, market_context)
-                            
-                            recommendation = rl_analysis.get('rl_recommendation', 'hold').upper()
-                            confidence = rl_analysis.get('rl_confidence', 0) * 100
-                            reasoning = rl_analysis.get('rl_reasoning', '')
-                            
-                            coin_data['ai_analysis'] = {
-                                'recommendation': recommendation,
-                                'confidence': f"{confidence:.0f}%",
-                                'summary': reasoning,
-                                'risk_level': rl_analysis.get('risk_assessment', {}).get('risk_level', 'Medium'),
-                                'position_size': f"{rl_analysis.get('position_size_percent', 0):.1f}%",
-                                'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
-                                'analysis_type': 'RL Enhanced'
-                            }
-                            coin_data['enhanced_score'] = min(10, rl_analysis.get('gem_score', coin.attractiveness_score / 10))
-                            analysis_done = True
-                        except Exception as e:
-                            logging.warning(f"RL analysis failed for favorite {coin.symbol}: {e}")
                     
-                    # Try Gem Detector (fallback)
+                    # Try Gem Detector
                     if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                         try:
                             gem_result = gem_detector.predict_hidden_gem(coin_dict)
-                            logger.info(f"[GEM] Gem analysis for {coin.symbol}: has_result={gem_result is not None}, ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else False}")
-                            if gem_result:
-                                gem_prob = gem_result.get('gem_probability', 0)
-                                is_gem = gem_prob > 0.6
-                                
-                                strengths = gem_result.get('key_strengths', [])
-                                weaknesses = gem_result.get('key_weaknesses', [])
-                                
-                                # Extract DeepSeek ai_sentiment if present for individualized summary
-                                ai_sentiment = gem_result.get('ai_sentiment')
+                            analysis, ai_sentiment, enhanced = _build_gem_analysis(gem_result)
+                            if analysis:
+                                coin_data['ai_analysis'] = analysis
                                 if ai_sentiment:
                                     coin_data['ai_sentiment'] = ai_sentiment
-                                
-                                # Build concise, individualized summary
-                                summary_parts = []
-                                
-                                # Use DeepSeek key_points for personalized insights (concise version)
-                                if ai_sentiment and ai_sentiment.get('key_points'):
-                                    key_points = ai_sentiment['key_points']
-                                    # Show main insight and risk only
-                                    if is_gem:
-                                        summary_parts.append(f"🔥 {key_points[0]}")
-                                    else:
-                                        summary_parts.append(key_points[0])
-                                    # Add risk for context
-                                    if len(key_points) > 2:
-                                        summary_parts.append(f"⚠️ {key_points[2]}")
-                                else:
-                                    # Fallback to generic if no DeepSeek data
-                                    if is_gem:
-                                        summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
-                                    if strengths:
-                                        summary_parts.append(f"{', '.join(strengths[:1])}")
-                                    if weaknesses:
-                                        summary_parts.append(f"⚠️ {weaknesses[0]}")
-                                
-                                coin_data['ai_analysis'] = {
-                                    'recommendation': 'BUY' if is_gem else 'WATCH',
-                                    'confidence': f"{gem_prob*100:.0f}%",
-                                    'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
-                                    'risk_level': gem_result.get('risk_level', 'Medium'),
-                                    'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-                                    'analysis_type': 'Gem Detector'
-                                }
-                                coin_data['enhanced_score'] = min(10, gem_result.get('gem_score', coin.attractiveness_score / 10))
-                                
+                                coin_data['enhanced_score'] = enhanced
                                 analysis_done = True
                         except Exception as e:
                             logging.warning(f"Gem detection failed for favorite {coin.symbol}: {e}")
-                    
-                    # If gem_detector didn't work, try DeepSeek directly for sentiment
-                    if not analysis_done or (coin_data.get('ai_sentiment') is None):
-                        try:
-                            from ml.deepseek_analyzer import deepseek_analyzer
-                            sentiment = deepseek_analyzer.analyze_coin_sentiment(coin_dict)
-                            if sentiment:
-                                coin_data['ai_sentiment'] = {
-                                    'score': sentiment.score,
-                                    'confidence': sentiment.confidence,
-                                    'key_points': sentiment.key_points,
-                                    'reasoning': sentiment.reasoning
-                                }
-                                logger.info(f"[SUCCESS] DeepSeek sentiment (direct) added for {coin.symbol}")
-                        except Exception as ds_error:
-                            logging.warning(f"DeepSeek direct call failed for {coin.symbol}: {ds_error}")
                     
                     # Basic ML prediction (last fallback)
                     if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded and not analysis_done:
@@ -924,13 +876,6 @@ def get_favorites():
                 try:
                     coin_data_raw = fetch_specific_coin(symbol)
                     if coin_data_raw:
-                        # Generate investment highlights for directly-fetched coins
-                        from src.core.live_data_fetcher import LiveDataFetcher
-                        fetcher = LiveDataFetcher()
-                        highlights = fetcher.generate_investment_highlights(coin_data_raw)
-                        highlights_str = ' • '.join(highlights) if isinstance(highlights, list) else highlights
-                        logger.info(f"[INFO] Generated highlights for {symbol}: '{highlights[:50]}...'")
-                        
                         coin_data = {
                             'symbol': coin_data_raw['symbol'],
                             'name': coin_data_raw['name'],
@@ -941,8 +886,7 @@ def get_favorites():
                             'market_cap_rank': coin_data_raw['market_cap_rank'],
                             'ai_analysis': None,
                             'enhanced_score': 5.0,
-                            'ai_sentiment': None,
-                            'investment_highlights': highlights_str
+                            'ai_sentiment': None
                         }
                         
                         # Run gem_detector analysis on directly-fetched coins
@@ -958,75 +902,19 @@ def get_favorites():
                         
                         analysis_done = False
                         
-                        # Try gem_detector analysis (includes DeepSeek)
+                        # Try gem_detector analysis (includes multi-agent AI)
                         if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                             try:
                                 gem_result = gem_detector.predict_hidden_gem(coin_dict)
-                                logger.info(f"[GEM] Direct-fetch gem analysis for {symbol}: ai_sentiment={gem_result.get('ai_sentiment') is not None if gem_result else 'NO RESULT'}")
-                                if gem_result:
-                                    gem_prob = gem_result.get('gem_probability', 0)
-                                    is_gem = gem_prob > 0.6
-                                    
-                                    strengths = gem_result.get('key_strengths', [])
-                                    weaknesses = gem_result.get('key_weaknesses', [])
-                                    
-                                    # Extract DeepSeek ai_sentiment if present for individualized summary
-                                    ai_sentiment = gem_result.get('ai_sentiment')
+                                analysis, ai_sentiment, enhanced = _build_gem_analysis(gem_result)
+                                if analysis:
+                                    coin_data['ai_analysis'] = analysis
                                     if ai_sentiment:
                                         coin_data['ai_sentiment'] = ai_sentiment
-                                    
-                                    # Build concise, individualized summary
-                                    summary_parts = []
-                                    
-                                    # Use DeepSeek key_points for personalized insights (concise version)
-                                    if ai_sentiment and ai_sentiment.get('key_points'):
-                                        key_points = ai_sentiment['key_points']
-                                        # Show main insight and risk only
-                                        if is_gem:
-                                            summary_parts.append(f"🔥 {key_points[0]}")
-                                        else:
-                                            summary_parts.append(key_points[0])
-                                        # Add risk for context
-                                        if len(key_points) > 2:
-                                            summary_parts.append(f"⚠️ {key_points[2]}")
-                                    else:
-                                        # Fallback to generic if no DeepSeek data
-                                        if is_gem:
-                                            summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
-                                        if strengths:
-                                            summary_parts.append(f"{', '.join(strengths[:1])}")
-                                        if weaknesses:
-                                            summary_parts.append(f"⚠️ {weaknesses[0]}")
-                                    
-                                    coin_data['ai_analysis'] = {
-                                        'recommendation': 'BUY' if is_gem else 'WATCH',
-                                        'confidence': f"{gem_prob*100:.0f}%",
-                                        'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
-                                        'risk_level': gem_result.get('risk_level', 'Medium'),
-                                        'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-                                        'analysis_type': 'Gem Detector'
-                                    }
-                                    coin_data['enhanced_score'] = min(10, gem_result.get('gem_score', 50) / 10)
-                                    
+                                    coin_data['enhanced_score'] = enhanced
                                     analysis_done = True
                             except Exception as e:
                                 logging.warning(f"Gem detection failed for directly-fetched {symbol}: {e}")
-                        
-                        # If no sentiment from gem_detector, try DeepSeek directly
-                        if coin_data.get('ai_sentiment') is None:
-                            try:
-                                from ml.deepseek_analyzer import deepseek_analyzer
-                                sentiment = deepseek_analyzer.analyze_coin_sentiment(coin_dict)
-                                if sentiment:
-                                    coin_data['ai_sentiment'] = {
-                                        'score': sentiment.score,
-                                        'confidence': sentiment.confidence,
-                                        'key_points': sentiment.key_points,
-                                        'reasoning': sentiment.reasoning
-                                    }
-                                    logger.info(f"[SUCCESS] DeepSeek sentiment (direct fallback) added for {symbol}")
-                            except Exception as ds_error:
-                                logging.debug(f"DeepSeek not available for direct-fetch {symbol}: {ds_error}")
                         
                         favorite_coins.append(coin_data)
                     else:
@@ -1044,6 +932,55 @@ def get_favorites():
         
         if missing_coins:
             logger.info(f"Missing favorite coins (could not fetch): {', '.join(missing_coins)}")
+        
+        # Add agent analysis to favorites if requested (optional for performance)
+        run_agents = request.args.get('agents', 'false').lower() == 'true'
+        
+        if run_agents and GEM_DETECTOR_AVAILABLE and gem_detector and gem_detector.multi_agent_enabled:
+            import asyncio
+            
+            for coin_data in favorite_coins:
+                try:
+                    symbol = coin_data['symbol']
+                    
+                    # Check cache first (1 hour expiry)
+                    cache_key = f"agent_{symbol}"
+                    if cache_key in agent_analysis_cache:
+                        cached_data, timestamp = agent_analysis_cache[cache_key]
+                        if (datetime.now().timestamp() - timestamp) < CACHE_EXPIRY_SECONDS:
+                            coin_data['agent_analysis'] = cached_data
+                            logger.info(f"Using cached agent analysis for favorite {symbol}")
+                            continue
+                    
+                    # Prepare comprehensive coin data for agent analysis
+                    market_cap_value = coin_data.get('market_cap', 0)
+                    if isinstance(market_cap_value, str):
+                        market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', '').replace('N/A', '0'))
+                    
+                    agent_coin_data = {
+                        'symbol': coin_data['symbol'],
+                        'name': coin_data['name'],
+                        'price': coin_data.get('price', 0),
+                        'price_change_24h': coin_data.get('price_change_24h', 0),
+                        'price_change_7d': 0,
+                        'market_cap_rank': coin_data.get('market_cap_rank', 999),
+                        'market_cap': market_cap_value,
+                        'volume_24h': 0,
+                        'attractiveness_score': coin_data.get('enhanced_score', 5.0) * 10,
+                        'status': 'favorite',
+                        'is_favorite': True
+                    }
+                    
+                    # Run async multi-agent analysis
+                    agent_result = run_async(gem_detector.analyze_with_agents(agent_coin_data))
+                    if agent_result:
+                        coin_data['agent_analysis'] = agent_result
+                        # Cache the result
+                        agent_analysis_cache[cache_key] = (agent_result, datetime.now().timestamp())
+                        logger.info(f"Multi-agent analysis completed for favorite {coin_data['symbol']}: {agent_result.get('gem_score')}%")
+                        
+                except Exception as agent_error:
+                    logger.warning(f"Multi-agent analysis failed for favorite {coin_data['symbol']}: {agent_error}")
         
         ml_status = ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded
         logger.info(f"[INFO] Favorites API - ML Enhanced: {ml_status}, Favorite coins: {len(favorite_coins)}, Missing: {len(missing_coins)}")
@@ -1135,15 +1072,161 @@ def get_ml_status():
             
         status = ml_pipeline.get_status()
         logger.info(f"📊 ML Status: {status}")
+        
         return jsonify({
             'ml_status': status,
             'service_available': True
         })
+        
     except Exception as e:
-        logger.error(f"❌ ML Status Error: {e}", exc_info=True)
+        logger.error(f"Error getting ML status: {e}")
         return jsonify({
-            'ml_status': {'error': str(e)},
+            'error': str(e),
             'service_available': False
+        }), 500
+
+@app.route('/api/gemini/quota')
+def check_gemini_quota():
+    """Check Gemini API quota status"""
+    import os
+    try:
+        api_key = os.getenv('GOOGLE_API_KEY')
+        if not api_key:
+            return jsonify({
+                'error': 'GOOGLE_API_KEY not found in environment',
+                'instructions': 'Set GOOGLE_API_KEY in your .env file (get it at https://aistudio.google.com/apikey)'
+            }), 500
+        
+        # Make a minimal test request to check quota
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        
+        try:
+            model = genai.GenerativeModel('gemini-2.0-flash')
+            response = model.generate_content("Say 'OK'")
+            
+            return jsonify({
+                'status': 'SUCCESS',
+                'message': '✅ Gemini API is working!',
+                'tier': 'PAID (if billing enabled) or FREE',
+                'test_response': response.text,
+                'next_steps': [
+                    'Check https://ai.google.dev/rate-limit for current usage',
+                    'If getting 429 errors, billing may not be active yet (can take a few minutes)',
+                    'Verify billing at https://console.cloud.google.com/billing'
+                ]
+            })
+        except Exception as e:
+            error_msg = str(e)
+            if '429' in error_msg or 'quota' in error_msg.lower():
+                return jsonify({
+                    'status': 'QUOTA_ERROR',
+                    'message': '⚠️ Still hitting quota limits',
+                    'error': error_msg,
+                    'billing_status': 'Billing may not be active yet - can take 5-10 minutes after enabling',
+                    'actions': [
+                        '1. Verify billing is enabled at https://console.cloud.google.com/billing',
+                        '2. Check project is linked to billing account',
+                        '3. Wait 5-10 minutes for changes to propagate',
+                        '4. Generate a NEW API key from a billing-enabled project'
+                    ]
+                })
+            else:
+                raise
+                
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'message': 'Failed to test Gemini API'
+        }), 500
+
+@app.route('/api/market/conditions')
+def get_market_conditions():
+    """Calculate overall market opportunity conditions based on current portfolio"""
+    try:
+        # Get all current coins
+        all_coins = analyzer.get_all_coins()
+        
+        if not all_coins:
+            return jsonify({
+                'opportunity_level': 'UNKNOWN',
+                'opportunity_score': 50,
+                'opportunity_percentage': 50,
+                'message': 'Insufficient data',
+                'indicators': {}
+            })
+        
+        # Calculate market metrics
+        total_coins = len(all_coins)
+        avg_price_change = sum(c.price_change_24h or 0 for c in all_coins) / max(total_coins, 1)
+        
+        # Count opportunity categories based on market cap
+        nano_caps = sum(1 for c in all_coins if (c.market_cap_rank or 999) > 500)
+        micro_caps = sum(1 for c in all_coins if 300 < (c.market_cap_rank or 999) <= 500)
+        low_caps = sum(1 for c in all_coins if 100 < (c.market_cap_rank or 999) <= 300)
+        
+        # Calculate opportunity score (0-100)
+        # Higher score = more opportunity
+        opp_score = 50  # baseline
+        
+        # More small caps = more upside opportunity
+        cap_opportunity = ((nano_caps * 3) + (micro_caps * 2) + (low_caps * 1)) / max(total_coins, 1) * 10
+        opp_score += cap_opportunity
+        
+        # Strong price movement = opportunity (both directions)
+        momentum_boost = abs(avg_price_change) * 1.5
+        opp_score += momentum_boost
+        
+        # Positive market = more opportunity
+        if avg_price_change > 5:
+            opp_score += 15  # Strong uptrend
+        elif avg_price_change > 2:
+            opp_score += 10  # Uptrend
+        elif avg_price_change < -5:
+            opp_score += 5   # Dip = buying opportunity
+        
+        # Clamp score between 0-100
+        opp_score = max(0, min(100, opp_score))
+        
+        # Determine opportunity level
+        if opp_score >= 75:
+            opp_level = 'EXCELLENT'
+            message = '🟢 Excellent Opportunity - Strong market conditions'
+        elif opp_score >= 60:
+            opp_level = 'GOOD'
+            message = '🟢 Good Opportunity - Favorable conditions'
+        elif opp_score >= 40:
+            opp_level = 'MODERATE'
+            message = '🟡 Moderate Opportunity - Standard conditions'
+        elif opp_score >= 25:
+            opp_level = 'LIMITED'
+            message = '⚪ Limited Opportunity - Quiet market'
+        else:
+            opp_level = 'LOW'
+            message = '⚪ Low Opportunity - Waiting for movement'
+        
+        return jsonify({
+            'opportunity_level': opp_level,
+            'opportunity_score': int(opp_score),
+            'opportunity_percentage': int(opp_score),
+            'message': message,
+            'indicators': {
+                'total_coins': total_coins,
+                'avg_price_change_24h': round(avg_price_change, 2),
+                'nano_caps': nano_caps,
+                'micro_caps': micro_caps,
+                'low_caps': low_caps,
+                'market_cap_diversity': f"{nano_caps}/{micro_caps}/{low_caps}"
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Market conditions error: {e}")
+        return jsonify({
+            'error': str(e),
+            'risk_level': 'UNKNOWN',
+            'risk_score': 50,
+            'risk_percentage': 50
         }), 500
 
 @app.route('/api/debug/ml')
@@ -1250,10 +1333,6 @@ def get_enhanced_coins():
         favorites_upper = [f.upper() for f in favorites]
         logger.info(f"[Enhanced] Excluding favorites from live coins: {favorites_upper}")
         
-        # List of stablecoins to exclude
-        STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN'}
-        MIN_PRICE = 0.00000001  # Minimum price threshold (1 satoshi equivalent)
-        
         # Get recently added symbols from data pipeline (same logic as /api/coins)
         recently_added_coins = []
         if SYMBOLS_AVAILABLE and data_pipeline:
@@ -1264,7 +1343,7 @@ def get_enhanced_coins():
                     recently_added_coins.append(matching_coin)
         
         # Get more coins initially to account for price filtering
-        low_cap_coins = analyzer.get_low_cap_coins(25)
+        low_cap_coins = analyzer.get_low_cap_coins(50)
         
         # Combine recently added coins with low cap coins (prioritize recently added)
         selected_coins = []
@@ -1277,7 +1356,7 @@ def get_enhanced_coins():
             if (coin not in selected_coins and 
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
-                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
+                coin.price <= MAX_PRICE):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
         # Then add low cap coins under £1 (avoiding duplicates, favorites, stablecoins, and very low prices)
@@ -1285,30 +1364,30 @@ def get_enhanced_coins():
             if coin.symbol.upper() in favorites_upper:
                 logger.debug(f"[Enhanced] Skipping {coin.symbol} - in favorites")
                 continue
-            if (coin not in selected_coins and len(selected_coins) < 25 and
+            if (coin not in selected_coins and len(selected_coins) < 50 and
                 coin.symbol not in STABLECOINS and
                 coin.price and coin.price >= MIN_PRICE and
-                coin.price <= 1.25):  # Under £1 equivalent (~$1.25)
+                coin.price <= MAX_PRICE):  # Under £1 equivalent (~$1.25)
                 selected_coins.append(coin)
         
         # If still need more coins, get affordable top coins by score (excluding favorites)
-        if len(selected_coins) < 15:
+        if len(selected_coins) < 20:
             # Get all coins sorted by attractiveness score
             all_affordable_coins = [coin for coin in analyzer.coins 
                                   if (coin.symbol.upper() not in favorites_upper and
                                       coin.symbol not in STABLECOINS and
                                       coin.price and coin.price >= MIN_PRICE and 
-                                      coin.price <= 1.25)]
+                                      coin.price <= MAX_PRICE)]
             all_affordable_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
             
             for coin in all_affordable_coins:
-                if coin not in selected_coins and len(selected_coins) < 25:
+                if coin not in selected_coins and len(selected_coins) < 50:
                     selected_coins.append(coin)
-                if len(selected_coins) >= 25:
+                if len(selected_coins) >= 50:
                     break
         
         coins_data = []
-        for coin in selected_coins[:8]:  # Show only 8 coins for dashboard layout
+        for coin in selected_coins[:20]:  # Show more coins now that cards are compact
             coin_data = {
                 'symbol': coin.symbol,
                 'name': coin.name,
@@ -1340,129 +1419,76 @@ def get_enhanced_coins():
                 'market_cap_rank': coin.market_cap_rank
             }
             
-            # Try the three-tier AI analysis system (same as favorites)
+            # AI analysis system
             analysis_done = False
             
-            # Try RL analysis first
-            if False:  # RL integrated into gem_detector
-                try:
-                    def safe_float(val):
-                        if isinstance(val, str):
-                            return float(val.replace('£', '').replace('$', '').replace(',', ''))
-                        return float(val or 0)
-                    
-                    market_context = {
-                        'total_market_cap': sum(safe_float(c.market_cap) for c in analyzer.coins if c.market_cap),
-                        'market_sentiment': 'neutral',
-                        'btc_dominance': 45.0
-                    }
-                    rl_analysis = None  # rl_detector removed(coin_dict, market_context)
-                    
-                    recommendation = rl_analysis.get('rl_recommendation', 'hold').upper()
-                    confidence = rl_analysis.get('rl_confidence', 0) * 100
-                    reasoning = rl_analysis.get('rl_reasoning', '')
-                    
-                    coin_data['ai_analysis'] = {
-                        'recommendation': recommendation,
-                        'confidence': f"{confidence:.0f}%",
-                        'summary': reasoning,
-                        'risk_level': rl_analysis.get('risk_assessment', {}).get('risk_level', 'Medium'),
-                        'position_size': f"{rl_analysis.get('position_size_percent', 0):.1f}%",
-                        'timing_score': f"{rl_analysis.get('timing_signals', {}).get('timing_score', 0):.1f}/10",
-                        'analysis_type': 'RL Enhanced'
-                    }
-                    coin_data['enhanced_score'] = min(10, rl_analysis.get('gem_score', coin.attractiveness_score / 10))
-                    analysis_done = True
-                except Exception as e:
-                    logger.warning(f"RL analysis failed for {coin.symbol}: {e}")
-            
-            # Try Gem Detector (fallback)
+            # Try Gem Detector
             if GEM_DETECTOR_AVAILABLE and gem_detector and not analysis_done:
                 try:
                     gem_result = gem_detector.predict_hidden_gem(coin_dict)
-                    if gem_result:
-                        gem_prob = gem_result.get('gem_probability', 0)
-                        is_gem = gem_prob > 0.6
-                        
-                        strengths = gem_result.get('key_strengths', [])
-                        weaknesses = gem_result.get('key_weaknesses', [])
-                        
-                        summary_parts = []
-                        if is_gem:
-                            summary_parts.append(f"Hidden gem detected ({gem_prob*100:.0f}% confidence).")
-                        if strengths:
-                            summary_parts.append(f"Strengths: {', '.join(strengths[:2])}.")
-                        if weaknesses:
-                            summary_parts.append(f"Watch: {', '.join(weaknesses[:1])}.")
-                        
-                        coin_data['ai_analysis'] = {
-                            'recommendation': 'BUY' if is_gem else 'WATCH',
-                            'confidence': f"{gem_prob*100:.0f}%",
-                            'summary': ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...'),
-                            'risk_level': gem_result.get('risk_level', 'Medium'),
-                            'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-                            'analysis_type': 'Gem Detector'
-                        }
-                        coin_data['enhanced_score'] = min(10, gem_result.get('gem_score', coin.attractiveness_score) / 10)
+                    analysis, ai_sentiment, enhanced = _build_gem_analysis(gem_result)
+                    if analysis:
+                        coin_data['ai_analysis'] = analysis
+                        coin_data['enhanced_score'] = enhanced
                         analysis_done = True
                 except Exception as e:
                     logger.warning(f"Gem detection failed for {coin.symbol}: {e}")
             
-            # Basic ML prediction (last fallback)
-            if ML_AVAILABLE and ml_pipeline and ml_pipeline.model_loaded and not analysis_done:
-                try:
-                    features = {
-                        'price_change_1h': coin.price_change_24h or 0,
-                        'price_change_24h': coin.price_change_24h or 0,
-                        'volume_change_24h': 0,
-                        'market_cap_change_24h': 0,
-                        'rsi': 50,
-                        'macd': 0,
-                        'moving_avg_7d': coin.price or 0,
-                        'moving_avg_30d': coin.price or 0
-                    }
-                    
-                    ml_result = ml_pipeline.predict_with_validation(features)
-                    pred_pct = ml_result.get('prediction_percentage', 0)
-                    
-                    # Individual recommendation based on multiple factors
-                    gem_score = coin_data.get('enhanced_score') or coin_data.get('score', 0)
-                    sentiment_score = coin_data.get('ai_sentiment', {}).get('score', 0) if coin_data.get('ai_sentiment') else 0
-                    
-                    rec_score = (pred_pct * 0.4) + (gem_score / 10 * 0.4) + (sentiment_score * 5 * 0.2)
-                    buy_threshold = 1.5 if gem_score < 60 else 0.8
-                    avoid_threshold = -1.5 if gem_score < 60 else -0.8
-                    
-                    if rec_score > buy_threshold:
-                        recommendation = 'BUY'
-                    elif rec_score < avoid_threshold:
-                        recommendation = 'AVOID'
-                    else:
-                        recommendation = 'HOLD'
-                    
-                    direction = 'bullish' if pred_pct > 1 else 'bearish' if pred_pct < -1 else 'neutral'
-                    
-                    coin_data['ai_analysis'] = {
-                        'recommendation': recommendation,
-                        'confidence': f"{ml_result.get('confidence', 0)*100:.0f}%",
-                        'summary': f"ML predicts {direction} trend with {abs(pred_pct):.1f}% expected movement.",
-                        'prediction': f"{pred_pct:+.1f}%",
-                        'analysis_type': 'ML Model'
-                    }
-                    
-                    # Enhance score with ML prediction
-                    ml_weight = 0.3
-                    original_weight = 0.7
-                    ml_contribution = min(10, max(0, 5 + pred_pct / 2))
-                    coin_data['enhanced_score'] = (
-                        original_weight * coin.attractiveness_score + 
-                        ml_weight * ml_contribution
-                    )
-                    analysis_done = True
-                except Exception as ml_error:
-                    logger.warning(f"ML prediction failed for {coin.symbol}: {ml_error}")
-            
             coins_data.append(coin_data)
+        
+        # Add agent analysis if explicitly requested (opt-in to avoid quota exhaustion)
+        run_agents = request.args.get('agents', 'false').lower() == 'true'
+        if run_agents and GEM_DETECTOR_AVAILABLE and gem_detector and gem_detector.multi_agent_enabled:
+            for coin_data in coins_data:
+                try:
+                    symbol = coin_data['symbol']
+                    
+                    # Check cache first (1 hour expiry)
+                    cache_key = f"agent_{symbol}"
+                    if cache_key in agent_analysis_cache:
+                        cached_data, timestamp = agent_analysis_cache[cache_key]
+                        if (datetime.now().timestamp() - timestamp) < CACHE_EXPIRY_SECONDS:
+                            coin_data['agent_analysis'] = cached_data
+                            logger.info(f"Using cached agent analysis for {symbol}")
+                            continue
+                    
+                    # Find the coin object
+                    matching_coin = next((c for c in selected_coins if c.symbol == symbol), None)
+                    if not matching_coin:
+                        continue
+                    
+                    # Prepare data for agent analysis
+                    market_cap_value = getattr(matching_coin, 'market_cap', 0)
+                    if isinstance(market_cap_value, str):
+                        market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', '').replace('N/A', '0'))
+                    
+                    volume_value = getattr(matching_coin, 'total_volume', 0)
+                    if isinstance(volume_value, str):
+                        volume_value = float(volume_value.replace('£', '').replace('$', '').replace(',', '').replace('N/A', '0'))
+                    
+                    agent_coin_data = {
+                        'symbol': matching_coin.symbol,
+                        'name': matching_coin.name,
+                        'price': matching_coin.price or 0,
+                        'price_change_24h': matching_coin.price_change_24h or 0,
+                        'price_change_7d': 0,
+                        'market_cap_rank': matching_coin.market_cap_rank or 999,
+                        'market_cap': market_cap_value,
+                        'volume_24h': volume_value,
+                        'attractiveness_score': matching_coin.attractiveness_score or 5.0,
+                        'status': getattr(matching_coin, 'status', 'current')
+                    }
+                    
+                    # Run async multi-agent analysis
+                    agent_result = run_async(gem_detector.analyze_with_agents(agent_coin_data))
+                    if agent_result:
+                        coin_data['agent_analysis'] = agent_result
+                        # Cache the result
+                        agent_analysis_cache[cache_key] = (agent_result, datetime.now().timestamp())
+                        logger.info(f"Multi-agent analysis completed for {symbol}: {agent_result.get('gem_score')}%")
+                        
+                except Exception as agent_error:
+                    logger.warning(f"Multi-agent analysis failed for {coin_data['symbol']}: {agent_error}")
         
         # Sort by enhanced score
         coins_data.sort(key=lambda x: x['enhanced_score'], reverse=True)
@@ -1573,13 +1599,7 @@ def search_coins():
                 'error': 'Please enter a search term'
             })
         
-        # Use asyncio to run the async search function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            results = loop.run_until_complete(data_pipeline.search_symbols(query, limit=20))
-        finally:
-            loop.close()
+        results = run_async(data_pipeline.search_symbols(query, limit=20))
         
         return jsonify({
             'success': True,
@@ -1618,13 +1638,7 @@ def search_symbols():
                 'error': 'Query must be at least 1 character long'
             }), 400
         
-        # Use asyncio to run the async search function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            results = loop.run_until_complete(data_pipeline.search_symbols(query, limit))
-        finally:
-            loop.close()
+        results = run_async(data_pipeline.search_symbols(query, limit))
         
         return jsonify({
             'success': True,
@@ -1663,13 +1677,7 @@ def validate_symbol():
                 'error': 'Symbol cannot be empty'
             }), 400
         
-        # Use asyncio to run the async validation function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            validation_result = loop.run_until_complete(data_pipeline.validate_symbol(symbol))
-        finally:
-            loop.close()
+        validation_result = run_async(data_pipeline.validate_symbol(symbol))
         
         if validation_result['status'] == 'valid':
             return jsonify({
@@ -1717,13 +1725,7 @@ def add_symbol():
                 'error': 'Symbol cannot be empty'
             }), 400
         
-        # Use asyncio to run the async add function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            success = loop.run_until_complete(data_pipeline.add_new_symbol(symbol))
-        finally:
-            loop.close()
+        success = run_async(data_pipeline.add_new_symbol(symbol))
         
         if success:
             # Immediately fetch data for the new symbol and add it to live data
@@ -1988,8 +1990,255 @@ def get_gem_detector_status():
     if gem_detector and GEM_DETECTOR_AVAILABLE:
         model_info = gem_detector.get_model_info()
         status.update(model_info)
+        # Add multi-agent status
+        status['multi_agent_enabled'] = gem_detector.multi_agent_enabled
+        if gem_detector.multi_agent_enabled:
+            status['agent_count'] = len(gem_detector.orchestrator.agents)
     
     return jsonify(status)
+
+@app.route('/api/agents/analyze/<symbol>')
+def analyze_with_agents(symbol):
+    """
+    PHASE 4: Analyze a coin using the multi-agent system
+    This is the new comprehensive analysis endpoint
+    """
+    if not GEM_DETECTOR_AVAILABLE or not gem_detector:
+        return jsonify({'error': 'Gem Detector not available'}), 503
+    
+    if not gem_detector.multi_agent_enabled:
+        return jsonify({'error': 'Multi-agent system not available'}), 503
+    
+    try:
+        # Find the coin
+        coin = None
+        for c in analyzer.coins:
+            if c.symbol.upper() == symbol.upper():
+                coin = c
+                break
+        
+        if not coin:
+            return jsonify({'error': f'Coin {symbol} not found'}), 404
+        
+        # Convert coin object to dictionary for analysis
+        coin_data = {
+            'symbol': coin.symbol,
+            'name': coin.name,
+            'price': coin.price,
+            'price_change_24h': getattr(coin, 'price_change_24h', 0),
+            'price_change_7d': 0,  # Not currently available
+            'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
+            'market_cap': float(str(getattr(coin, 'market_cap', '0')).replace('$', '').replace(',', '').replace('N/A', '0')),
+            'volume_24h': float(str(getattr(coin, 'total_volume', '0')).replace('$', '').replace(',', '').replace('N/A', '0')),
+            'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
+            'status': getattr(coin, 'status', 'current')
+        }
+        
+        # Run async analysis
+        analysis = run_async(gem_detector.analyze_with_agents(coin_data))
+        
+        if analysis is None:
+            return jsonify({'error': 'Analysis failed'}), 500
+        
+        # Add coin info
+        analysis['coin'] = {
+            'symbol': coin.symbol,
+            'name': coin.name,
+            'price': coin.price,
+            'market_cap_rank': coin_data['market_cap_rank'],
+            'attractiveness_score': coin_data['attractiveness_score']
+        }
+        
+        return jsonify(analysis)
+        
+    except Exception as e:
+        logger.error(f"Agent analysis error for {symbol}: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/agents/scan')
+def scan_with_agents():
+    """
+    PHASE 4: Scan coins using multi-agent system
+    More comprehensive but slower than regular gem scan
+    """
+    if not GEM_DETECTOR_AVAILABLE or not gem_detector:
+        return jsonify({'error': 'Gem Detector not available'}), 503
+    
+    if not gem_detector.multi_agent_enabled:
+        return jsonify({'error': 'Multi-agent system not available'}), 503
+    
+    try:
+        limit = int(request.args.get('limit', 10))  # Lower default due to cost
+        min_score = float(request.args.get('min_score', 0.6))
+        
+        agent_gems = []
+        processed_count = 0
+        
+        # Scan fewer coins with agents due to cost
+        scan_count = min(50, len(analyzer.coins))
+        
+        for coin in analyzer.coins[:scan_count]:
+            try:
+                processed_count += 1
+                
+                # Convert coin object to dictionary
+                coin_data = {
+                    'symbol': coin.symbol,
+                    'name': coin.name,
+                    'price': coin.price,
+                    'price_change_24h': getattr(coin, 'price_change_24h', 0),
+                    'price_change_7d': 0,
+                    'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
+                    'market_cap': float(str(getattr(coin, 'market_cap', '0')).replace('$', '').replace(',', '').replace('N/A', '0')),
+                    'volume_24h': float(str(getattr(coin, 'total_volume', '0')).replace('$', '').replace(',', '').replace('N/A', '0')),
+                    'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
+                }
+                
+                # Run async analysis
+                analysis = run_async(gem_detector.analyze_with_agents(coin_data))
+                
+                if analysis and analysis.get('gem_score', 0) / 100 >= min_score:
+                    gem_info = {
+                        'symbol': coin.symbol,
+                        'name': coin.name,
+                        'price': coin.price,
+                        'market_cap_rank': coin_data['market_cap_rank'],
+                        'gem_score': analysis['gem_score'],
+                        'gem_probability': analysis['gem_probability'],
+                        'confidence': analysis['confidence'],
+                        'risk_level': analysis['risk_level'],
+                        'recommendation': analysis['recommendation'],
+                        'key_strengths': analysis['key_strengths'][:3],
+                        'multi_agent': True
+                    }
+                    agent_gems.append(gem_info)
+                    
+            except Exception as e:
+                logger.error(f"Error scanning {coin.symbol} with agents: {e}")
+                continue
+        
+        # Sort by gem score
+        agent_gems.sort(key=lambda x: x['gem_score'], reverse=True)
+        
+        return jsonify({
+            'agent_gems': agent_gems[:limit],
+            'total_scanned': processed_count,
+            'gems_found': len(agent_gems),
+            'min_score_threshold': min_score,
+            'scan_summary': {
+                'ultra_high_potential': len([g for g in agent_gems if g['gem_score'] > 80]),
+                'high_potential': len([g for g in agent_gems if 70 <= g['gem_score'] <= 80]),
+                'moderate_potential': len([g for g in agent_gems if 60 <= g['gem_score'] < 70])
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Agent scan error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/agents/metrics')
+def get_agent_metrics():
+    """Get metrics from the multi-agent orchestrator"""
+    if not GEM_DETECTOR_AVAILABLE or not gem_detector:
+        return jsonify({'error': 'Gem Detector not available'}), 503
+    
+    if not gem_detector.multi_agent_enabled:
+        return jsonify({'error': 'Multi-agent system not available'}), 503
+    
+    try:
+        metrics = gem_detector.orchestrator.get_metrics()
+        return jsonify(metrics)
+    except Exception as e:
+        logger.error(f"Error getting agent metrics: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/portfolio/analyze')
+def analyze_portfolio():
+    """
+    PHASE 5: Analyze portfolio and generate recommendations
+    Uses multi-agent system to evaluate multiple coins and suggest optimal allocation
+    """
+    if not GEM_DETECTOR_AVAILABLE or not gem_detector:
+        return jsonify({'error': 'Gem Detector not available'}), 503
+    
+    if not gem_detector.multi_agent_enabled or not gem_detector.orchestrator:
+        return jsonify({'error': 'Multi-agent system not available'}), 503
+    
+    try:
+        from ml.portfolio_manager import PortfolioManager
+        
+        # Get parameters
+        max_coins = int(request.args.get('max_coins', 20))
+        min_score = float(request.args.get('min_score', 6.0))
+        
+        # Get top coins by attractiveness score
+        candidates = sorted(
+            analyzer.coins,
+            key=lambda x: x.attractiveness_score,
+            reverse=True
+        )[:max_coins]
+        
+        # Filter by minimum score and price
+        candidates = [
+            c for c in candidates 
+            if c.attractiveness_score >= min_score and c.price and c.price > 0
+        ]
+        
+        # Convert to dict format
+        coins_data = []
+        for coin in candidates:
+            market_cap_value = getattr(coin, 'market_cap', 0)
+            if isinstance(market_cap_value, str):
+                market_cap_value = float(market_cap_value.replace('£', '').replace('$', '').replace(',', '').replace('N/A', '0'))
+            
+            volume_value = getattr(coin, 'total_volume', 0)
+            if isinstance(volume_value, str):
+                volume_value = float(volume_value.replace('£', '').replace('$', '').replace(',', '').replace('N/A', '0'))
+            
+            coins_data.append({
+                'symbol': coin.symbol,
+                'name': coin.name,
+                'price': coin.price,
+                'price_change_24h': getattr(coin, 'price_change_24h', 0),
+                'price_change_7d': 0,
+                'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
+                'market_cap': market_cap_value,
+                'volume_24h': volume_value,
+                'attractiveness_score': coin.attractiveness_score,
+                'status': getattr(coin, 'status', 'current')
+            })
+        
+        # Run portfolio analysis
+        portfolio_mgr = PortfolioManager(gem_detector.orchestrator)
+        
+        recommendation = run_async(
+            portfolio_mgr.analyze_portfolio(coins_data, max_coins)
+        )
+        
+        # Convert to JSON-serializable format
+        result = {
+            'summary': {
+                'total_analyzed': len(coins_data),
+                'gems_found': recommendation.total_gems_found,
+                'market_sentiment': recommendation.market_sentiment,
+                'portfolio_risk': round(recommendation.portfolio_risk_score, 1),
+                'diversification': round(recommendation.diversification_score, 1)
+            },
+            'recommendations': {
+                'buy': recommendation.buy_recommendations,
+                'hold': recommendation.hold_recommendations,
+                'avoid': recommendation.avoid_recommendations
+            },
+            'top_opportunities': recommendation.top_opportunities,
+            'risk_warnings': recommendation.risk_warnings,
+            'allocation_strategy': recommendation.allocation_strategy
+        }
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Portfolio analysis error: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/gems/top/<int:count>')
 def get_top_hidden_gems(count):
@@ -2061,250 +2310,6 @@ def get_top_hidden_gems(count):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ========================================
-# RL-Enhanced Gem Detection Endpoints
-# Note: These endpoints are DEPRECATED - use /api/gems/scan instead
-# RL functionality now integrated into HiddenGemDetector via simple_rl
-# ========================================
-
-@app.route('/api/rl/analyze_coin/<symbol>', methods=['GET'])
-def rl_analyze_coin(symbol):
-    """DEPRECATED: Use /api/gems/scan - RL integrated into gem_detector"""
-    if True:  # Always disabled - RL integrated into gem_detector
-        return jsonify({
-            'error': 'RL Detector not available',
-            'message': 'RL system is not initialized'
-        }), 503
-    
-    try:
-        # Get coin data
-        coin = None
-        for c in analyzer.coins:
-            if c.symbol.upper() == symbol.upper():
-                coin = c
-                break
-        
-        if not coin:
-            return jsonify({'error': f'Coin {symbol} not found'}), 404
-        
-        # Convert coin object to dict
-        coin_data = {
-            'symbol': coin.symbol,
-            'name': coin.name,
-            'price': coin.price,
-            'market_cap': coin.market_cap,
-            'price_change_24h': coin.price_change_24h
-        }
-        
-        # Get market context
-        market_context = {
-            'total_market_cap': sum(float(c.market_cap or 0) for c in analyzer.coins if c.market_cap),
-            'market_sentiment': 'neutral',  # Could be enhanced with sentiment analysis
-            'btc_dominance': 45.0  # Could be calculated from actual data
-        }
-        
-        # Analyze with RL
-        analysis = None  # rl_detector removed(coin_data, market_context)
-        
-        return jsonify({
-            'symbol': symbol.upper(),
-            'analysis': analysis,
-            'timestamp': datetime.now().isoformat(),
-            'rl_enabled': True
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rl/scan_gems', methods=['GET'])
-def rl_scan_gems():
-    """DEPRECATED: Use /api/gems/scan - RL integrated into gem_detector"""
-    if True:  # Always disabled - RL integrated into gem_detector
-        return jsonify({
-            'error': 'RL Detector not available', 
-            'message': 'RL system is not initialized'
-        }), 503
-    
-    try:
-        limit = int(request.args.get('limit', 20))
-        min_confidence = float(request.args.get('min_confidence', 0.6))
-        
-        rl_gems = []
-        processed = 0
-        
-        # Get market context
-        market_context = {
-            'total_market_cap': sum(float(c.market_cap or 0) for c in analyzer.coins if c.market_cap),
-            'market_sentiment': 'neutral',
-            'btc_dominance': 45.0
-        }
-        
-        for coin in analyzer.coins:
-            try:
-                # Convert coin object to dict
-                coin_data = {
-                    'symbol': coin.symbol,
-                    'name': coin.name,
-                    'price': coin.price,
-                    'market_cap': coin.market_cap,
-                    'volume_24h': coin.total_volume,
-                    'price_change_24h': coin.price_change_24h,
-                    'price_change_7d': 0  # Not available in current model
-                }
-                
-                # Analyze with RL
-                analysis = None  # rl_detector removed(coin_data, market_context)
-                
-                # Filter by RL recommendation and confidence
-                if (analysis['rl_recommendation'] == 'buy' and 
-                    analysis['rl_confidence'] >= min_confidence):
-                    
-                    rl_gems.append({
-                        'symbol': coin.symbol,
-                        'name': coin.name,
-                        'price': coin.price,
-                        'market_cap': coin.market_cap,
-                        'rl_confidence': analysis['rl_confidence'],
-                        'rl_recommendation': analysis['rl_recommendation'],
-                        'gem_score': analysis.get('gem_score', 0),
-                        'risk_level': analysis['risk_assessment']['risk_level'],
-                        'position_size_percent': analysis['position_size_percent'],
-                        'timing_score': analysis['timing_signals']['timing_score'],
-                        'rl_reasoning': analysis['rl_reasoning']
-                    })
-                
-                processed += 1
-                
-            except Exception as e:
-                print(f"Error analyzing {coin.symbol} with RL: {e}")
-                continue
-        
-        # Sort by RL confidence
-        rl_gems.sort(key=lambda x: x['rl_confidence'], reverse=True)
-        
-        return jsonify({
-            'rl_gems': rl_gems[:limit],
-            'stats': {
-                'total_processed': processed,
-                'gems_found': len(rl_gems),
-                'high_confidence': len([g for g in rl_gems if g['rl_confidence'] > 0.8]),
-                'medium_confidence': len([g for g in rl_gems if 0.6 <= g['rl_confidence'] <= 0.8]),
-                'low_risk': len([g for g in rl_gems if g['risk_level'] == 'Low']),
-                'medium_risk': len([g for g in rl_gems if g['risk_level'] == 'Medium']),
-                'high_risk': len([g for g in rl_gems if g['risk_level'] == 'High'])
-            },
-            'filters': {
-                'min_confidence': min_confidence,
-                'limit': limit
-            },
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rl/performance', methods=['GET'])
-def rl_performance():
-    """DEPRECATED: RL integrated into gem_detector via simple_rl"""
-    if True:  # Always disabled
-        return jsonify({
-            'error': 'RL Detector not available',
-            'message': 'RL system is not initialized'
-        }), 503
-    
-    try:
-        performance = rl_detector.get_rl_performance_summary()
-        
-        return jsonify({
-            'performance': performance,
-            'status': 'inactive',  # RL integrated into gem_detector
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rl/record_trade', methods=['POST'])
-def rl_record_trade():
-    """DEPRECATED: Use simple_rl via /api/simple_rl/record_outcome"""
-    if True:  # Always disabled
-        return jsonify({
-            'error': 'RL Detector not available',
-            'message': 'RL system is not initialized'
-        }), 503
-    
-    try:
-        data = request.get_json()
-        
-        required_fields = ['symbol', 'entry_price', 'current_price', 'entry_date']
-        if not all(field in data for field in required_fields):
-            return jsonify({
-                'error': 'Missing required fields',
-                'required': required_fields
-            }), 400
-        
-        # Parse entry date
-        entry_date = datetime.fromisoformat(data['entry_date'].replace('Z', '+00:00'))
-        
-        # Record trade outcome
-        trade_record = rl_detector.record_trade_outcome(
-            symbol=data['symbol'],
-            entry_price=float(data['entry_price']),
-            current_price=float(data['current_price']),
-            entry_date=entry_date
-        )
-        
-        return jsonify({
-            'message': 'Trade recorded successfully',
-            'trade_record': trade_record,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/rl/train', methods=['POST'])
-def rl_train():
-    """DEPRECATED: RL training integrated into simple_rl"""
-    if True:  # Always disabled
-        return jsonify({
-            'error': 'RL Detector not available',
-            'message': 'RL system is not initialized'  
-        }), 503
-    
-    try:
-        from ml.rl_integration import RLCryptoTrainer
-        from ml.training_pipeline import CryptoMLPipeline
-        
-        trainer = RLCryptoTrainer()
-        
-        # Generate sample training data if it doesn't exist
-        csv_path = os.path.join(project_root, 'models', 'sample_training_data.csv')
-        
-        if not os.path.exists(csv_path):
-            if not os.path.exists('models'):
-                os.makedirs('models')
-            
-            # Generate sample data dynamically
-            ml_pipeline = CryptoMLPipeline()
-            sample_df = ml_pipeline.create_sample_data(symbol="BTC", days=30)
-            sample_df.to_csv(csv_path, index=False)
-        
-        results = trainer.train_from_csv(csv_path)
-        
-        # Save trained model
-        model_path = os.path.join(project_root, 'models', 'rl_model.pkl')
-        rl_detector.save_rl_model(model_path)
-        
-        return jsonify({
-            'message': 'RL training completed',
-            'results': results,
-            'model_saved': model_path,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/status/idle')
 def get_idle_status():
@@ -2374,6 +2379,241 @@ def debug_coins():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ========================================
+# Live Trading Engine Routes
+# ========================================
+
+@app.route('/api/trades/status')
+def trading_status():
+    """Get trading engine status — budget, active trades, kill switch state"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        return jsonify(engine.get_status()), 200
+    except Exception as e:
+        logger.error(f"Trading status error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trades/pending')
+def pending_proposals():
+    """Get all pending trade proposals awaiting approval"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        return jsonify({"proposals": engine.get_pending_proposals()}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trades/history')
+def trade_history():
+    """Get executed trade history"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        return jsonify({"trades": engine.get_trade_history()}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trades/approve/<proposal_id>')
+def approve_trade(proposal_id):
+    """Approve a trade proposal (called from email link)"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        result = engine.approve_trade(proposal_id)
+
+        # Return a nice HTML page for email click-through
+        if result.get("success"):
+            return f"""
+            <html>
+            <body style="font-family: -apple-system, sans-serif; background: #0d0d14; color: #e2e8f0; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
+                <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px; border: 1px solid #2d3748; max-width: 400px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
+                    <h2 style="margin: 0 0 8px; color: #48bb78;">Trade Approved & Executed</h2>
+                    <p style="color: #a0aec0; margin: 0 0 16px;">
+                        {result.get('side', '').upper()} {result.get('quantity', 0):.6f} {result.get('symbol', '')}
+                        @ £{result.get('price', 0):.6f}
+                    </p>
+                    <p style="color: #a0aec0; font-size: 13px;">Amount: £{result.get('amount_gbp', 0):.4f}</p>
+                    <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 8px;">View Trades</a>
+                </div>
+            </body>
+            </html>
+            """
+        else:
+            return f"""
+            <html>
+            <body style="font-family: -apple-system, sans-serif; background: #0d0d14; color: #e2e8f0; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
+                <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px; border: 1px solid #2d3748; max-width: 400px;">
+                    <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
+                    <h2 style="margin: 0 0 8px; color: #ecc94b;">Could Not Execute</h2>
+                    <p style="color: #a0aec0;">{result.get('error', 'Unknown error')}</p>
+                    <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 8px;">View Trades</a>
+                </div>
+            </body>
+            </html>
+            """
+    except Exception as e:
+        logger.error(f"Approve trade error: {e}")
+        return f"<html><body><h2>Error: {e}</h2></body></html>", 500
+
+
+@app.route('/api/trades/reject/<proposal_id>')
+def reject_trade(proposal_id):
+    """Reject a trade proposal (called from email link)"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        result = engine.reject_trade(proposal_id)
+
+        return f"""
+        <html>
+        <body style="font-family: -apple-system, sans-serif; background: #0d0d14; color: #e2e8f0; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
+            <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px; border: 1px solid #2d3748; max-width: 400px;">
+                <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                <h2 style="margin: 0 0 8px; color: #fc8181;">Trade Rejected</h2>
+                <p style="color: #a0aec0;">Proposal {proposal_id} has been rejected. No money spent.</p>
+                <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px; background: #667eea; color: white; text-decoration: none; border-radius: 8px;">View Trades</a>
+            </div>
+        </body>
+        </html>
+        """
+    except Exception as e:
+        logger.error(f"Reject trade error: {e}")
+        return f"<html><body><h2>Error: {e}</h2></body></html>", 500
+
+
+@app.route('/api/trades/propose', methods=['POST'])
+def propose_trade_api():
+    """Manually propose a trade (from dashboard or agent)"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+
+        data = request.json
+        required = ['symbol', 'side', 'amount_gbp', 'current_price', 'reason', 'confidence']
+        for field in required:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400
+
+        result = engine.propose_trade(
+            symbol=data['symbol'],
+            side=data['side'],
+            amount_gbp=float(data['amount_gbp']),
+            current_price=float(data['current_price']),
+            reason=data['reason'],
+            confidence=int(data['confidence']),
+            recommendation=data.get('recommendation', 'BUY'),
+        )
+        return jsonify(result), 200 if result['success'] else 400
+
+    except Exception as e:
+        logger.error(f"Propose trade error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trades/kill-switch', methods=['POST'])
+def toggle_kill_switch():
+    """Activate or deactivate the trading kill switch"""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+
+        action = request.json.get('action', 'activate')
+        if action == 'activate':
+            result = engine.activate_kill_switch()
+        else:
+            result = engine.deactivate_kill_switch()
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/trades/auto-evaluate', methods=['POST'])
+def auto_evaluate_trade():
+    """
+    Run the trading agent on a coin's analysis to decide if it's worth a real trade.
+    Requires the coin to already have agent_analysis.
+    """
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+
+        data = request.json
+        symbol = data.get('symbol', '').upper()
+        analysis = data.get('analysis', {})
+        current_price = float(data.get('current_price', 0))
+
+        if not symbol or not analysis or not current_price:
+            return jsonify({"error": "Missing symbol, analysis, or current_price"}), 400
+
+        remaining = engine.get_remaining_budget()
+        if remaining <= 0:
+            return jsonify({"error": "Daily budget exhausted", "remaining": 0}), 400
+
+        # Run trading agent evaluation
+        import asyncio
+        from ml.agents.official.trading_agent import evaluate_trade
+
+        loop = asyncio.new_event_loop()
+        decision = loop.run_until_complete(
+            evaluate_trade(symbol, analysis, current_price, remaining)
+        )
+        loop.close()
+
+        if not decision.get("success"):
+            return jsonify(decision), 500
+
+        # Parse the trading agent's decision
+        import json as _json
+        import re
+
+        decision_text = decision.get("decision_raw", "")
+        parsed = None
+
+        # Try JSON extraction
+        json_match = re.search(r'\{.*\}', decision_text, re.DOTALL)
+        if json_match:
+            try:
+                parsed = _json.loads(json_match.group())
+            except _json.JSONDecodeError:
+                pass
+
+        if parsed and parsed.get("should_trade"):
+            conviction = parsed.get("conviction", 0)
+            allocation_pct = parsed.get("suggested_allocation_pct", 50)
+            amount = remaining * (allocation_pct / 100)
+            amount = min(amount, remaining)
+
+            # Propose the trade
+            result = engine.propose_trade(
+                symbol=symbol,
+                side=parsed.get("side", "buy"),
+                amount_gbp=round(amount, 4),
+                current_price=current_price,
+                reason=parsed.get("reasoning", "Agent recommended trade"),
+                confidence=conviction,
+                recommendation=data.get("recommendation", "BUY"),
+            )
+            result["agent_decision"] = parsed
+            return jsonify(result), 200
+        else:
+            return jsonify({
+                "success": True,
+                "should_trade": False,
+                "reason": parsed.get("reasoning", "Agent decided not to trade") if parsed else "Could not parse decision",
+                "risk_note": parsed.get("risk_note", "") if parsed else "",
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Auto-evaluate error: {e}")
+        return jsonify({"error": str(e)}), 500
+
 
 # ========================================
 # Trade Journal & RL Learning Routes

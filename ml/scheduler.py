@@ -39,9 +39,6 @@ class MLScheduler:
             # Log success
             logging.info(f"Retraining completed. Metrics: {metrics}")
             
-            # Optional: Deploy to Azure (implement based on your setup)
-            # self.deploy_to_azure()
-            
         except Exception as e:
             logging.error(f"Retraining failed: {str(e)}")
             self.send_alert(f"ML retraining failed: {str(e)}")

@@ -84,7 +84,6 @@ wheels/
 ## Data Files (add specific patterns if needed)
 data/favorites.json
 data/live_api.json
-data/deepseek_cache/
 data/Coinmarketcap.api
 *.api
 .env

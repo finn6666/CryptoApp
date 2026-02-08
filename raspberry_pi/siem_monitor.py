@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Raspberry Pi SIEM-style Monitoring System for CryptoApp
-Monitors: Azure VM health, crypto anomalies, ML alerts, system metrics
+Monitors: Local CryptoApp server health, crypto anomalies, ML alerts, system metrics
 Optimized for Pi 4GB RAM
 """
 
@@ -76,7 +76,7 @@ class SIEMMonitor:
     def get_default_config(self) -> Dict:
         """Default monitoring configuration"""
         return {
-            "azure_vm": {
+            "local_server": {
                 "url": "http://your-vm-ip:5001",
                 "check_interval": 60,  # seconds
                 "timeout": 10
@@ -105,9 +105,9 @@ class SIEMMonitor:
         }
     
     def check_vm_health(self) -> Dict[str, Any]:
-        """Monitor Azure VM health"""
-        vm_url = self.config['azure_vm']['url']
-        timeout = self.config['azure_vm']['timeout']
+        """Monitor Local Server health"""
+        vm_url = self.config['local_server']['url']
+        timeout = self.config['local_server']['timeout']
         
         health_data = {
             'status': 'unknown',
@@ -149,7 +149,7 @@ class SIEMMonitor:
                 severity='CRITICAL',
                 category='SYSTEM',
                 title='VM Timeout',
-                description=f'Azure VM not responding (timeout: {timeout}s)'
+                description=f'Local Server not responding (timeout: {timeout}s)'
             )
         except requests.exceptions.ConnectionError:
             health_data['status'] = 'offline'
@@ -158,7 +158,7 @@ class SIEMMonitor:
                 severity='CRITICAL',
                 category='SYSTEM',
                 title='VM Offline',
-                description='Cannot connect to Azure VM'
+                description='Cannot connect to Local Server'
             )
         except Exception as e:
             health_data['status'] = 'error'
@@ -238,7 +238,7 @@ class SIEMMonitor:
     
     def monitor_market_anomalies(self) -> Dict[str, Any]:
         """Detect unusual market activity"""
-        vm_url = self.config['azure_vm']['url']
+        vm_url = self.config['local_server']['url']
         
         try:
             # Get current coin data from VM
@@ -400,13 +400,13 @@ Threshold: {alert.threshold}
     def run_forever(self):
         """Main monitoring loop"""
         logger.info("🚀 CryptoApp SIEM Monitor started")
-        logger.info(f"Monitoring VM: {self.config['azure_vm']['url']}")
-        logger.info(f"Check interval: {self.config['azure_vm']['check_interval']}s\n")
+        logger.info(f"Monitoring VM: {self.config['local_server']['url']}")
+        logger.info(f"Check interval: {self.config['local_server']['check_interval']}s\n")
         
         try:
             while True:
                 self.run_monitoring_cycle()
-                time.sleep(self.config['azure_vm']['check_interval'])
+                time.sleep(self.config['local_server']['check_interval'])
         except KeyboardInterrupt:
             logger.info("\n👋 SIEM Monitor stopped by user")
         except Exception as e:

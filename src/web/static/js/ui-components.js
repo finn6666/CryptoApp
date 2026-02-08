@@ -1,140 +1,182 @@
 // UI Components and HTML Generators
 
-// Generate combined AI analysis HTML section (ML + DeepSeek) - Always visible, compact design
-function generateAISentimentHTML(coin, coinId) {
-    // Only show if we have AI analysis or DeepSeek sentiment
-    if (!coin.ai_analysis && !coin.ai_sentiment) {
-        return '';
-    }
+// PHASE 4: Generate unified AI analysis HTML (multi-agent integrated)
+function generateUnifiedAIAnalysis(coin, coinId) {
+    // Check if we have multi-agent analysis
+    const agentAnalysis = coin.agent_analysis;
     
-    const analysis = coin.ai_analysis;
-    const sentiment = coin.ai_sentiment;
-    
-    let content = '';
-    
-    // Build combined ML + DeepSeek analysis (use summary with individualized insights)
-    if (analysis && sentiment) {
-        const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
-                                   analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
+    if (agentAnalysis) {
+        // Full multi-agent analysis available
+        const gemScore = agentAnalysis.gem_score || 0;
+        const scoreClass = gemScore >= 70 ? 'score-high' : 
+                          gemScore >= 50 ? 'score-medium' : 'score-low';
         
-        let sentimentLabel = 'Neutral';
-        if (sentiment.score >= 0.3) sentimentLabel = 'Bullish';
-        else if (sentiment.score <= -0.3) sentimentLabel = 'Bearish';
+        const riskLevel = agentAnalysis.risk_level || 'Moderate';
+        // Map risk levels to opportunity framing
+        const opportunityLabel = riskLevel.toLowerCase().includes('extreme') ? 'High Upside' :
+                                riskLevel.toLowerCase().includes('high') ? 'Growth Play' :
+                                riskLevel.toLowerCase().includes('conservative') ? 'Stable' :
+                                riskLevel.toLowerCase().includes('low') ? 'Stable' : 'Balanced';
+        const oppClass = riskLevel.toLowerCase().includes('extreme') || riskLevel.toLowerCase().includes('high') ? 'positive' : 
+                         riskLevel.toLowerCase().includes('conservative') || riskLevel.toLowerCase().includes('low') ? 'neutral' : 'neutral';
         
-        const scorePercent = sentiment.score ? ((sentiment.score + 1) * 5).toFixed(1) : 'N/A';
+        const recommendation = agentAnalysis.recommendation || 'HOLD';
+        const recClass = recommendation === 'BUY' || recommendation === 'STRONG BUY' ? 'positive' :
+                        recommendation === 'SELL' || recommendation === 'AVOID' ? 'negative' : 'neutral';
         
-        // Use analysis.summary which now contains individualized DeepSeek key_points
-        const displayText = analysis.summary || sentiment.reasoning || '';
+        const confidence = agentAnalysis.confidence || 0;
         
-        content += `
-            <div class="deepseek-analysis-inline">
-                <div class="deepseek-header">
-                    <span>AI Analysis ${analysis.gem_score ? `(${analysis.gem_score})` : ''}</span>
-                    <span class="sentiment-badge ${recommendationClass}">${analysis.recommendation} · ${sentimentLabel} ${scorePercent}/10</span>
-                </div>
-                <div class="key-points-compact">
-                    <div class="key-point">${displayText}</div>
-                </div>
-            </div>
-        `;
-    }
-    // Show ML only if no DeepSeek sentiment with reasoning
-    else if (analysis) {
-        const recommendationClass = analysis.recommendation === 'BUY' ? 'positive' : 
-                                   analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
-        
-        // If we have sentiment without reasoning, show combined badge but use summary
-        if (sentiment) {
-            let sentimentLabel = 'Neutral';
-            if (sentiment.score >= 0.3) sentimentLabel = 'Bullish';
-            else if (sentiment.score <= -0.3) sentimentLabel = 'Bearish';
-            const scorePercent = sentiment.score ? ((sentiment.score + 1) * 5).toFixed(1) : 'N/A';
-            
-            content += `
-                <div class="deepseek-analysis-inline">
-                    <div class="deepseek-header">
-                        <span>AI Analysis</span>
-                        <span class="sentiment-badge ${recommendationClass}">${analysis.recommendation} · ${sentimentLabel} ${scorePercent}/10</span>
-                    </div>
-                    ${(sentiment.key_points && sentiment.key_points[0]) ? `
-                        <div class="key-points-compact">
-                            <div class="key-point">${sentiment.key_points[0]}</div>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        } else {
-            // No sentiment at all, just show ML prediction
-            content += `
-                <div class="deepseek-analysis-inline">
-                    <div class="deepseek-header">
-                        <span>ML Prediction</span>
-                        <span class="sentiment-badge ${recommendationClass}">${analysis.recommendation}</span>
-                    </div>
-                    ${analysis.summary ? `
-                        <div class="key-points-compact">
-                            <div class="key-point">${analysis.summary}</div>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-    }
-    // Show DeepSeek only if no ML analysis
-    else if (sentiment && sentiment.key_points && sentiment.key_points.length > 0) {
-        let sentimentLabel = 'Neutral';
-        let sentimentClass = 'neutral';
-        
-        if (sentiment.score >= 0.3) {
-            sentimentLabel = 'Bullish';
-            sentimentClass = 'positive';
-        } else if (sentiment.score <= -0.3) {
-            sentimentLabel = 'Bearish';
-            sentimentClass = 'negative';
+        // Summary text — personalized from agents (sanitize JSON leaks)
+        let summary = agentAnalysis.summary || '';
+        if (typeof summary === 'object') summary = '';
+        if (summary.includes('{"') || summary.includes('": "')) {
+            summary = summary.replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '').replace(/\s{2,}/g, ' ').trim();
         }
         
-        const scorePercent = sentiment.score ? ((sentiment.score + 1) * 5).toFixed(1) : 'N/A';
+        // Get strengths and weaknesses 
+        const strengths = agentAnalysis.key_strengths || [];
+        const weaknesses = agentAnalysis.key_weaknesses || [];
         
-        content += `
-            <div class="deepseek-analysis-inline">
-                <div class="deepseek-header">
-                    <span>AI Sentiment</span>
-                    <span class="sentiment-badge ${sentimentClass}">${sentimentLabel}</span>
+        return `
+            <div class="unified-ai-analysis compact">
+                <div class="ai-header-compact">
+                    <div class="ai-score-badge ${scoreClass}">
+                        <div class="score-number">${Math.round(gemScore)}%</div>
+                        <div class="score-action ${recClass}">${recommendation}</div>
+                    </div>
+                    <div class="ai-confidence-risk">
+                        <div class="confidence-indicator">${confidence}% confident</div>
+                        <div class="opportunity-badge ${oppClass}">${opportunityLabel}</div>
+                    </div>
                 </div>
-                <div class="deepseek-score">
-                    <span class="score-text">${scorePercent}/10</span>
+                
+                ${summary ? `
+                <div class="ai-summary-text">
+                    ${summary.length > 200 ? summary.substring(0, 200) + '...' : summary}
                 </div>
-                ${sentiment.key_points && sentiment.key_points.length > 0 ? `
-                    <div class="key-points-compact">
-                        ${sentiment.key_points.slice(0, 3).map(point => `
-                            <div class="key-point">• ${point}</div>
-                        `).join('')}
+                ` : ''}
+                
+                ${strengths.length > 0 || weaknesses.length > 0 ? `
+                <div class="ai-summary-compact">
+                    ${strengths.length > 0 ? `
+                    <div class="summary-item positive">
+                        <span class="summary-icon">✓</span>
+                        <span class="summary-text">${strengths[0].length > 100 ? strengths[0].substring(0, 100) + '...' : strengths[0]}</span>
+                    </div>
+                    ` : ''}
+                    ${weaknesses.length > 0 ? `
+                    <div class="summary-item negative">
+                        <span class="summary-icon">!</span>
+                        <span class="summary-text">${weaknesses[0].length > 100 ? weaknesses[0].substring(0, 100) + '...' : weaknesses[0]}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                ` : ''}
+                
+                <div style="display: flex; gap: 6px; margin-top: 6px;">
+                    ${recommendation === 'BUY' || recommendation === 'STRONG BUY' ? `
+                    <button class="ai-expand-btn" onclick="proposeTrade('${coin.symbol}', ${coin.price || 0}, ${JSON.stringify({gem_score: gemScore, recommendation, confidence, risk_level: riskLevel, summary: (summary || '').substring(0,150), key_strengths: strengths.slice(0,2), key_weaknesses: weaknesses.slice(0,2)}).replace(/'/g, "\\'")})" style="flex: 1; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; font-weight: 700;">
+                        ⚡ Trade
+                    </button>
+                    ` : ''}
+                    ${strengths.length > 1 || weaknesses.length > 1 ? `
+                    <button class="ai-expand-btn" onclick="toggleAgentDetails('${coinId}')" style="flex: 1;">
+                        <span>More</span> <span class="arrow">▼</span>
+                    </button>
+                    ` : ''}
+                </div>
+                    <div id="agent-details-${coinId}" class="agent-details-compact" style="display: none;">
+                        ${strengths.length > 1 ? `
+                            <div class="detail-section">
+                                <div class="detail-header positive">Key Insights</div>
+                                ${strengths.slice(1, 4).map(s => `
+                                    <div class="detail-item">• ${s.length > 120 ? s.substring(0, 120) + '...' : s}</div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                        ${weaknesses.length > 1 ? `
+                            <div class="detail-section">
+                                <div class="detail-header negative">Watch For</div>
+                                ${weaknesses.slice(1, 3).map(w => `
+                                    <div class="detail-item">• ${w.length > 120 ? w.substring(0, 120) + '...' : w}</div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
                     </div>
                 ` : ''}
             </div>
         `;
     }
     
-    return `
-        <div class="ai-analysis-container">
-            ${content}
-        </div>
-    `;
-}
-
-// Generate ML reasoning HTML section - Always visible inline
-function generateMLReasoningHTML(coin, coinId, mlEnabled) {
-    // Show investment highlights if available
-    if (coin.investment_highlights && coin.investment_highlights.trim().length > 0) {
+    // Fallback to legacy AI analysis if no multi-agent data
+    const analysis = coin.ai_analysis;
+    const sentiment = coin.ai_sentiment;
+    
+    if (!analysis && !sentiment) {
         return `
-            <div class="ml-insights-inline">
-                <div class="insights-label">ML Insights</div>
-                <div class="insights-text">${coin.investment_highlights}</div>
+            <div class="unified-ai-analysis loading-analysis">
+                <div class="ai-loading">
+                    <span class="loading-icon">🔄</span>
+                    <span>AI analysis loading in background...</span>
+                </div>
             </div>
         `;
     }
+    
+    // Show AI analysis (with or without sentiment)
+    if (analysis) {
+        const recommendationClass = analysis.recommendation === 'BUY' || analysis.recommendation === 'STRONG BUY' ? 'positive' : 
+                                   analysis.recommendation === 'SELL' || analysis.recommendation === 'AVOID' ? 'negative' : 'neutral';
+        
+        let sentimentText = '';
+        if (sentiment && sentiment.score != null) {
+            let sentimentLabel = 'Neutral';
+            if (sentiment.score >= 0.3) sentimentLabel = 'Bullish';
+            else if (sentiment.score <= -0.3) sentimentLabel = 'Bearish';
+            const scorePercent = ((sentiment.score + 1) * 50).toFixed(0);
+            sentimentText = ` • ${sentimentLabel} ${scorePercent}%`;
+        }
+        
+        const gemScore = analysis.gem_score || '';
+        const riskLevel = analysis.risk_level || '';
+        const confidence = analysis.confidence || '';
+        
+        // Sanitize summary - strip any raw JSON that leaked through
+        let summaryText = analysis.summary || (sentiment && sentiment.reasoning) || 'Analysis in progress...';
+        if (typeof summaryText === 'object') {
+            summaryText = 'Analysis in progress...';
+        } else if (summaryText.includes('{"') || summaryText.includes('": "')) {
+            // Strip JSON objects from the text
+            summaryText = summaryText.replace(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g, '').replace(/\s{2,}/g, ' ').trim();
+            if (!summaryText || summaryText.length < 10) summaryText = 'Analysis complete';
+        }
+        
+        return `
+            <div class="unified-ai-analysis">
+                <div class="ai-header">
+                    <div class="ai-title">
+                        <span class="ai-icon">🤖</span>
+                        <span>Analysis</span>
+                    </div>
+                    <div class="ai-sentiment ${recommendationClass}">
+                        ${analysis.recommendation}${sentimentText}${confidence ? ' • ' + confidence : ''}
+                    </div>
+                </div>
+                ${gemScore ? `
+                <div class="ai-meta">
+                    ${gemScore ? `<span class="gem-score">Score: ${gemScore}</span>` : ''}
+                </div>
+                ` : ''}
+                <div class="ai-summary">
+                    ${summaryText}
+                </div>
+            </div>
+        `;
+    }
+    
     return '';
 }
+
 
 // Format price in GBP
 function formatPrice(price) {
@@ -183,8 +225,16 @@ function toggleAISentiment(coinId) {
     }
 }
 
-function toggleMLReasoning(coinId) {
-    const content = document.getElementById(`ml-reasoning-${coinId}`);
+
+
+function toggleMLStatusDetails() {
+    const detailsDiv = document.getElementById('mlStatusDetails');
+    detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
+}
+
+// PHASE 4: Toggle agent details
+function toggleAgentDetails(coinId) {
+    const content = document.getElementById(`agent-details-${coinId}`);
     const button = content.previousElementSibling;
     const arrow = button.querySelector('.arrow');
     
@@ -197,10 +247,7 @@ function toggleMLReasoning(coinId) {
     }
 }
 
-function toggleMLStatusDetails() {
-    const detailsDiv = document.getElementById('mlStatusDetails');
-    detailsDiv.style.display = detailsDiv.style.display === 'none' ? 'block' : 'none';
-}
+
 
 // Status notification
 function showStatus(message, type = 'info', duration = 4000) {

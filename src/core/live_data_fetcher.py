@@ -6,6 +6,14 @@ from typing import Dict, List
 from .crypto_analyzer import Coin, CoinStatus, RiskLevel
 from .config import Config
 
+# Stablecoins to exclude from low-cap filtering
+STABLECOINS = {
+    'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD',
+    'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL',
+    'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC',
+}
+
+
 class LiveDataFetcher:
     """Fetches live cryptocurrency data from CoinMarketCap API"""
     
@@ -51,14 +59,9 @@ class LiveDataFetcher:
     def get_top_coins_by_market_cap(self, limit: int = 15) -> List[Dict]:
         """Get top coins by market capitalization - filtered for low price and low cap"""
         try:
-            # List of stablecoins to exclude
-            STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 
-                          'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 
-                          'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
-            
             url = f"{self.cmc_base_url}/cryptocurrency/listings/latest"
             params = {
-                'limit': 500,  # Get more coins to filter from
+                'limit': 500,
                 'convert': 'GBP',
                 'sort': 'market_cap',
                 'sort_dir': 'desc'
@@ -145,11 +148,6 @@ class LiveDataFetcher:
     def get_new_listings(self) -> List[Dict]:
         """Get recently listed coins with low market caps under £1"""
         try:
-            # List of stablecoins to exclude
-            STABLECOINS = {'USDT', 'USDC', 'BUSD', 'DAI', 'TUSD', 'USDP', 'USDD', 'FRAX', 'GUSD', 
-                          'LUSD', 'SUSD', 'USDK', 'USDX', 'PAX', 'USDN', 'USD1', 'C1USD', 'BUIDL', 
-                          'USDF', 'USDTB', 'PYUSD', 'FDUSD', 'EURT', 'EURC'}
-            
             # Get latest listings from CMC
             url = f"{self.cmc_base_url}/cryptocurrency/listings/latest"
             params = {
@@ -356,17 +354,17 @@ class LiveDataFetcher:
                 ]))
             elif volume_ratio < 0.01:
                 highlights.append(random.choice([
-                    "Low liquidity - tread carefully",
-                    "Thin volume = slippage risk",
-                    "Illiquid - hard to exit"
+                    "Low liquidity - early entry opportunity",
+                    "Thin volume = room to grow",
+                    "Under the radar - watch for catalysts"
                 ]))
         
         # Fallback if nothing interesting
         if not highlights:
             highlights = [random.choice([
-                "High risk, high reward play",
-                "Speculative micro cap bet",
-                "Early stage - do your research",
+                "Moonshot potential play",
+                "Speculative micro cap gem",
+                "Early stage - ground floor entry",
                 "Volatile small cap opportunity"
             ])]
         

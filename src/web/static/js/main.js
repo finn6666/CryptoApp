@@ -10,13 +10,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('CryptoApp Dashboard initializing...');
     
     try {
-        // Load all data in parallel
+        // Phase 1: Load data WITHOUT agents (fast - shows UI immediately)
         await Promise.all([
-            loadCoins(),
-            loadFavorites()
+            loadCoins(false),
+            loadFavorites(false),
+            loadMarketConditions()
         ]);
         
-        console.log('Dashboard loaded successfully');
+        console.log('Dashboard loaded (basic data). Loading agent analyses in background...');
+        
+        // Phase 2: Load agent analyses in background (non-blocking)
+        loadAgentAnalysesInBackground();
         
         // Start auto-refresh timer
         startRefreshTimer();

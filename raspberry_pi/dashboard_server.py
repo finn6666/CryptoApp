@@ -26,7 +26,7 @@ def background_monitoring():
     while monitoring_active:
         try:
             monitor.run_monitoring_cycle()
-            time.sleep(monitor.config['azure_vm']['check_interval'])
+            time.sleep(monitor.config['cryptoapp_server']['check_interval'])
         except Exception as e:
             print(f"Monitoring error: {e}")
             time.sleep(10)
@@ -84,8 +84,8 @@ def get_status():
         'uptime_hours': monitor.get_dashboard_data()['uptime'],
         'total_alerts': len(monitor.alerts),
         'config': {
-            'vm_url': monitor.config['azure_vm']['url'],
-            'check_interval': monitor.config['azure_vm']['check_interval']
+            'server_url': monitor.config['cryptoapp_server']['url'],
+            'check_interval': monitor.config['cryptoapp_server']['check_interval']
         }
     })
 

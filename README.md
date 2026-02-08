@@ -1,73 +1,100 @@
-# 🚀 CryptoApp
+# CryptoApp
 
-AI-powered cryptocurrency analysis platform with hidden gem detection and weekly email reports.
+AI-powered low-cap cryptocurrency analysis with multi-agent intelligence and reinforcement learning. Opportunity-first design -- upside potential and gem discovery come before risk aversion.
 
-![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
----
-
-## 📚 **[→ Full Documentation](docs/README.md)**
-
-### Quick Links
-
-| Need to... | Go to |
-|------------|-------|
-| **Update code on Azure VM** ⭐ | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#updates-most-common) |
-| **First time setup & deployment** | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) |
-| **Setup Raspberry Pi SIEM** | [raspberry_pi/README.md](raspberry_pi/README.md) |
-| **Understand the architecture** | [docs/README.md](docs/README.md#-architecture) |
-
----
-
-## ⚡ Quick Start
+## Quick Start
 
 ```bash
-# Install and run locally
-pip install -e .
-python app.py
-# Visit http://localhost:5001
+uv sync
+cp .env.example .env   # Add CoinMarketCap + Gemini API keys
+python app.py           # http://localhost:5001
 ```
 
-## ✨ Features
+## Documentation
 
-- 📊 **Real-time Analysis** - CoinMarketCap API with 16+ alpha signals
-- 💎 **Hidden Gem Detection** - ML-powered ranking (1-10 score)
-- 🧠 **Inline ML Analysis** - Detailed predictions and reasoning displayed directly on each coin card
-- 🤖 **DeepSeek AI Sentiment** - Optional AI-powered sentiment scores with concise, formatted insights
-- 📈 **Simple RL Learning** - Learns from your trades via Trade Journal
-- 📧 **Weekly Reports** - Top 3 opportunities via email (Monday 9 AM)
-- ⭐ **Favorites** - Save and track your picks
-- 🎨 **Modern UI** - Clean, responsive cards with inline analysis and auto-refresh
+| Guide | Description |
+|-------|-------------|
+| [Setup](documentation/setup/README.md) | Installation, API keys, config |
+| [API Reference](documentation/api/README.md) | All 40 endpoints |
+| [ML System](documentation/ml-system/README.md) | Agents, gem detection, RL |
+| [Deployment](documentation/deployment/README.md) | Raspberry Pi setup |
 
-## 🚀 Update Azure VM
+## Features
 
-```bash
-ssh your-username@your-vm-ip
-cd ~/CryptoApp
-git pull origin main
-sudo systemctl restart cryptoapp
-sudo systemctl status cryptoapp
+- **Multi-Agent AI** -- 4 agents (Gemini + DeepSeek) reach weighted consensus
+- **Gem Detection** -- Random Forest + Gradient Boosting identify hidden gems
+- **Reinforcement Learning** -- Q-Learning improves from reported trade outcomes
+- **Portfolio Analysis** -- Batch analysis with opportunity-weighted allocation
+- **Market Opportunity Bar** -- Real-time opportunity scoring (not risk)
+- **Trade Journal** -- Report trades to train the RL system
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Backend | Flask, Python 3.13 |
+| AI Agents | Google ADK (gemini-2.5-flash), DeepSeek |
+| Orchestrator | gemini-3-flash-preview |
+| ML | Random Forest, Gradient Boosting, Q-Learning |
+| Data | CoinMarketCap API |
+| Frontend | Vanilla HTML/CSS/JS |
+| Deployment | Raspberry Pi 4/5, systemd, nginx |
+
+## Multi-Agent Weights
+
+| Agent | Weight | Role |
+|-------|--------|------|
+| Gemini Research | 35% | Fundamentals, team, roadmap |
+| Gemini Technical | 35% | Charts, trends, levels |
+| Position Manager | 15% | Sizing, exits |
+| Sentiment Analyst | 15% | Social sentiment, FUD/FOMO |
+
+## Opportunity Labels
+
+| Threshold | Label |
+|-----------|-------|
+| > 0.7 | Extreme Moonshot |
+| > 0.5 | High Upside |
+| > 0.3 | Growth Play |
+| <= 0.3 | Stable |
+
+## Costs
+
+| Component | Monthly |
+|-----------|---------|
+| CoinMarketCap | Free tier |
+| Google Gemini | ~$2 |
+| DeepSeek | ~$0.60 |
+| Raspberry Pi power | ~$0.50 |
+| **Total** | **~$3/month** |
+
+## API Keys
+
+| Provider | URL |
+|----------|-----|
+| CoinMarketCap | https://coinmarketcap.com/api/ |
+| Google Gemini | https://makersuite.google.com/app/apikey |
+| DeepSeek (optional) | https://platform.deepseek.com/ |
+
+## Project Structure
+
+```
+CryptoApp/
++-- app.py                  # Flask app (40 routes)
++-- ml/                     # AI & ML
+|   +-- agents/official/    # 4 ADK agents + orchestrator
+|   +-- tools/adk_tools.py  # 16 agent tools
+|   +-- enhanced_gem_detector.py
+|   +-- portfolio_manager.py
+|   +-- simple_rl.py
++-- src/core/               # Data fetcher, analyzer
++-- src/web/                # Frontend
++-- models/                 # ONNX model, RL state
++-- data/                   # Cache, favorites, agent memory
++-- raspberry_pi/           # Pi monitoring dashboard
++-- documentation/          # Full docs
 ```
 
-See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete guide.
+## Disclaimer
 
-## 💰 Cost
-
-- **Azure VM B2s**: ~$40/month (recommended)
-- **Azure VM B1ms**: ~$15/month (budget)
-- **Break-even**: 1 good trade per month
-
-## ⚠️ Disclaimer
-
-**NOT FINANCIAL ADVICE.** Educational purposes only. Cryptocurrency investments are highly risky. Always do your own research and never invest more than you can afford to lose.
-
-## 📞 Support
-
-- **Documentation**: [docs/](docs/)
-- **Issues**: [GitHub Issues](https://github.com/finn6666/CryptoApp/issues)
-- **Service problems**: `sudo journalctl -u cryptoapp -n 100`
-
----
-
-**MIT License** • [Full Documentation](docs/README.md)
+Educational purpose only. Not financial advice. Cryptocurrency trading carries significant risk.

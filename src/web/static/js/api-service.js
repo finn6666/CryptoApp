@@ -18,12 +18,13 @@ async function loadStats() {
     }
 }
 
-async function loadCoins() {
+async function loadCoins(withAgents = false) {
     try {
-        let response = await fetch('/api/coins/enhanced');
+        const agentParam = withAgents ? 'true' : 'false';
+        let response = await fetch(`/api/coins/enhanced?agents=${agentParam}`);
         
         if (!response.ok) {
-            response = await fetch('/api/coins');
+            response = await fetch(`/api/coins?run_agents=${agentParam}`);
         }
         
         const data = await response.json();
@@ -47,9 +48,10 @@ async function loadCoins() {
     }
 }
 
-async function loadFavorites() {
+async function loadFavorites(withAgents = false) {
     try {
-        const response = await fetch('/api/favorites');
+        const agentParam = withAgents ? 'true' : 'false';
+        const response = await fetch(`/api/favorites?agents=${agentParam}`);
         const data = await response.json();
 
         if (data.error) {
@@ -73,6 +75,43 @@ async function loadFavorites() {
         console.error('Error loading favorites:', error);
         document.getElementById('favoritesContent').innerHTML = 
             `<div class="error">❌ Error loading favorites: ${error.message}</div>`;
+    }
+}
+
+async function loadMarketConditions() {
+    try {
+        const response = await fetch('/api/market/conditions');
+        const data = await response.json();
+
+        if (data.error) {
+            console.warn('Market conditions unavailable:', data.error);
+            return;
+        }
+
+        // Update opportunity bar (invert: high opportunity_score = good)
+        const oppFill = document.getElementById('opportunityFill');
+        const oppText = document.getElementById('opportunityText');
+        
+        if (oppFill && oppText) {
+            oppFill.style.width = `${data.opportunity_percentage}%`;
+            oppText.textContent = data.message;
+            
+            // Color: high opportunity = green/gold, low = muted
+            if (data.opportunity_score >= 75) {
+                oppFill.style.background = 'linear-gradient(90deg, #48bb78, #38a169)';
+            } else if (data.opportunity_score >= 60) {
+                oppFill.style.background = 'linear-gradient(90deg, #68d391, #48bb78)';
+            } else if (data.opportunity_score >= 40) {
+                oppFill.style.background = 'linear-gradient(90deg, #ecc94b, #d69e2e)';
+            } else if (data.opportunity_score >= 25) {
+                oppFill.style.background = 'linear-gradient(90deg, #a0aec0, #718096)';
+            } else {
+                oppFill.style.background = 'linear-gradient(90deg, #4a5568, #2d3748)';
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error loading market conditions:', error);
     }
 }
 
@@ -121,16 +160,6 @@ async function loadMLStatus() {
                     <span class="ml-status-icon">⏰</span>
                     <span class="ml-status-label">Last Trained</span>
                     <span class="ml-status-value">${hoursSince}h ago</span>
-                </div>
-            `;
-        }
-        
-        if (data.deepseek_enabled !== undefined) {
-            statusHtml += `
-                <div class="ml-status-item ${data.deepseek_enabled ? 'success' : 'warning'}">
-                    <span class="ml-status-icon">${data.deepseek_enabled ? '🧠' : '💤'}</span>
-                    <span class="ml-status-label">AI Analysis</span>
-                    <span class="ml-status-value">${data.deepseek_enabled ? 'Active' : 'Inactive'}</span>
                 </div>
             `;
         }
@@ -198,8 +227,8 @@ async function trainMLModel() {
         console.log('Training result:', data.training_result);
         
         // Reload data to show ML predictions
-        await loadCoins();
-        await loadFavorites();
+        await loadCoins(false);
+        await loadFavorites(false);
         
     } catch (error) {
         if (error.name === 'AbortError') {
@@ -215,11 +244,66 @@ async function trainMLModel() {
 }
 
 async function refreshData() {
+    // Load basic data first (fast)
     await Promise.all([
-        loadCoins(),
-        loadFavorites(),
-        loadMLStatus()
+        loadCoins(false),
+        loadFavorites(false),
+        loadMarketConditions()
     ]);
+    // Then load agent analyses in background
+    loadAgentAnalysesInBackground();
+}
+
+// Background agent analysis loader - fetches with agents and updates cards incrementally
+async function loadAgentAnalysesInBackground() {
+    console.log('Loading agent analyses in background...');
+    
+    // Load coins with agents
+    try {
+        const coinsResponse = await fetch('/api/coins/enhanced?agents=true');
+        if (coinsResponse.ok) {
+            const coinsData = await coinsResponse.json();
+            if (coinsData.coins) {
+                updateCardsWithAgentData(coinsData.coins, false);
+                console.log('Coins agent analyses loaded');
+            }
+        }
+    } catch (e) {
+        console.warn('Background coins agent load failed:', e);
+    }
+    
+    // Load favorites with agents
+    try {
+        const favsResponse = await fetch('/api/favorites?agents=true');
+        if (favsResponse.ok) {
+            const favsData = await favsResponse.json();
+            if (favsData.favorites) {
+                updateCardsWithAgentData(favsData.favorites, true);
+                console.log('Favorites agent analyses loaded');
+            }
+        }
+    } catch (e) {
+        console.warn('Background favorites agent load failed:', e);
+    }
+}
+
+// Update existing coin cards with agent analysis data without re-rendering everything
+function updateCardsWithAgentData(coins, isFavorites) {
+    coins.forEach((coin, index) => {
+        if (!coin.agent_analysis && !coin.ai_analysis) return;
+        
+        // Find the card by symbol
+        const card = document.querySelector(`.coin-card[data-symbol="${coin.symbol}"]`);
+        if (!card) return;
+        
+        // Find the AI analysis section and update it
+        const coinId = isFavorites ? `fav-${index}` : card.dataset.coinId;
+        const analysisEl = card.querySelector('.unified-ai-analysis');
+        if (analysisEl) {
+            const newHtml = generateUnifiedAIAnalysis(coin, coinId);
+            analysisEl.outerHTML = newHtml;
+        }
+    });
 }
 
 async function forceRefresh() {
@@ -249,5 +333,36 @@ async function forceRefresh() {
         refreshing = false;
         btn.textContent = originalText;
         btn.disabled = false;
+    }
+}
+
+// ─── Live Trading Functions ──────────────────────────
+
+async function proposeTrade(symbol, price, analysis) {
+    try {
+        const response = await fetch('/api/trades/auto-evaluate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                symbol: symbol,
+                current_price: price,
+                analysis: analysis,
+                recommendation: analysis.recommendation || 'BUY',
+            })
+        });
+        const result = await response.json();
+        
+        if (result.success && result.proposal_id) {
+            showStatus(`📧 Trade proposal sent for ${symbol} — check your email!`, 'success', 6000);
+        } else if (result.should_trade === false) {
+            showStatus(`🤔 Agent decided not to trade ${symbol}: ${result.reason}`, 'info', 5000);
+        } else {
+            showStatus(`⚠️ ${result.error || 'Could not propose trade'}`, 'error');
+        }
+        return result;
+    } catch (error) {
+        console.error('Error proposing trade:', error);
+        showStatus(`❌ Trade proposal failed: ${error.message}`, 'error');
+        return {success: false, error: error.message};
     }
 }

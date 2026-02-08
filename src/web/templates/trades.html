@@ -317,10 +317,10 @@
     <div class="container">
         <div class="header">
             <div class="header-top">
-                <h1>🧠 Trade Journal & RL Learning</h1>
+                <h1>🧠 Trade Journal & Live Trading</h1>
                 <a href="/" class="back-btn">← Dashboard</a>
             </div>
-            <p>Report your trades to teach the RL system what works. The more you report, the smarter it gets!</p>
+            <p>Live trading with AI agent approval • Max £0.05/day • Report manual trades to teach RL</p>
             
             <div class="stats-grid" id="statsGrid">
                 <div class="stat-card">
@@ -332,20 +332,53 @@
                     <div class="stat-label">Success Rate</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="winningTrades">0</div>
-                    <div class="stat-label">Winning Trades</div>
+                    <div class="stat-value" id="budgetRemaining">—</div>
+                    <div class="stat-label">Budget Left Today</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" id="losingTrades">0</div>
-                    <div class="stat-label">Losing Trades</div>
+                    <div class="stat-value" id="tradesToday">0</div>
+                    <div class="stat-label">Trades Today</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Trading Section -->
+        <div class="section-card">
+            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                ⚡ Live Trading
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span id="tradingStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600;"></span>
+                    <button id="killSwitchBtn" onclick="toggleKillSwitch()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+                        🛑 Kill Switch
+                    </button>
+                </div>
+            </h2>
+
+            <div id="configWarning" style="display: none; background: rgba(237,137,54,0.15); border: 1px solid rgba(237,137,54,0.4); border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: #ecc94b;">
+                ⚠️ <strong>Setup required:</strong> Add your Coinbase API keys and Gmail app password to <code>.env</code> — see <code>.env.example</code>
+            </div>
+
+            <!-- Pending Proposals -->
+            <div id="pendingSection" style="display: none;">
+                <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px;">Pending Approval</h3>
+                <div id="pendingProposals"></div>
+            </div>
+
+            <!-- Recent Executed Trades -->
+            <div id="executedSection" style="margin-top: 16px;">
+                <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px;">Executed Trades</h3>
+                <div id="executedTrades">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
+                        No trades yet. Agents will propose trades when they find high-conviction opportunities.
+                    </p>
                 </div>
             </div>
         </div>
 
         <div class="info-box">
-            <strong>📝 How it works:</strong> Enter any crypto symbol (BTC, ETH, etc.), your entry/exit prices, and how long you held it. 
-            The RL system doesn't validate if the symbol exists - it learns from your actual trading patterns regardless of the coin. 
-            This way you can track ANY trade, even from coins not listed in the main dashboard!
+            <strong>📝 How it works:</strong> AI agents analyse coins and propose trades when conviction is high. 
+            You'll get an email with Approve/Reject links. Max spend: £0.05/day. 
+            You can also report manual trades below to teach the RL system.
         </div>
 
         <div class="alert" id="alert">
@@ -353,7 +386,7 @@
         </div>
 
         <div class="section-card">
-            <h2 class="section-header">📈 Report a Trade</h2>
+            <h2 class="section-header">📈 Report a Manual Trade</h2>
             
             <form id="tradeForm">
                 <div class="form-grid">
@@ -402,7 +435,172 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
             loadTrades();
+            loadTradingStatus();
+            loadPendingProposals();
+            loadExecutedTrades();
+            // Refresh pending proposals every 30s
+            setInterval(loadPendingProposals, 30000);
+            setInterval(loadTradingStatus, 30000);
         });
+
+        // ─── Live Trading Functions ──────────────────────────
+
+        async function loadTradingStatus() {
+            try {
+                const response = await fetch('/api/trades/status');
+                const data = await response.json();
+
+                // Update budget display
+                document.getElementById('budgetRemaining').textContent = `£${data.remaining_today_gbp.toFixed(2)}`;
+                document.getElementById('tradesToday').textContent = data.trades_today || 0;
+
+                // Trading status indicator
+                const statusEl = document.getElementById('tradingStatus');
+                if (!data.active) {
+                    statusEl.textContent = '⛔ HALTED';
+                    statusEl.style.background = 'rgba(245,101,101,0.2)';
+                    statusEl.style.color = '#fc8181';
+                    document.getElementById('killSwitchBtn').textContent = '▶️ Resume';
+                } else {
+                    statusEl.textContent = '🟢 ACTIVE';
+                    statusEl.style.background = 'rgba(72,187,120,0.2)';
+                    statusEl.style.color = '#48bb78';
+                    document.getElementById('killSwitchBtn').textContent = '🛑 Kill Switch';
+                }
+
+                // Config warning
+                const configWarning = document.getElementById('configWarning');
+                if (!data.exchange_configured || !data.email_configured) {
+                    configWarning.style.display = 'block';
+                    let warnings = [];
+                    if (!data.exchange_configured) warnings.push('Coinbase API keys');
+                    if (!data.email_configured) warnings.push('Gmail SMTP credentials');
+                    configWarning.innerHTML = `⚠️ <strong>Setup required:</strong> Add ${warnings.join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
+                } else {
+                    configWarning.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Error loading trading status:', e);
+            }
+        }
+
+        async function loadPendingProposals() {
+            try {
+                const response = await fetch('/api/trades/pending');
+                const data = await response.json();
+                const section = document.getElementById('pendingSection');
+                const container = document.getElementById('pendingProposals');
+
+                if (data.proposals && data.proposals.length > 0) {
+                    section.style.display = 'block';
+                    container.innerHTML = data.proposals.map(p => {
+                        const sideColor = p.side === 'buy' ? '#48bb78' : '#fc8181';
+                        const sideIcon = p.side === 'buy' ? '🟢' : '🔴';
+                        const created = new Date(p.created_at).toLocaleString();
+                        return `
+                            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${sideColor}; border-radius: 8px; padding: 14px; margin-bottom: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <div>
+                                        <span style="font-weight: 700; font-size: 15px;">${sideIcon} ${p.side.toUpperCase()} ${p.symbol}</span>
+                                        <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${p.amount_gbp.toFixed(4)}</span>
+                                    </div>
+                                    <div style="display: flex; gap: 6px;">
+                                        <button onclick="approveTrade('${p.id}')" style="padding: 6px 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">✅ Approve</button>
+                                        <button onclick="rejectTrade('${p.id}')" style="padding: 6px 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">❌ Reject</button>
+                                    </div>
+                                </div>
+                                <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
+                                    <div style="margin-bottom: 4px;">${p.reason}</div>
+                                    <div>Confidence: ${p.confidence}% • Price: £${p.price_at_proposal.toFixed(6)} • ${created}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    section.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Error loading proposals:', e);
+            }
+        }
+
+        async function loadExecutedTrades() {
+            try {
+                const response = await fetch('/api/trades/history');
+                const data = await response.json();
+                const container = document.getElementById('executedTrades');
+
+                if (data.trades && data.trades.length > 0) {
+                    container.innerHTML = data.trades.map(t => {
+                        const sideIcon = t.side === 'buy' ? '🟢' : '🔴';
+                        const time = new Date(t.timestamp).toLocaleString();
+                        return `
+                            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-weight: 700;">${sideIcon} ${t.side.toUpperCase()} ${t.symbol}</span>
+                                    <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${t.quantity.toFixed(6)} @ £${t.price.toFixed(6)}</span>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 600; font-size: 13px;">£${t.amount_gbp.toFixed(4)}</div>
+                                    <div style="font-size: 11px; color: var(--text-secondary);">${time}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trades yet. Agents will propose trades when they find high-conviction opportunities.</p>';
+                }
+            } catch (e) {
+                console.error('Error loading executed trades:', e);
+            }
+        }
+
+        async function approveTrade(proposalId) {
+            try {
+                const response = await fetch(`/api/trades/approve/${proposalId}`);
+                showAlert('Trade approved — executing...', 'success');
+                setTimeout(() => {
+                    loadPendingProposals();
+                    loadExecutedTrades();
+                    loadTradingStatus();
+                }, 1000);
+            } catch (e) {
+                showAlert('Error approving trade: ' + e.message, 'error');
+            }
+        }
+
+        async function rejectTrade(proposalId) {
+            try {
+                const response = await fetch(`/api/trades/reject/${proposalId}`);
+                showAlert('Trade rejected', 'info');
+                loadPendingProposals();
+            } catch (e) {
+                showAlert('Error rejecting trade: ' + e.message, 'error');
+            }
+        }
+
+        async function toggleKillSwitch() {
+            const btn = document.getElementById('killSwitchBtn');
+            const isHalted = btn.textContent.includes('Resume');
+            const action = isHalted ? 'deactivate' : 'activate';
+
+            if (!isHalted && !confirm('⛔ This will HALT all trading and reject pending proposals. Continue?')) return;
+
+            try {
+                await fetch('/api/trades/kill-switch', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({action})
+                });
+                showAlert(isHalted ? 'Trading resumed' : 'Trading HALTED — all pending proposals rejected', isHalted ? 'success' : 'error');
+                loadTradingStatus();
+                loadPendingProposals();
+            } catch (e) {
+                showAlert('Error toggling kill switch: ' + e.message, 'error');
+            }
+        }
+
+        // ─── Existing RL Functions ───────────────────────────
 
         // Load RL statistics
         async function loadStats() {

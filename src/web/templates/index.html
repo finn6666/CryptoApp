@@ -5,11 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Low Cap Crypto Analyzer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260118b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260208b">
 </head>
 <body>
     <div class="container">
         <div class="header">
+            <!-- Market Opportunity Indicator -->
+            <div class="market-opportunity-bar" id="marketOpportunityBar">
+                <div class="opportunity-label">Market Opportunity</div>
+                <div class="opportunity-indicator">
+                    <div class="opportunity-fill" id="opportunityFill" style="width: 50%"></div>
+                    <span class="opportunity-text" id="opportunityText">Loading...</span>
+                </div>
+            </div>
+            
             <div class="refresh-controls">
                 <div class="refresh-status">
                     <div>Last: <span class="last-updated" id="lastUpdated">Loading...</span></div>
@@ -20,9 +29,6 @@
                 </button>
                 <button class="btn" onclick="toggleSymbolSearch()" id="symbolToggleBtn">
                     Add Favorite
-                </button>
-                <button class="btn" onclick="trainMLModel()" id="trainBtn">
-                    Train ML Model
                 </button>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">
                     Refresh
@@ -40,6 +46,17 @@
         </div>
 
         <div class="dashboard-grid">
+            <!-- Portfolio Analysis Container (PHASE 5) -->
+            <div class="portfolio-container" id="portfolioContainer" style="display: none;">
+                <div class="coins-header">
+                    <h2>🤖 AI Portfolio Analysis</h2>
+                    <button class="close-btn" onclick="closePortfolioAnalysis()">✕</button>
+                </div>
+                <div id="portfolioContent">
+                    <div class="loading">Running multi-agent portfolio analysis...</div>
+                </div>
+            </div>
+            
             <div class="favorites-container" id="favoritesContainer">
                 <div class="coins-header">
                     <h2>Favorites</h2>
@@ -85,12 +102,13 @@
     </div>
 
     <!-- Modular JavaScript -->
-    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260118"></script>
-    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260118"></script>
-    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260118"></script>
-    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260118"></script>
-    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260118"></script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260118"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260118"></script>
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260204c"></script>
 </body>
 </html>

@@ -1,0 +1,610 @@
+"""
+Live Trading Engine with Safety Rails
+Executes real trades on Coinbase via ccxt with strict daily budget limits
+and email-based approval workflow.
+"""
+
+import os
+import json
+import uuid
+import logging
+import smtplib
+import asyncio
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, date, timedelta
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# ─── Data Models ───────────────────────────────────────────────
+
+@dataclass
+class TradeProposal:
+    """A proposed trade awaiting approval."""
+    id: str
+    symbol: str
+    side: str  # "buy" or "sell"
+    amount_gbp: float  # how much GBP to spend
+    price_at_proposal: float
+    reason: str  # agent's explanation
+    confidence: int  # 0-100
+    agent_recommendation: str  # BUY/SELL/HOLD
+    created_at: str = ""
+    status: str = "pending"  # pending / approved / rejected / executed / expired
+    executed_at: Optional[str] = None
+    execution_price: Optional[float] = None
+    quantity: Optional[float] = None
+    order_id: Optional[str] = None
+    error: Optional[str] = None
+
+    def __post_init__(self):
+        if not self.created_at:
+            self.created_at = datetime.utcnow().isoformat()
+
+
+@dataclass
+class DailyBudget:
+    """Track daily spending."""
+    date: str
+    spent_gbp: float = 0.0
+    trades_executed: int = 0
+    trades_proposed: int = 0
+
+
+# ─── Trading Engine ───────────────────────────────────────────
+
+class TradingEngine:
+    """
+    Core trading engine with safety limits and email approval.
+    
+    Safety features:
+    - Hard daily spend limit (default £0.05)
+    - Per-trade max (never exceed daily limit in one trade)
+    - Email approval required before execution
+    - Proposals expire after 1 hour
+    - All trades logged to disk
+    - Kill switch to halt all trading
+    """
+
+    def __init__(
+        self,
+        daily_budget_gbp: float = 0.05,
+        exchange_id: str = "coinbase",
+        data_dir: str = "data/trades",
+        server_url: str = "http://localhost:5001",
+    ):
+        self.daily_budget_gbp = daily_budget_gbp
+        self.exchange_id = exchange_id
+        self.data_dir = Path(data_dir)
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.server_url = server_url
+
+        # State
+        self.proposals: Dict[str, TradeProposal] = {}
+        self.trade_history: List[Dict[str, Any]] = []
+        self.daily_budgets: Dict[str, DailyBudget] = {}
+        self.kill_switch = False  # Emergency stop
+
+        # Email config (from env)
+        self.email_to = os.getenv("TRADE_NOTIFICATION_EMAIL", "finnbryant90@gmail.com")
+        self.smtp_user = os.getenv("SMTP_USER", "")
+        self.smtp_password = os.getenv("SMTP_PASSWORD", "")  # Gmail app password
+        self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+
+        # Exchange (lazy init)
+        self._exchange = None
+
+        # Load persisted state
+        self._load_state()
+
+        logger.info(
+            f"Trading engine initialized: budget=£{daily_budget_gbp}/day, "
+            f"exchange={exchange_id}, email={self.email_to}"
+        )
+
+    # ─── Exchange Connection ──────────────────────────────────
+
+    def _get_exchange(self):
+        """Lazy-initialize exchange connection via ccxt."""
+        if self._exchange is None:
+            try:
+                import ccxt
+
+                api_key = os.getenv("COINBASE_API_KEY", "")
+                api_secret = os.getenv("COINBASE_API_SECRET", "")
+
+                if not api_key or not api_secret:
+                    logger.warning("Exchange API keys not configured — trades will fail")
+
+                self._exchange = ccxt.coinbase({
+                    "apiKey": api_key,
+                    "secret": api_secret,
+                    "enableRateLimit": True,
+                })
+                # Test connection
+                self._exchange.load_markets()
+                logger.info("Coinbase exchange connected successfully")
+            except ImportError:
+                logger.error("ccxt not installed — run: pip install ccxt")
+                raise
+            except Exception as e:
+                logger.error(f"Exchange connection failed: {e}")
+                raise
+        return self._exchange
+
+    # ─── Budget Tracking ──────────────────────────────────────
+
+    def _get_today_budget(self) -> DailyBudget:
+        """Get or create today's budget tracker."""
+        today = date.today().isoformat()
+        if today not in self.daily_budgets:
+            self.daily_budgets[today] = DailyBudget(date=today)
+        return self.daily_budgets[today]
+
+    def get_remaining_budget(self) -> float:
+        """How much GBP is left to spend today."""
+        budget = self._get_today_budget()
+        return max(0, self.daily_budget_gbp - budget.spent_gbp)
+
+    def can_afford_trade(self, amount_gbp: float) -> bool:
+        """Check if a trade fits within today's budget."""
+        if self.kill_switch:
+            return False
+        return amount_gbp <= self.get_remaining_budget()
+
+    # ─── Trade Proposal ───────────────────────────────────────
+
+    def propose_trade(
+        self,
+        symbol: str,
+        side: str,
+        amount_gbp: float,
+        current_price: float,
+        reason: str,
+        confidence: int,
+        recommendation: str,
+    ) -> Dict[str, Any]:
+        """
+        Create a trade proposal and send approval email.
+        
+        Returns dict with proposal status.
+        """
+        if self.kill_switch:
+            return {"success": False, "error": "Trading is halted (kill switch active)"}
+
+        # Cap amount to remaining budget
+        remaining = self.get_remaining_budget()
+        if remaining <= 0:
+            return {
+                "success": False,
+                "error": f"Daily budget exhausted (£{self.daily_budget_gbp} spent today)",
+            }
+
+        if amount_gbp > remaining:
+            amount_gbp = remaining
+            logger.info(f"Capped trade to remaining budget: £{amount_gbp:.4f}")
+
+        # Hard cap — never exceed daily budget in a single trade
+        amount_gbp = min(amount_gbp, self.daily_budget_gbp)
+
+        proposal = TradeProposal(
+            id=uuid.uuid4().hex[:12],
+            symbol=symbol.upper(),
+            side=side.lower(),
+            amount_gbp=round(amount_gbp, 4),
+            price_at_proposal=current_price,
+            reason=reason,
+            confidence=confidence,
+            agent_recommendation=recommendation,
+        )
+
+        self.proposals[proposal.id] = proposal
+
+        # Update daily counter
+        budget = self._get_today_budget()
+        budget.trades_proposed += 1
+
+        # Send approval email
+        email_sent = self._send_approval_email(proposal)
+
+        self._save_state()
+
+        return {
+            "success": True,
+            "proposal_id": proposal.id,
+            "symbol": symbol,
+            "side": side,
+            "amount_gbp": proposal.amount_gbp,
+            "price": current_price,
+            "email_sent": email_sent,
+            "approve_url": f"{self.server_url}/api/trades/approve/{proposal.id}",
+            "reject_url": f"{self.server_url}/api/trades/reject/{proposal.id}",
+        }
+
+    # ─── Approval / Rejection ─────────────────────────────────
+
+    def approve_trade(self, proposal_id: str) -> Dict[str, Any]:
+        """Approve and execute a pending trade."""
+        proposal = self.proposals.get(proposal_id)
+        if not proposal:
+            return {"success": False, "error": "Proposal not found"}
+
+        if proposal.status != "pending":
+            return {"success": False, "error": f"Proposal already {proposal.status}"}
+
+        # Check if expired (1 hour)
+        created = datetime.fromisoformat(proposal.created_at)
+        if datetime.utcnow() - created > timedelta(hours=1):
+            proposal.status = "expired"
+            self._save_state()
+            return {"success": False, "error": "Proposal expired (>1 hour old)"}
+
+        # Check budget again (might have been spent since proposal)
+        if not self.can_afford_trade(proposal.amount_gbp):
+            proposal.status = "rejected"
+            proposal.error = "Budget exhausted since proposal"
+            self._save_state()
+            return {"success": False, "error": "Daily budget now exhausted"}
+
+        # Execute!
+        proposal.status = "approved"
+        result = self._execute_trade(proposal)
+
+        self._save_state()
+        return result
+
+    def reject_trade(self, proposal_id: str) -> Dict[str, Any]:
+        """Reject a pending trade."""
+        proposal = self.proposals.get(proposal_id)
+        if not proposal:
+            return {"success": False, "error": "Proposal not found"}
+
+        if proposal.status != "pending":
+            return {"success": False, "error": f"Proposal already {proposal.status}"}
+
+        proposal.status = "rejected"
+        self._save_state()
+
+        return {"success": True, "proposal_id": proposal_id, "status": "rejected"}
+
+    # ─── Trade Execution ──────────────────────────────────────
+
+    def _execute_trade(self, proposal: TradeProposal) -> Dict[str, Any]:
+        """Actually execute a trade on the exchange."""
+        try:
+            exchange = self._get_exchange()
+
+            # Find the right market pair (e.g., DOGE/GBP or DOGE/USDT)
+            symbol_pair = self._find_market_pair(proposal.symbol)
+            if not symbol_pair:
+                proposal.status = "rejected"
+                proposal.error = f"No trading pair found for {proposal.symbol}"
+                return {"success": False, "error": proposal.error}
+
+            # Calculate quantity from GBP amount
+            ticker = exchange.fetch_ticker(symbol_pair)
+            current_price = ticker["last"]
+            quantity = proposal.amount_gbp / current_price
+
+            # Place market order
+            if proposal.side == "buy":
+                order = exchange.create_market_buy_order(symbol_pair, quantity)
+            else:
+                order = exchange.create_market_sell_order(symbol_pair, quantity)
+
+            # Update proposal
+            proposal.status = "executed"
+            proposal.executed_at = datetime.utcnow().isoformat()
+            proposal.execution_price = order.get("average", current_price)
+            proposal.quantity = order.get("filled", quantity)
+            proposal.order_id = order.get("id", "unknown")
+
+            # Update daily budget
+            budget = self._get_today_budget()
+            budget.spent_gbp += proposal.amount_gbp
+            budget.trades_executed += 1
+
+            # Log trade to history
+            trade_record = {
+                "proposal_id": proposal.id,
+                "symbol": proposal.symbol,
+                "side": proposal.side,
+                "amount_gbp": proposal.amount_gbp,
+                "quantity": proposal.quantity,
+                "price": proposal.execution_price,
+                "order_id": proposal.order_id,
+                "reason": proposal.reason,
+                "confidence": proposal.confidence,
+                "timestamp": proposal.executed_at,
+            }
+            self.trade_history.append(trade_record)
+
+            # Send confirmation email
+            self._send_execution_email(proposal)
+
+            logger.info(
+                f"TRADE EXECUTED: {proposal.side.upper()} {proposal.quantity:.6f} "
+                f"{proposal.symbol} @ £{proposal.execution_price:.6f} "
+                f"(£{proposal.amount_gbp:.4f})"
+            )
+
+            return {
+                "success": True,
+                "proposal_id": proposal.id,
+                "order_id": proposal.order_id,
+                "side": proposal.side,
+                "symbol": proposal.symbol,
+                "quantity": proposal.quantity,
+                "price": proposal.execution_price,
+                "amount_gbp": proposal.amount_gbp,
+            }
+
+        except Exception as e:
+            proposal.status = "rejected"
+            proposal.error = str(e)
+            logger.error(f"Trade execution failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    def _find_market_pair(self, symbol: str) -> Optional[str]:
+        """Find a valid trading pair for a symbol on the exchange."""
+        exchange = self._get_exchange()
+        # Try GBP pair first, then USD, then USDT
+        for quote in ["GBP", "USD", "USDT"]:
+            pair = f"{symbol}/{quote}"
+            if pair in exchange.markets:
+                return pair
+        return None
+
+    # ─── Email Notifications ──────────────────────────────────
+
+    def _send_approval_email(self, proposal: TradeProposal) -> bool:
+        """Send trade approval email with approve/reject links."""
+        if not self.smtp_user or not self.smtp_password:
+            logger.warning("SMTP not configured — skipping approval email")
+            return False
+
+        approve_url = f"{self.server_url}/api/trades/approve/{proposal.id}"
+        reject_url = f"{self.server_url}/api/trades/reject/{proposal.id}"
+
+        subject = f"🔔 Trade Proposal: {proposal.side.upper()} {proposal.symbol} — £{proposal.amount_gbp:.4f}"
+
+        body = f"""
+        <html>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
+                <div style="background: linear-gradient(90deg, #667eea, #764ba2); padding: 16px 20px;">
+                    <h2 style="margin: 0; color: white; font-size: 18px;">
+                        {'🟢' if proposal.side == 'buy' else '🔴'} {proposal.side.upper()} {proposal.symbol}
+                    </h2>
+                </div>
+                
+                <div style="padding: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 8px 0; color: #a0aec0;">Amount</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: 700;">£{proposal.amount_gbp:.4f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #a0aec0;">Price</td>
+                            <td style="padding: 8px 0; text-align: right;">£{proposal.price_at_proposal:.6f}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #a0aec0;">Confidence</td>
+                            <td style="padding: 8px 0; text-align: right;">{proposal.confidence}%</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px 0; color: #a0aec0;">Recommendation</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: 700;">{proposal.agent_recommendation}</td>
+                        </tr>
+                    </table>
+                    
+                    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; margin: 16px 0; border-left: 3px solid #667eea;">
+                        <div style="font-size: 11px; color: #a0aec0; text-transform: uppercase; margin-bottom: 4px;">Agent Reasoning</div>
+                        <div style="font-size: 13px; line-height: 1.5;">{proposal.reason}</div>
+                    </div>
+                    
+                    <div style="font-size: 11px; color: #a0aec0; margin-bottom: 16px;">
+                        Daily budget remaining: £{self.get_remaining_budget():.4f} / £{self.daily_budget_gbp:.4f}<br>
+                        Expires in 1 hour. Proposal ID: {proposal.id}
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px;">
+                        <a href="{approve_url}" style="flex: 1; display: block; text-align: center; padding: 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+                            ✅ APPROVE
+                        </a>
+                        <a href="{reject_url}" style="flex: 1; display: block; text-align: center; padding: 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
+                            ❌ REJECT
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        return self._send_email(subject, body)
+
+    def _send_execution_email(self, proposal: TradeProposal) -> bool:
+        """Send trade execution confirmation email."""
+        if not self.smtp_user or not self.smtp_password:
+            return False
+
+        subject = f"✅ Trade Executed: {proposal.side.upper()} {proposal.symbol} — £{proposal.amount_gbp:.4f}"
+
+        body = f"""
+        <html>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; padding: 20px;">
+                <h2 style="color: #48bb78; margin-top: 0;">✅ Trade Executed</h2>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{proposal.symbol}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">£{proposal.amount_gbp:.4f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{proposal.quantity:.8f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">£{proposal.execution_price:.6f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Order ID</td><td style="text-align: right; font-size: 11px;">{proposal.order_id}</td></tr>
+                </table>
+                <div style="margin-top: 16px; font-size: 12px; color: #a0aec0;">
+                    Remaining daily budget: £{self.get_remaining_budget():.4f}
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        return self._send_email(subject, body)
+
+    def _send_email(self, subject: str, html_body: str) -> bool:
+        """Send an HTML email."""
+        try:
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = self.smtp_user
+            msg["To"] = self.email_to
+            msg.attach(MIMEText(html_body, "html"))
+
+            with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.smtp_user, self.smtp_password)
+                server.sendmail(self.smtp_user, self.email_to, msg.as_string())
+
+            logger.info(f"Email sent: {subject}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send email: {e}")
+            return False
+
+    # ─── Kill Switch ──────────────────────────────────────────
+
+    def activate_kill_switch(self) -> Dict[str, Any]:
+        """Emergency halt all trading."""
+        self.kill_switch = True
+        # Reject all pending proposals
+        rejected = 0
+        for proposal in self.proposals.values():
+            if proposal.status == "pending":
+                proposal.status = "rejected"
+                proposal.error = "Kill switch activated"
+                rejected += 1
+        self._save_state()
+        logger.warning(f"KILL SWITCH ACTIVATED — {rejected} pending proposals rejected")
+        return {"success": True, "proposals_rejected": rejected}
+
+    def deactivate_kill_switch(self) -> Dict[str, Any]:
+        """Resume trading."""
+        self.kill_switch = False
+        self._save_state()
+        logger.info("Kill switch deactivated — trading resumed")
+        return {"success": True, "trading_active": True}
+
+    # ─── Status & History ─────────────────────────────────────
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get current trading engine status."""
+        budget = self._get_today_budget()
+        pending = [p for p in self.proposals.values() if p.status == "pending"]
+
+        return {
+            "active": not self.kill_switch,
+            "daily_budget_gbp": self.daily_budget_gbp,
+            "spent_today_gbp": round(budget.spent_gbp, 4),
+            "remaining_today_gbp": round(self.get_remaining_budget(), 4),
+            "trades_today": budget.trades_executed,
+            "proposals_today": budget.trades_proposed,
+            "pending_proposals": len(pending),
+            "total_trades": len(self.trade_history),
+            "exchange": self.exchange_id,
+            "email_configured": bool(self.smtp_user and self.smtp_password),
+            "exchange_configured": bool(
+                os.getenv("COINBASE_API_KEY") and os.getenv("COINBASE_API_SECRET")
+            ),
+        }
+
+    def get_pending_proposals(self) -> List[Dict[str, Any]]:
+        """Get all pending trade proposals."""
+        # Expire old proposals
+        now = datetime.utcnow()
+        for proposal in self.proposals.values():
+            if proposal.status == "pending":
+                created = datetime.fromisoformat(proposal.created_at)
+                if now - created > timedelta(hours=1):
+                    proposal.status = "expired"
+
+        pending = [
+            asdict(p) for p in self.proposals.values() if p.status == "pending"
+        ]
+        return sorted(pending, key=lambda x: x["created_at"], reverse=True)
+
+    def get_trade_history(self) -> List[Dict[str, Any]]:
+        """Get all executed trades."""
+        return list(reversed(self.trade_history[-50:]))
+
+    # ─── Persistence ──────────────────────────────────────────
+
+    def _save_state(self):
+        """Save engine state to disk."""
+        state = {
+            "proposals": {k: asdict(v) for k, v in self.proposals.items()},
+            "trade_history": self.trade_history,
+            "daily_budgets": {k: asdict(v) for k, v in self.daily_budgets.items()},
+            "kill_switch": self.kill_switch,
+        }
+        state_file = self.data_dir / "trading_state.json"
+        try:
+            with open(state_file, "w") as f:
+                json.dump(state, f, indent=2, default=str)
+        except Exception as e:
+            logger.error(f"Failed to save trading state: {e}")
+
+    def _load_state(self):
+        """Load engine state from disk."""
+        state_file = self.data_dir / "trading_state.json"
+        if not state_file.exists():
+            return
+
+        try:
+            with open(state_file) as f:
+                state = json.load(f)
+
+            # Restore proposals
+            for pid, pdata in state.get("proposals", {}).items():
+                self.proposals[pid] = TradeProposal(**{
+                    k: v for k, v in pdata.items()
+                    if k in TradeProposal.__dataclass_fields__
+                })
+
+            self.trade_history = state.get("trade_history", [])
+            self.kill_switch = state.get("kill_switch", False)
+
+            for did, ddata in state.get("daily_budgets", {}).items():
+                self.daily_budgets[did] = DailyBudget(**ddata)
+
+            logger.info(
+                f"Loaded trading state: {len(self.trade_history)} trades, "
+                f"{len(self.proposals)} proposals"
+            )
+        except Exception as e:
+            logger.error(f"Failed to load trading state: {e}")
+
+
+# ─── Singleton ────────────────────────────────────────────────
+
+_engine: Optional[TradingEngine] = None
+
+
+def get_trading_engine() -> TradingEngine:
+    """Get or create the singleton trading engine."""
+    global _engine
+    if _engine is None:
+        daily_budget = float(os.getenv("DAILY_TRADE_BUDGET_GBP", "0.05"))
+        server_url = os.getenv("TRADE_SERVER_URL", "http://localhost:5001")
+        _engine = TradingEngine(
+            daily_budget_gbp=daily_budget,
+            server_url=server_url,
+        )
+    return _engine
