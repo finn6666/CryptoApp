@@ -46,6 +46,18 @@ state.init_all()                         # ML, gem detector, data pipeline, ADK,
 state.start_idle_monitor()
 
 # ---------------------------------------------------------------------------
+# Start automated scan scheduler (if not in debug mode)
+# ---------------------------------------------------------------------------
+try:
+    from ml.scan_loop import get_scan_loop  # noqa: E402
+    scan_enabled = os.environ.get('SCAN_ENABLED', 'true').lower() in ('1', 'true', 'yes')
+    if scan_enabled:
+        _scanner = get_scan_loop()
+        _scanner.start_scheduler()
+except Exception as e:
+    logger.warning(f'Scan scheduler not started: {e}')
+
+# ---------------------------------------------------------------------------
 # Register blueprints
 # ---------------------------------------------------------------------------
 from routes.coins import coins_bp        # noqa: E402

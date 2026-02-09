@@ -47,7 +47,8 @@ class LiveDataFetcher:
                     'current_price': quote.get('price'),
                     'market_cap': quote.get('market_cap'),
                     'total_volume': quote.get('volume_24h'),
-                    'price_change_percentage_24h': quote.get('percent_change_24h')
+                    'price_change_percentage_24h': quote.get('percent_change_24h'),
+                    'price_change_percentage_7d': quote.get('percent_change_7d'),
                 })
             
             return trending_coins[:limit]
@@ -84,7 +85,8 @@ class LiveDataFetcher:
                     'current_price': quote.get('price'),
                     'market_cap': quote.get('market_cap'),
                     'total_volume': quote.get('volume_24h'),
-                    'price_change_percentage_24h': quote.get('percent_change_24h')
+                    'price_change_percentage_24h': quote.get('percent_change_24h'),
+                    'price_change_percentage_7d': quote.get('percent_change_7d'),
                 })
             
             # Filter for TRUE low cap coins under £1 price - exclude stablecoins
@@ -174,7 +176,8 @@ class LiveDataFetcher:
                     'current_price': quote.get('price'),
                     'market_cap': quote.get('market_cap'),
                     'total_volume': quote.get('volume_24h'),
-                    'price_change_percentage_24h': quote.get('percent_change_24h')
+                    'price_change_percentage_24h': quote.get('percent_change_24h'),
+                    'price_change_percentage_7d': quote.get('percent_change_7d'),
                 })
             
             # Filter for small market caps (potential gems) under £1 - exclude stablecoins
@@ -396,6 +399,7 @@ class LiveDataFetcher:
                     price=coin_data.get('current_price'),
                     price_btc=coin_data.get('price_btc'),
                     price_change_24h=coin_data.get('price_change_percentage_24h'),
+                    price_change_7d=coin_data.get('price_change_percentage_7d'),
                     market_cap=f"£{coin_data.get('market_cap', 0):,.0f}" if coin_data.get('market_cap') else None,
                     total_volume=f"£{coin_data.get('total_volume', 0):,.0f}" if coin_data.get('total_volume') else None,
                     risk_level=risk_level
@@ -467,6 +471,9 @@ class LiveDataFetcher:
                             "price_change_percentage_24h": {
                                 "gbp": coin.price_change_24h
                             } if coin.price_change_24h else None,
+                            "price_change_percentage_7d": {
+                                "gbp": coin.price_change_7d
+                            } if coin.price_change_7d else None,
                             "market_cap": coin.market_cap,
                             "total_volume": coin.total_volume,
                             "content": None
@@ -525,7 +532,8 @@ def fetch_specific_coin(symbol: str, retry_on_rate_limit: bool = True):
             'market_cap': quote.get('market_cap', 0),
             'market_cap_rank': coin_data.get('cmc_rank'),
             'total_volume': quote.get('volume_24h', 0),
-            'price_change_percentage_24h': quote.get('percent_change_24h', 0)
+            'price_change_percentage_24h': quote.get('percent_change_24h', 0),
+            'price_change_percentage_7d': quote.get('percent_change_7d', 0),
         }
         
         # Debug logging to diagnose 24h change issue

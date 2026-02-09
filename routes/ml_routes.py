@@ -445,3 +445,43 @@ def analyze_portfolio():
     except Exception as e:
         logger.error(f"Portfolio analysis error: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+
+# ─── Gem Score History ────────────────────────────────────────
+
+@ml_bp.route('/api/gems/history')
+def gem_score_history():
+    """Get historical gem score predictions. Optional ?symbol=X filter."""
+    try:
+        from ml.gem_score_tracker import get_gem_score_tracker
+        tracker = get_gem_score_tracker()
+        symbol = request.args.get('symbol')
+        limit = min(int(request.args.get('limit', 200)), 1000)
+        history = tracker.get_history(symbol=symbol, limit=limit)
+        return jsonify({"entries": len(history), "history": history})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_bp.route('/api/gems/history/<symbol>/trend')
+def gem_score_trend(symbol):
+    """Get trend analysis for a specific coin's gem scores over time."""
+    try:
+        from ml.gem_score_tracker import get_gem_score_tracker
+        tracker = get_gem_score_tracker()
+        trend = tracker.get_symbol_trend(symbol.upper())
+        return jsonify(trend)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@ml_bp.route('/api/gems/accuracy')
+def gem_accuracy_report():
+    """Get overall gem detector accuracy metrics."""
+    try:
+        from ml.gem_score_tracker import get_gem_score_tracker
+        tracker = get_gem_score_tracker()
+        report = tracker.get_accuracy_report()
+        return jsonify(report)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

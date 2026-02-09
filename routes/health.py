@@ -40,6 +40,39 @@ def health():
 @health_bp.route('/api/health')
 def api_health():
     """Enhanced health check for SIEM monitoring"""
+    # Trading engine status
+    trading_status = {}
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        if engine:
+            eng_status = engine.get_status()
+            trading_status = {
+                'active': eng_status.get('trading_active', False),
+                'kill_switch': eng_status.get('kill_switch', False),
+                'budget_remaining': eng_status.get('remaining_budget', 0),
+                'trades_today': eng_status.get('todays_trades', 0),
+                'pending_proposals': eng_status.get('pending_proposals', 0),
+            }
+    except Exception:
+        trading_status = {'active': False, 'error': 'Engine not available'}
+
+    # Scan loop status
+    scan_status = {}
+    try:
+        from ml.scan_loop import get_scan_loop
+        scanner = get_scan_loop()
+        if scanner:
+            scan_info = scanner.get_status()
+            scan_status = {
+                'scheduler_running': scan_info.get('scheduler_running', False),
+                'last_scan': scan_info.get('last_scan'),
+                'next_scan': scan_info.get('next_scan'),
+                'scan_running': scan_info.get('scan_running', False),
+            }
+    except Exception:
+        scan_status = {'scheduler_running': False}
+
     return jsonify({
         'status': 'online',
         'timestamp': datetime.now().isoformat(),
@@ -47,9 +80,14 @@ def api_health():
             'analyzer': state.analyzer is not None,
             'ml_pipeline': state.ML_AVAILABLE,
             'gem_detector': state.GEM_DETECTOR_AVAILABLE,
-            'rl_detector': False
+            'adk_orchestrator': state.official_adk_available,
+            'trading_engine': trading_status,
+            'scan_loop': scan_status,
         },
-        'uptime_hours': (time.time() - state.start_time) / 3600
+        'cache': {
+            'analysis_entries': len(state.agent_analysis_cache),
+        },
+        'uptime_hours': round((time.time() - state.start_time) / 3600, 2),
     }), 200
 
 

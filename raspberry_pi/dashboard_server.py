@@ -107,11 +107,11 @@ def start_monitoring():
 
 if __name__ == '__main__':
     print("🚀 Starting CryptoApp SIEM Dashboard")
-    print("📊 Dashboard: http://0.0.0.0:5002")
+    print("📊 Dashboard: http://127.0.0.1:5002")
     print("🔍 Starting background monitoring...\n")
     
     # Start monitoring in background
     start_monitoring()
     
     # Run Flask app
-    app.run(host='0.0.0.0', port=5002, debug=False)
+    app.run(host='127.0.0.1', port=5002, debug=False)

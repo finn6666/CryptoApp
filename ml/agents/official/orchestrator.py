@@ -19,6 +19,15 @@ from .sentiment_agent import sentiment_agent
 
 logger = logging.getLogger(__name__)
 
+# Late-import helper to avoid circular imports
+def _get_agent_memory():
+    """Get the persistent agent memory store."""
+    try:
+        from ml.agent_memory import get_memory
+        return get_memory()
+    except Exception:
+        return None
+
 
 class CryptoAnalysisOutput(BaseModel):
     """Structured output for comprehensive crypto analysis"""
@@ -116,6 +125,7 @@ async def analyze_crypto(
             f"Name: {coin_data.get('name', symbol)}",
             f"Price: £{coin_data.get('price', 'N/A')}",
             f"24h: {coin_data.get('price_change_24h', 'N/A')}%",
+            f"7d: {coin_data.get('price_change_7d', 'N/A')}%",
             f"Rank: #{coin_data.get('market_cap_rank', 'N/A')}",
             f"MCap: £{coin_data.get('market_cap', 'N/A')}",
             f"Vol: £{coin_data.get('volume_24h', 'N/A')}",

@@ -418,6 +418,243 @@ def auto_evaluate_trade():
 
 
 # ========================================
+# Scan Loop Routes
+# ========================================
+
+@trading_bp.route('/api/trades/scan-now', methods=['POST'])
+@limiter.limit('5 per hour')
+@require_trading_auth
+def scan_now():
+    """Trigger an on-demand scan of all tradeable coins."""
+    try:
+        from ml.scan_loop import get_scan_loop
+        scanner = get_scan_loop()
+        result = scanner.run_scan(triggered_by="manual_api")
+        return jsonify(result), 200 if result.get("success") else 429
+    except Exception as e:
+        logger.error(f"Scan-now error: {e}")
+        return jsonify({"error": "Failed to run scan"}), 500
+
+
+@trading_bp.route('/api/trades/scan-status')
+def scan_status():
+    """Get scan loop status and recent scan results."""
+    try:
+        from ml.scan_loop import get_scan_loop
+        scanner = get_scan_loop()
+        return jsonify({
+            "status": scanner.get_status(),
+            "recent_logs": scanner.get_recent_logs(days=3),
+        }), 200
+    except Exception as e:
+        logger.error(f"Scan status error: {e}")
+        return jsonify({"error": "Failed to get scan status"}), 500
+
+
+@trading_bp.route('/api/trades/audit-trail')
+def audit_trail():
+    """Get recent audit trail entries."""
+    try:
+        from ml.scan_loop import get_scan_loop
+        scanner = get_scan_loop()
+        limit = request.args.get('limit', 100, type=int)
+        return jsonify({"entries": scanner.get_audit_trail(limit=limit)}), 200
+    except Exception as e:
+        logger.error(f"Audit trail error: {e}")
+        return jsonify({"error": "Failed to get audit trail"}), 500
+
+
+# ========================================
+# Portfolio Routes
+# ========================================
+
+@trading_bp.route('/api/portfolio/holdings')
+def portfolio_holdings():
+    """Get current portfolio holdings with live P&L."""
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+
+        # Get live prices for held coins
+        live_prices = {}
+        holdings_raw = tracker.get_holdings()
+        if holdings_raw and state.analyzer:
+            for coin in state.analyzer.coins:
+                if coin.price and coin.symbol.upper() in {h["symbol"] for h in holdings_raw}:
+                    live_prices[coin.symbol.upper()] = coin.price
+
+        holdings = tracker.get_holdings(live_prices)
+        summary = tracker.get_total_value(live_prices)
+
+        return jsonify({
+            "holdings": holdings,
+            "summary": summary,
+        }), 200
+    except Exception as e:
+        logger.error(f"Portfolio holdings error: {e}")
+        return jsonify({"error": "Failed to get portfolio holdings"}), 500
+
+
+@trading_bp.route('/api/portfolio/history')
+def portfolio_history():
+    """Get full trade log with outcomes."""
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+        limit = request.args.get('limit', 50, type=int)
+        return jsonify({"trades": tracker.get_trade_history(limit=limit)}), 200
+    except Exception as e:
+        logger.error(f"Portfolio history error: {e}")
+        return jsonify({"error": "Failed to get portfolio history"}), 500
+
+
+@trading_bp.route('/api/portfolio/sell-signals')
+def portfolio_sell_signals():
+    """Check current holdings for sell signals (profit targets / stop losses)."""
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+
+        live_prices = {}
+        if state.analyzer:
+            for coin in state.analyzer.coins:
+                if coin.price:
+                    live_prices[coin.symbol.upper()] = coin.price
+
+        profit_target = request.args.get('profit_target', 20.0, type=float)
+        signals = tracker.check_sell_signals(live_prices, profit_target_pct=profit_target)
+        return jsonify({"signals": signals}), 200
+    except Exception as e:
+        logger.error(f"Sell signals error: {e}")
+        return jsonify({"error": "Failed to check sell signals"}), 500
+
+
+# ========================================
+# RL Outcome Feedback for Live Trades
+# ========================================
+
+@trading_bp.route('/api/trades/check-outcomes', methods=['POST'])
+@limiter.limit('10 per hour')
+@require_trading_auth
+def check_trade_outcomes():
+    """
+    Review all open positions and feed results back to RL.
+    Checks each holding's P&L and reports outcomes for learning.
+    """
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+
+        live_prices = {}
+        if state.analyzer:
+            for coin in state.analyzer.coins:
+                if coin.price:
+                    live_prices[coin.symbol.upper()] = coin.price
+
+        holdings = tracker.get_holdings(live_prices)
+        outcomes_reported = 0
+        results = []
+
+        for holding in holdings:
+            symbol = holding["symbol"]
+            if symbol not in live_prices:
+                continue
+
+            current_price = live_prices[symbol]
+            entry_price = holding.get("avg_entry_price", 0)
+            if entry_price <= 0:
+                continue
+
+            # Calculate days held
+            first_buy = holding.get("first_buy_at", "")
+            if first_buy:
+                from datetime import datetime as dt
+                try:
+                    buy_dt = dt.fromisoformat(first_buy)
+                    days_held = (dt.utcnow() - buy_dt).days
+                except Exception:
+                    days_held = 1
+            else:
+                days_held = 1
+
+            pnl_pct = ((current_price - entry_price) / entry_price) * 100
+
+            # Report to RL
+            if state.GEM_DETECTOR_AVAILABLE and state.gem_detector:
+                try:
+                    features = {
+                        'profit_indicator': 1.0 if pnl_pct > 0 else -1.0,
+                        'days_held': days_held / 100.0,
+                        'entry_price': entry_price / 10000.0,
+                    }
+                    rl_result = state.gem_detector.learn_from_outcome(
+                        symbol=symbol,
+                        entry_price=entry_price,
+                        current_price=current_price,
+                        days_held=days_held,
+                        features=features,
+                        notes=f"Auto-checked by outcome scanner",
+                    )
+                    if rl_result:
+                        outcomes_reported += 1
+                        results.append({
+                            "symbol": symbol,
+                            "entry_price": entry_price,
+                            "current_price": current_price,
+                            "pnl_pct": round(pnl_pct, 2),
+                            "days_held": days_held,
+                            "rl_updated": True,
+                        })
+                except Exception as e:
+                    logger.warning(f"RL update failed for {symbol}: {e}")
+
+        return jsonify({
+            "success": True,
+            "outcomes_reported": outcomes_reported,
+            "results": results,
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Check outcomes error: {e}")
+        return jsonify({"error": "Failed to check trade outcomes"}), 500
+
+
+# ========================================
+# Exchange Info Routes
+# ========================================
+
+@trading_bp.route('/api/exchanges/status')
+def exchange_status():
+    """Get multi-exchange status and tradeable pair counts."""
+    try:
+        from ml.exchange_manager import get_exchange_manager
+        mgr = get_exchange_manager()
+        return jsonify(mgr.get_tradeable_summary()), 200
+    except Exception as e:
+        logger.error(f"Exchange status error: {e}")
+        return jsonify({"error": "Failed to get exchange status"}), 500
+
+
+@trading_bp.route('/api/exchanges/check/<symbol>')
+def check_symbol_tradeable(symbol):
+    """Check if a specific coin is tradeable and on which exchanges."""
+    try:
+        from ml.exchange_manager import get_exchange_manager
+        mgr = get_exchange_manager()
+        exchanges = mgr.get_exchanges_for_coin(symbol.upper())
+        best = mgr.find_best_pair(symbol.upper())
+        return jsonify({
+            "symbol": symbol.upper(),
+            "tradeable": len(exchanges) > 0,
+            "exchanges": exchanges,
+            "best_pair": {"exchange": best[0], "pair": best[1]} if best else None,
+        }), 200
+    except Exception as e:
+        logger.error(f"Check tradeable error: {e}")
+        return jsonify({"error": "Failed to check symbol"}), 500
+
+
+# ========================================
 # Trade Journal & RL Learning Routes
 # ========================================
 

@@ -10,8 +10,7 @@ from services.app_state import (
     analyzer, load_favorites, save_favorites, run_async,
     _build_gem_analysis, _sanitize_ai_text, parse_market_cap, parse_volume,
     fetch_and_add_new_symbol_data,
-    STABLECOINS, MIN_PRICE, MAX_PRICE, CACHE_EXPIRY_SECONDS,
-    agent_analysis_cache,
+    STABLECOINS, MIN_PRICE, MAX_PRICE,
 )
 import services.app_state as state
 
@@ -31,6 +30,7 @@ def _prepare_coin_dict(coin):
         'market_cap': parse_market_cap(getattr(coin, 'market_cap', 0)),
         'volume_24h': parse_volume(getattr(coin, 'total_volume', 0)),
         'price_change_24h': coin.price_change_24h or 0,
+        'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
         'market_cap_rank': coin.market_cap_rank,
     }
 
@@ -132,12 +132,12 @@ def _run_agent_analysis(coin, coin_data_out):
     """Run multi-agent analysis on a single coin (uses cache)."""
     symbol = coin_data_out['symbol']
     cache_key = f"agent_{symbol}"
-    if cache_key in agent_analysis_cache:
-        cached_data, ts = agent_analysis_cache[cache_key]
-        if (datetime.now().timestamp() - ts) < CACHE_EXPIRY_SECONDS:
-            coin_data_out['agent_analysis'] = cached_data
-            logger.info(f"Using cached agent analysis for {symbol}")
-            return
+
+    cached = state.get_cached_analysis(cache_key)
+    if cached:
+        coin_data_out['agent_analysis'] = cached.get("result", cached)
+        logger.info(f"Using cached agent analysis for {symbol}")
+        return
 
     mc = parse_market_cap(getattr(coin, 'market_cap', 0))
     vol = parse_volume(getattr(coin, 'total_volume', 0))
@@ -147,7 +147,7 @@ def _run_agent_analysis(coin, coin_data_out):
         'name': coin.name,
         'price': coin.price or 0,
         'price_change_24h': coin.price_change_24h or 0,
-        'price_change_7d': 0,
+        'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
         'market_cap_rank': coin.market_cap_rank or 999,
         'market_cap': mc,
         'volume_24h': vol,
@@ -159,7 +159,7 @@ def _run_agent_analysis(coin, coin_data_out):
         result = run_async(state.gem_detector.analyze_with_agents(agent_coin_data))
         if result:
             coin_data_out['agent_analysis'] = result
-            agent_analysis_cache[cache_key] = (result, datetime.now().timestamp())
+            state.cache_analysis(cache_key, {"result": result})
             logger.info(f"Multi-agent analysis completed for {symbol}: {result.get('gem_score')}%")
     except Exception as e:
         logger.warning(f"Multi-agent analysis failed for {symbol}: {e}")
@@ -199,6 +199,7 @@ def get_coins():
                 'score': coin.attractiveness_score,
                 'price': coin.price,
                 'price_change_24h': coin.price_change_24h or 0,
+                'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
                 'market_cap_rank': coin.market_cap_rank,
                 'recently_added': coin.symbol in [c.symbol for c in recently_added],
                 'ai_analysis': None,
@@ -251,6 +252,7 @@ def get_enhanced_coins():
                 'score': min(10, coin.attractiveness_score / 10),
                 'price': coin.price,
                 'price_change_24h': coin.price_change_24h or 0,
+                'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
                 'market_cap_rank': coin.market_cap_rank,
                 'recently_added': coin.symbol in [c.symbol for c in recently_added],
                 'ai_analysis': None,
@@ -367,6 +369,7 @@ def get_favorites():
                     cd = {
                         'symbol': coin.symbol, 'name': coin.name,
                         'price': coin.price, 'price_change_24h': coin.price_change_24h,
+                        'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
                         'score': min(10, coin.attractiveness_score / 10),
                         'market_cap': coin.market_cap, 'market_cap_rank': coin.market_cap_rank,
                         'ai_analysis': None, 'enhanced_score': min(10, coin.attractiveness_score / 10),

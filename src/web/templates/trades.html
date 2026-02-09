@@ -339,6 +339,14 @@
                     <div class="stat-value" id="tradesToday">0</div>
                     <div class="stat-label">Trades Today</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="winningTrades">0</div>
+                    <div class="stat-label">Winning Trades</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="losingTrades">0</div>
+                    <div class="stat-label">Losing Trades</div>
+                </div>
             </div>
         </div>
 
@@ -372,6 +380,75 @@
                         No trades yet. Agents will propose trades when they find high-conviction opportunities.
                     </p>
                 </div>
+            </div>
+        </div>
+
+        <!-- Scan & Automation Section -->
+        <div class="section-card">
+            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                📊 Automated Scanning
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span id="scanStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
+                    <button id="scanNowBtn" onclick="triggerScan()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--accent-primary); background: rgba(102,126,234,0.1); color: var(--accent-primary); cursor: pointer; font-weight: 600;">
+                        🔍 Scan Now
+                    </button>
+                </div>
+            </h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanNextTime">—</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Next Scan</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanLastRun">Never</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Last Scan</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanCoinsAnalysed">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Coins Analysed</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanProposals">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Proposals Made</div>
+                </div>
+            </div>
+            <div id="scanResultMsg" style="display: none; background: rgba(102,126,234,0.1); border: 1px solid var(--accent-primary); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--text-secondary);"></div>
+        </div>
+
+        <!-- Portfolio Holdings Section -->
+        <div class="section-card">
+            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                💼 Portfolio Holdings
+                <button onclick="loadPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+                    🔄 Refresh
+                </button>
+            </h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="portfolioValue">£0.00</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Total Value</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700;" id="portfolioPnl">£0.00</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Total P&L</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="portfolioCount">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Holdings</div>
+                </div>
+            </div>
+            <div id="holdingsList">
+                <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
+                    No holdings yet. The portfolio tracker records every executed trade automatically.
+                </p>
+            </div>
+        </div>
+
+        <!-- Activity Log Section -->
+        <div class="section-card">
+            <h2 class="section-header">📜 Activity Log</h2>
+            <div id="activityLog" style="max-height: 300px; overflow-y: auto;">
+                <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
             </div>
         </div>
 
@@ -438,9 +515,13 @@
             loadTradingStatus();
             loadPendingProposals();
             loadExecutedTrades();
-            // Refresh pending proposals every 30s
+            loadScanStatus();
+            loadPortfolio();
+            loadActivityLog();
+            // Refresh live data periodically
             setInterval(loadPendingProposals, 30000);
             setInterval(loadTradingStatus, 30000);
+            setInterval(loadScanStatus, 60000);
         });
 
         // ─── Live Trading Functions ──────────────────────────
@@ -597,6 +678,183 @@
                 loadPendingProposals();
             } catch (e) {
                 showAlert('Error toggling kill switch: ' + e.message, 'error');
+            }
+        }
+
+        // ─── Scan Functions ───────────────────────────────────
+
+        async function loadScanStatus() {
+            try {
+                const response = await fetch('/api/trades/scan-status');
+                const data = await response.json();
+                const status = data.status || {};
+
+                // Status badge
+                const statusEl = document.getElementById('scanStatus');
+                if (status.scan_running) {
+                    statusEl.textContent = '⏳ Running';
+                    statusEl.style.background = 'rgba(237,137,54,0.2)';
+                    statusEl.style.color = '#ed8936';
+                } else if (status.scheduler_active) {
+                    statusEl.textContent = '🟢 Scheduled';
+                    statusEl.style.background = 'rgba(72,187,120,0.2)';
+                    statusEl.style.color = '#48bb78';
+                } else {
+                    statusEl.textContent = '⚪ Off';
+                    statusEl.style.background = 'rgba(255,255,255,0.05)';
+                    statusEl.style.color = 'var(--text-secondary)';
+                }
+
+                document.getElementById('scanNextTime').textContent = status.scan_time || '—';
+                document.getElementById('scanLastRun').textContent = status.last_scan
+                    ? new Date(status.last_scan).toLocaleString()
+                    : 'Never';
+
+                // Show last scan results
+                const logs = data.recent_logs || [];
+                if (logs.length > 0) {
+                    const latest = logs[logs.length - 1];
+                    document.getElementById('scanCoinsAnalysed').textContent = latest.coins_analysed || 0;
+                    document.getElementById('scanProposals').textContent = latest.proposals_made || 0;
+                }
+            } catch (e) {
+                console.error('Error loading scan status:', e);
+            }
+        }
+
+        async function triggerScan() {
+            const btn = document.getElementById('scanNowBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Scanning...';
+            const resultEl = document.getElementById('scanResultMsg');
+
+            try {
+                const apiKey = prompt('Enter your TRADING_API_KEY:');
+                if (!apiKey) { btn.disabled = false; btn.textContent = '🔍 Scan Now'; return; }
+
+                const response = await fetch('/api/trades/scan-now', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                });
+                const data = await response.json();
+
+                resultEl.style.display = 'block';
+                if (data.success) {
+                    resultEl.style.borderColor = 'var(--success)';
+                    resultEl.style.background = 'rgba(72,187,120,0.1)';
+                    resultEl.innerHTML = `✅ Scan complete — <strong>${data.coins_analysed}</strong> coins analysed, <strong>${data.proposals_made}</strong> proposals made, <strong>${data.errors?.length || 0}</strong> errors`;
+                } else {
+                    resultEl.style.borderColor = 'var(--error)';
+                    resultEl.style.background = 'rgba(245,101,101,0.1)';
+                    resultEl.innerHTML = `⚠️ ${data.error || 'Scan failed'}`;
+                }
+
+                loadScanStatus();
+                loadPendingProposals();
+            } catch (e) {
+                resultEl.style.display = 'block';
+                resultEl.innerHTML = `❌ Network error: ${e.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🔍 Scan Now';
+            }
+        }
+
+        // ─── Portfolio Functions ──────────────────────────────
+
+        async function loadPortfolio() {
+            try {
+                const response = await fetch('/api/portfolio/holdings');
+                const data = await response.json();
+                const holdings = data.holdings || [];
+                const summary = data.summary || {};
+
+                // Summary cards
+                document.getElementById('portfolioValue').textContent = `£${(summary.total_value_gbp || 0).toFixed(4)}`;
+                document.getElementById('portfolioCount').textContent = summary.active_holdings || 0;
+
+                const pnlEl = document.getElementById('portfolioPnl');
+                const totalPnl = summary.total_pnl_gbp || 0;
+                pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}£${totalPnl.toFixed(4)}`;
+                pnlEl.style.color = totalPnl >= 0 ? 'var(--success)' : 'var(--error)';
+
+                // Holdings list
+                const container = document.getElementById('holdingsList');
+                if (holdings.length > 0) {
+                    container.innerHTML = holdings.map(h => {
+                        const pnlPct = h.unrealised_pnl_pct || 0;
+                        const pnlGbp = h.unrealised_pnl_gbp || 0;
+                        const pnlColor = pnlGbp >= 0 ? '#48bb78' : '#fc8181';
+                        return `
+                            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${pnlColor}; border-radius: 8px; padding: 14px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span style="font-weight: 700; font-size: 15px;">💰 ${h.symbol}</span>
+                                        <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${h.quantity?.toFixed(6) || 0} units</span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-weight: 700; color: ${pnlColor}; font-size: 14px;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(4)} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%)</div>
+                                        <div style="font-size: 11px; color: var(--text-secondary);">Cost: £${(h.total_cost_gbp || 0).toFixed(4)} • Value: £${(h.current_value_gbp || 0).toFixed(4)}</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">
+                                    Avg entry: £${(h.avg_entry_price || 0).toFixed(6)} • Exchange: ${h.exchange || '—'} • Trades: ${h.trades || 0}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No holdings yet. The portfolio tracker records every executed trade automatically.</p>';
+                }
+            } catch (e) {
+                console.error('Error loading portfolio:', e);
+            }
+        }
+
+        // ─── Activity Log ────────────────────────────────────
+
+        async function loadActivityLog() {
+            try {
+                const response = await fetch('/api/trades/audit-trail?limit=30');
+                const data = await response.json();
+                const entries = data.entries || [];
+                const container = document.getElementById('activityLog');
+
+                if (entries.length > 0) {
+                    container.innerHTML = entries.map(e => {
+                        const time = new Date(e.timestamp).toLocaleString();
+                        let icon = '📋', color = 'var(--text-secondary)';
+                        if (e.event === 'proposal') { icon = '📨'; color = '#667eea'; }
+                        else if (e.event === 'skip') { icon = '⏭️'; color = 'var(--text-secondary)'; }
+                        else if (e.event === 'scan_start') { icon = '🔍'; color = '#ed8936'; }
+                        else if (e.event === 'scan_complete') { icon = '✅'; color = '#48bb78'; }
+                        else if (e.event === 'error') { icon = '❌'; color = '#fc8181'; }
+                        else if (e.event === 'scan_no_coins') { icon = '⚠️'; color = '#ecc94b'; }
+
+                        let detail = '';
+                        if (e.symbol) detail += `<strong>${e.symbol}</strong> `;
+                        if (e.reason) detail += `— ${e.reason} `;
+                        if (e.confidence) detail += `(${e.confidence}% conf) `;
+                        if (e.proposals !== undefined) detail += `${e.proposals} proposals `;
+                        if (e.error) detail += `— ${e.error} `;
+
+                        return `<div style="display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
+                            <span>${icon}</span>
+                            <div style="flex: 1;">
+                                <span style="color: ${color}; font-weight: 600;">${e.event}</span>
+                                <span style="color: var(--text-secondary);"> ${detail}</span>
+                            </div>
+                            <span style="color: var(--text-secondary); font-size: 11px; white-space: nowrap;">${time}</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No activity yet. Activity will appear here when scans run and trades are proposed.</p>';
+                }
+            } catch (e) {
+                console.error('Error loading activity log:', e);
             }
         }
 

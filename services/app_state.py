@@ -34,6 +34,7 @@ analyze_crypto_adk = None
 
 agent_analysis_cache = {}
 CACHE_EXPIRY_SECONDS = 14400  # 4 hours
+CACHE_FILE = os.path.join(project_root, "data", "agent_analysis_cache.json")
 
 analyzer = None  # set during init_app()
 
@@ -128,6 +129,53 @@ def initialize_gem_detector():
         return False
 
 
+def load_analysis_cache():
+    """Load agent analysis cache from disk."""
+    global agent_analysis_cache
+    try:
+        if os.path.exists(CACHE_FILE):
+            with open(CACHE_FILE, "r") as f:
+                raw = json.load(f)
+            # Prune expired entries on load
+            now = time.time()
+            agent_analysis_cache = {
+                k: v for k, v in raw.items()
+                if now - v.get("_cached_at", 0) < CACHE_EXPIRY_SECONDS
+            }
+            logger.info(f"Loaded {len(agent_analysis_cache)} cached analyses from disk")
+    except Exception as e:
+        logger.warning(f"Could not load analysis cache: {e}")
+        agent_analysis_cache = {}
+
+
+def save_analysis_cache():
+    """Persist agent analysis cache to disk."""
+    try:
+        os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+        with open(CACHE_FILE, "w") as f:
+            json.dump(agent_analysis_cache, f, indent=2, default=str)
+    except Exception as e:
+        logger.warning(f"Could not save analysis cache: {e}")
+
+
+def cache_analysis(symbol: str, result: dict):
+    """Store an analysis result in the cache and persist to disk."""
+    result["_cached_at"] = time.time()
+    agent_analysis_cache[symbol] = result
+    save_analysis_cache()
+
+
+def get_cached_analysis(symbol: str):
+    """Return cached analysis for symbol if still valid, else None."""
+    entry = agent_analysis_cache.get(symbol)
+    if not entry:
+        return None
+    if time.time() - entry.get("_cached_at", 0) > CACHE_EXPIRY_SECONDS:
+        agent_analysis_cache.pop(symbol, None)
+        return None
+    return entry
+
+
 def init_all():
     """Run all startup initializers and create the analyzer."""
     global analyzer
@@ -139,6 +187,8 @@ def init_all():
             fn()
         except Exception as e:
             logger.warning(f"Startup {fn.__name__} failed: {e}")
+
+    load_analysis_cache()
 
     analyzer = CryptoAnalyzer(data_file='data/live_api.json')
     logger.info(
@@ -175,6 +225,7 @@ def coin_to_dict(coin, include_highlights=False):
         'market_cap': safe_float(getattr(coin, 'market_cap', 0)),
         'volume_24h': safe_float(getattr(coin, 'total_volume', 0)),
         'price_change_24h': coin.price_change_24h or 0,
+        'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
         'market_cap_rank': coin.market_cap_rank,
     }
     if include_highlights:

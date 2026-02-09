@@ -89,6 +89,12 @@ class TradingEngine:
         self.daily_budgets: Dict[str, DailyBudget] = {}
         self.kill_switch = False  # Emergency stop
 
+        # Safety: max single trade = 50% of daily budget
+        self.max_trade_pct = float(os.getenv("MAX_TRADE_PCT", "50")) / 100
+        # Cooldown: minimum minutes between proposals
+        self.trade_cooldown_min = int(os.getenv("TRADE_COOLDOWN_MIN", "60"))
+        self._last_proposal_time: Optional[datetime] = None
+
         # Email config (from env)
         self.email_to = os.getenv("TRADE_NOTIFICATION_EMAIL", "")
         if not self.email_to:
@@ -98,7 +104,7 @@ class TradingEngine:
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
-        # Exchange (lazy init)
+        # Exchange (lazy init — prefers ExchangeManager for multi-exchange)
         self._exchange = None
 
         # Token signing for approve/reject links
@@ -111,6 +117,10 @@ class TradingEngine:
         logger.info(
             f"Trading engine initialized: budget=£{daily_budget_gbp}/day, "
             f"exchange={exchange_id}, email={self.email_to}"
+        )
+        logger.info(
+            f"Safety: max_trade={self.max_trade_pct*100:.0f}% of budget, "
+            f"cooldown={self.trade_cooldown_min}min between proposals"
         )
 
     # ─── Exchange Connection ──────────────────────────────────
@@ -198,6 +208,22 @@ class TradingEngine:
         # Hard cap — never exceed daily budget in a single trade
         amount_gbp = min(amount_gbp, self.daily_budget_gbp)
 
+        # Safety: cap single trade to max_trade_pct of daily budget
+        max_single = self.daily_budget_gbp * self.max_trade_pct
+        if amount_gbp > max_single:
+            amount_gbp = max_single
+            logger.info(f"Capped trade to max single trade: £{amount_gbp:.4f}")
+
+        # Cooldown check
+        if self._last_proposal_time:
+            elapsed = (datetime.utcnow() - self._last_proposal_time).total_seconds() / 60
+            if elapsed < self.trade_cooldown_min:
+                remaining_min = self.trade_cooldown_min - elapsed
+                return {
+                    "success": False,
+                    "error": f"Cooldown active — wait {remaining_min:.0f} more minutes",
+                }
+
         proposal = TradeProposal(
             id=uuid.uuid4().hex[:12],
             symbol=symbol.upper(),
@@ -210,6 +236,7 @@ class TradingEngine:
         )
 
         self.proposals[proposal.id] = proposal
+        self._last_proposal_time = datetime.utcnow()
 
         # Update daily counter
         budget = self._get_today_budget()
@@ -279,34 +306,42 @@ class TradingEngine:
     # ─── Trade Execution ──────────────────────────────────────
 
     def _execute_trade(self, proposal: TradeProposal) -> Dict[str, Any]:
-        """Actually execute a trade on the exchange."""
+        """Execute a trade using multi-exchange routing (ExchangeManager → fallback to legacy)."""
         try:
-            exchange = self._get_exchange()
+            # Try multi-exchange routing first
+            exchange_used = self.exchange_id
+            order_result = self._execute_via_exchange_manager(proposal)
 
-            # Find the right market pair (e.g., DOGE/GBP or DOGE/USDT)
-            symbol_pair = self._find_market_pair(proposal.symbol)
-            if not symbol_pair:
-                proposal.status = "rejected"
-                proposal.error = f"No trading pair found for {proposal.symbol}"
-                return {"success": False, "error": proposal.error}
-
-            # Calculate quantity from GBP amount
-            ticker = exchange.fetch_ticker(symbol_pair)
-            current_price = ticker["last"]
-            quantity = proposal.amount_gbp / current_price
-
-            # Place market order
-            if proposal.side == "buy":
-                order = exchange.create_market_buy_order(symbol_pair, quantity)
+            if order_result:
+                proposal.status = "executed"
+                proposal.executed_at = datetime.utcnow().isoformat()
+                proposal.execution_price = order_result.get("price", proposal.price_at_proposal)
+                proposal.quantity = order_result.get("quantity", 0)
+                proposal.order_id = order_result.get("order_id", "unknown")
+                exchange_used = order_result.get("exchange", self.exchange_id)
             else:
-                order = exchange.create_market_sell_order(symbol_pair, quantity)
+                # Fallback to legacy single-exchange
+                exchange = self._get_exchange()
+                symbol_pair = self._find_market_pair(proposal.symbol)
+                if not symbol_pair:
+                    proposal.status = "rejected"
+                    proposal.error = f"No trading pair found for {proposal.symbol}"
+                    return {"success": False, "error": proposal.error}
 
-            # Update proposal
-            proposal.status = "executed"
-            proposal.executed_at = datetime.utcnow().isoformat()
-            proposal.execution_price = order.get("average", current_price)
-            proposal.quantity = order.get("filled", quantity)
-            proposal.order_id = order.get("id", "unknown")
+                ticker = exchange.fetch_ticker(symbol_pair)
+                current_price = ticker["last"]
+                quantity = proposal.amount_gbp / current_price
+
+                if proposal.side == "buy":
+                    order = exchange.create_market_buy_order(symbol_pair, quantity)
+                else:
+                    order = exchange.create_market_sell_order(symbol_pair, quantity)
+
+                proposal.status = "executed"
+                proposal.executed_at = datetime.utcnow().isoformat()
+                proposal.execution_price = order.get("average", current_price)
+                proposal.quantity = order.get("filled", quantity)
+                proposal.order_id = order.get("id", "unknown")
 
             # Update daily budget
             budget = self._get_today_budget()
@@ -325,8 +360,12 @@ class TradingEngine:
                 "reason": proposal.reason,
                 "confidence": proposal.confidence,
                 "timestamp": proposal.executed_at,
+                "exchange": exchange_used,
             }
             self.trade_history.append(trade_record)
+
+            # Auto-record to portfolio tracker
+            self._record_to_portfolio(proposal, exchange_used)
 
             # Send confirmation email
             self._send_execution_email(proposal)
@@ -334,7 +373,7 @@ class TradingEngine:
             logger.info(
                 f"TRADE EXECUTED: {proposal.side.upper()} {proposal.quantity:.6f} "
                 f"{proposal.symbol} @ £{proposal.execution_price:.6f} "
-                f"(£{proposal.amount_gbp:.4f})"
+                f"(£{proposal.amount_gbp:.4f}) on {exchange_used}"
             )
 
             return {
@@ -346,6 +385,7 @@ class TradingEngine:
                 "quantity": proposal.quantity,
                 "price": proposal.execution_price,
                 "amount_gbp": proposal.amount_gbp,
+                "exchange": exchange_used,
             }
 
         except Exception as e:
@@ -353,6 +393,43 @@ class TradingEngine:
             proposal.error = str(e)
             logger.error(f"Trade execution failed: {e}")
             return {"success": False, "error": str(e)}
+
+    def _execute_via_exchange_manager(self, proposal: TradeProposal) -> Optional[Dict[str, Any]]:
+        """Try executing via the multi-exchange manager."""
+        try:
+            from ml.exchange_manager import get_exchange_manager
+            mgr = get_exchange_manager()
+            result = mgr.execute_order(
+                symbol=proposal.symbol,
+                side=proposal.side,
+                amount_gbp=proposal.amount_gbp,
+            )
+            if result.get("success"):
+                return result
+            return None
+        except Exception as e:
+            logger.debug(f"Exchange manager not available, using legacy: {e}")
+            return None
+
+    def _record_to_portfolio(self, proposal: TradeProposal, exchange: str):
+        """Auto-record executed trade to portfolio tracker."""
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            tracker = get_portfolio_tracker()
+            tracker.record_trade(
+                symbol=proposal.symbol,
+                side=proposal.side,
+                quantity=proposal.quantity or 0,
+                price=proposal.execution_price or proposal.price_at_proposal,
+                amount_gbp=proposal.amount_gbp,
+                exchange=exchange,
+                order_id=proposal.order_id or "",
+                reasoning=proposal.reason,
+                confidence=proposal.confidence,
+                proposal_id=proposal.id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to record trade to portfolio: {e}")
 
     def _find_market_pair(self, symbol: str) -> Optional[str]:
         """Find a valid trading pair for a symbol on the exchange."""
@@ -526,6 +603,15 @@ class TradingEngine:
         budget = self._get_today_budget()
         pending = [p for p in self.proposals.values() if p.status == "pending"]
 
+        # Multi-exchange status
+        exchange_info = {"primary": self.exchange_id}
+        try:
+            from ml.exchange_manager import get_exchange_manager
+            mgr = get_exchange_manager()
+            exchange_info = mgr.get_tradeable_summary()
+        except Exception:
+            pass
+
         return {
             "active": not self.kill_switch,
             "daily_budget_gbp": self.daily_budget_gbp,
@@ -535,11 +621,13 @@ class TradingEngine:
             "proposals_today": budget.trades_proposed,
             "pending_proposals": len(pending),
             "total_trades": len(self.trade_history),
-            "exchange": self.exchange_id,
+            "exchange": exchange_info,
             "email_configured": bool(self.smtp_user and self.smtp_password),
             "exchange_configured": bool(
                 os.getenv("COINBASE_API_KEY") and os.getenv("COINBASE_API_SECRET")
             ),
+            "max_trade_pct": self.max_trade_pct * 100,
+            "trade_cooldown_min": self.trade_cooldown_min,
         }
 
     def get_pending_proposals(self) -> List[Dict[str, Any]]:

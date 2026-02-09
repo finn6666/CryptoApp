@@ -27,6 +27,7 @@ class Coin:
     price: Optional[float]
     price_btc: Optional[float]
     price_change_24h: Optional[float]
+    price_change_7d: Optional[float]
     market_cap: Optional[str]
     total_volume: Optional[str]
     risk_level: Optional[RiskLevel] = None
@@ -99,6 +100,15 @@ class CryptoAnalyzer:
                     except ValueError:
                         risk_level = None
                 
+                # Get 7-day price change
+                price_change_7d = None
+                if 'price_change_percentage_7d' in data and data['price_change_percentage_7d']:
+                    pc7d = data['price_change_percentage_7d']
+                    if isinstance(pc7d, dict):
+                        price_change_7d = pc7d.get('gbp') or pc7d.get('usd') or pc7d.get('eur')
+                    elif isinstance(pc7d, (int, float)):
+                        price_change_7d = pc7d
+
                 coin = Coin(
                     id=item['id'],
                     name=item['name'],
@@ -110,6 +120,7 @@ class CryptoAnalyzer:
                     price=price,
                     price_btc=float(item.get('price_btc', 0)) if item.get('price_btc') else None,
                     price_change_24h=price_change,
+                    price_change_7d=price_change_7d,
                     market_cap=data.get('market_cap'),
                     total_volume=data.get('total_volume'),
                     risk_level=risk_level,
