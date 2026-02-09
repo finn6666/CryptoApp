@@ -31,6 +31,14 @@ if not os.environ.get('SECRET_KEY'):
     logger.warning('⚠️  No SECRET_KEY set — using random key (sessions won\'t persist across restarts)')
 
 # ---------------------------------------------------------------------------
+# Extensions — CORS + rate limiting
+# ---------------------------------------------------------------------------
+from extensions import limiter, init_cors  # noqa: E402
+
+limiter.init_app(app)
+init_cors(app)
+
+# ---------------------------------------------------------------------------
 # Shared state — initialise all ML / data components
 # ---------------------------------------------------------------------------
 import services.app_state as state       # noqa: E402

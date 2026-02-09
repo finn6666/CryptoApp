@@ -16,6 +16,7 @@ from datetime import datetime, date, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,10 @@ class TradingEngine:
 
         # Exchange (lazy init)
         self._exchange = None
+
+        # Token signing for approve/reject links
+        secret = os.getenv('SECRET_KEY', 'fallback-insecure-key')
+        self._serializer = URLSafeTimedSerializer(secret, salt='trade-approval')
 
         # Load persisted state
         self._load_state()
@@ -223,8 +228,6 @@ class TradingEngine:
             "amount_gbp": proposal.amount_gbp,
             "price": current_price,
             "email_sent": email_sent,
-            "approve_url": f"{self.server_url}/api/trades/approve/{proposal.id}",
-            "reject_url": f"{self.server_url}/api/trades/reject/{proposal.id}",
         }
 
     # ─── Approval / Rejection ─────────────────────────────────
@@ -361,16 +364,28 @@ class TradingEngine:
                 return pair
         return None
 
+    # ─── Token Signing ─────────────────────────────────────────
+
+    def sign_proposal_token(self, proposal_id: str, action: str) -> str:
+        """Create a signed token for approve/reject links (HMAC, 1-hour expiry)."""
+        return self._serializer.dumps({'id': proposal_id, 'action': action})
+
+    def verify_proposal_token(self, token: str, max_age: int = 3600) -> Dict[str, str]:
+        """Verify a signed proposal token. Returns {'id': ..., 'action': ...} or raises."""
+        return self._serializer.loads(token, max_age=max_age)
+
     # ─── Email Notifications ──────────────────────────────────
 
     def _send_approval_email(self, proposal: TradeProposal) -> bool:
-        """Send trade approval email with approve/reject links."""
+        """Send trade approval email with signed approve/reject links."""
         if not self.smtp_user or not self.smtp_password:
             logger.warning("SMTP not configured — skipping approval email")
             return False
 
-        approve_url = f"{self.server_url}/api/trades/approve/{proposal.id}"
-        reject_url = f"{self.server_url}/api/trades/reject/{proposal.id}"
+        approve_token = self.sign_proposal_token(proposal.id, 'approve')
+        reject_token = self.sign_proposal_token(proposal.id, 'reject')
+        approve_url = f"{self.server_url}/api/trades/confirm/{approve_token}"
+        reject_url = f"{self.server_url}/api/trades/confirm/{reject_token}"
 
         subject = f"🔔 Trade Proposal: {proposal.side.upper()} {proposal.symbol} — £{proposal.amount_gbp:.4f}"
 
