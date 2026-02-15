@@ -397,7 +397,6 @@ class LiveDataFetcher:
                     investment_highlights=self.generate_investment_highlights(coin_data),
                     market_cap_rank=coin_data.get('market_cap_rank'),
                     price=coin_data.get('current_price'),
-                    price_btc=coin_data.get('price_btc'),
                     price_change_24h=coin_data.get('price_change_percentage_24h'),
                     price_change_7d=coin_data.get('price_change_percentage_7d'),
                     market_cap=f"£{coin_data.get('market_cap', 0):,.0f}" if coin_data.get('market_cap') else None,
@@ -463,11 +462,9 @@ class LiveDataFetcher:
                         "attractiveness_score": coin.attractiveness_score,
                         "investment_highlights": coin.investment_highlights,
                         "market_cap_rank": coin.market_cap_rank,
-                        "price_btc": coin.price_btc,
                         "risk_level": coin.risk_level.value if coin.risk_level else None,
                         "data": {
                             "price": coin.price,
-                            "price_btc": str(coin.price_btc) if coin.price_btc else None,
                             "price_change_percentage_24h": {
                                 "gbp": coin.price_change_24h
                             } if coin.price_change_24h else None,

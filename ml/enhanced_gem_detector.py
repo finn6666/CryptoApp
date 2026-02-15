@@ -887,7 +887,8 @@ class HiddenGemDetector:
         elif features['technology_score'] < 0.4:
             weaknesses.append("Limited innovation or technological differentiation")
         
-        # Considerations\n        if features['whale_concentration_risk'] > 0.7:
+        # Considerations
+        if features['whale_concentration_risk'] > 0.7:
             weaknesses.append("Whale-heavy distribution — watch for large moves")
         if features['exchange_diversity_score'] < 0.4:
             weaknesses.append("Few exchange listings — early stage, watch liquidity")

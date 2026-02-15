@@ -1,53 +1,5 @@
 // API and Data Loading Functions
 
-async function loadStats() {
-    try {
-        const response = await fetch('/api/stats');
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        document.getElementById('totalCoins').textContent = data.total_coins;
-        document.getElementById('currentCoins').textContent = data.current_coins;
-        document.getElementById('highPotential').textContent = data.high_potential;
-        document.getElementById('trendingUp').textContent = data.trending_up;
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
-}
-
-async function loadCoins(withAgents = false) {
-    try {
-        const agentParam = withAgents ? 'true' : 'false';
-        let response = await fetch(`/api/coins/enhanced?agents=${agentParam}`);
-        
-        if (!response.ok) {
-            response = await fetch(`/api/coins?run_agents=${agentParam}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        const coins = data.coins || [];
-        const mlEnabled = data.ml_enhanced || false;
-        
-        const coinsHtml = generateCoinsTable(coins, mlEnabled);
-        document.getElementById('coinsContent').innerHTML = coinsHtml;
-        
-        updateRefreshStatus(data.last_updated, data.cache_expires_in);
-        
-    } catch (error) {
-        console.error('Error loading coins:', error);
-        document.getElementById('coinsContent').innerHTML = 
-            `<div class="error">❌ Error loading coins: ${error.message}</div>`;
-    }
-}
-
 async function loadFavorites(withAgents = false) {
     try {
         const agentParam = withAgents ? 'true' : 'false';
@@ -226,8 +178,7 @@ async function trainMLModel() {
         showStatus(`${data.message} (Trained on ${data.rows_trained || 'multiple'} data points)`, 'success', 8000);
         console.log('Training result:', data.training_result);
         
-        // Reload data to show ML predictions
-        await loadCoins(false);
+        // Reload favorites to show ML predictions
         await loadFavorites(false);
         
     } catch (error) {
@@ -244,9 +195,7 @@ async function trainMLModel() {
 }
 
 async function refreshData() {
-    // Load basic data first (fast)
     await Promise.all([
-        loadCoins(false),
         loadFavorites(false),
         loadMarketConditions()
     ]);
@@ -254,25 +203,10 @@ async function refreshData() {
     loadAgentAnalysesInBackground();
 }
 
-// Background agent analysis loader - fetches with agents and updates cards incrementally
+// Background agent analysis loader - fetches favorites with agent analysis and updates cards
 async function loadAgentAnalysesInBackground() {
     console.log('Loading agent analyses in background...');
     
-    // Load coins with agents
-    try {
-        const coinsResponse = await fetch('/api/coins/enhanced?agents=true');
-        if (coinsResponse.ok) {
-            const coinsData = await coinsResponse.json();
-            if (coinsData.coins) {
-                updateCardsWithAgentData(coinsData.coins, false);
-                console.log('Coins agent analyses loaded');
-            }
-        }
-    } catch (e) {
-        console.warn('Background coins agent load failed:', e);
-    }
-    
-    // Load favorites with agents
     try {
         const favsResponse = await fetch('/api/favorites?agents=true');
         if (favsResponse.ok) {

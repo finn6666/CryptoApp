@@ -1,5 +1,4 @@
 // CryptoApp Dashboard - Main Entry Point
-// Modularized for better maintainability
 
 // Global state
 let refreshing = false;
@@ -10,16 +9,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('CryptoApp Dashboard initializing...');
     
     try {
-        // Phase 1: Load data WITHOUT agents (fast - shows UI immediately)
+        // Load favorites and market conditions
         await Promise.all([
-            loadCoins(false),
             loadFavorites(false),
             loadMarketConditions()
         ]);
         
         console.log('Dashboard loaded (basic data). Loading agent analyses in background...');
         
-        // Phase 2: Load agent analyses in background (non-blocking)
+        // Load agent analyses in background (non-blocking)
         loadAgentAnalysesInBackground();
         
         // Start auto-refresh timer

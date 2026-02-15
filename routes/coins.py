@@ -10,7 +10,6 @@ from services.app_state import (
     analyzer, load_favorites, save_favorites, run_async,
     _build_gem_analysis, _sanitize_ai_text, parse_market_cap, parse_volume,
     fetch_and_add_new_symbol_data,
-    STABLECOINS, MIN_PRICE, MAX_PRICE,
 )
 import services.app_state as state
 
@@ -33,51 +32,6 @@ def _prepare_coin_dict(coin):
         'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
         'market_cap_rank': coin.market_cap_rank,
     }
-
-
-def _coin_selection(favorites_upper, pool_size=50):
-    """Select coins excluding favorites, stablecoins, and price filters.
-    Shared between /api/coins and /api/coins/enhanced.
-    """
-    recently_added_coins = []
-    if state.SYMBOLS_AVAILABLE and state.data_pipeline:
-        for symbol in state.data_pipeline.supported_symbols:
-            match = next((c for c in state.analyzer.coins if c.symbol == symbol), None)
-            if match and match not in recently_added_coins:
-                recently_added_coins.append(match)
-
-    low_cap_coins = state.analyzer.get_low_cap_coins(pool_size)
-
-    selected = []
-
-    for coin in recently_added_coins:
-        if coin.symbol.upper() in favorites_upper:
-            continue
-        if (coin not in selected and coin.symbol not in STABLECOINS
-                and coin.price and MIN_PRICE <= coin.price <= MAX_PRICE):
-            selected.append(coin)
-
-    for coin in low_cap_coins:
-        if coin.symbol.upper() in favorites_upper:
-            continue
-        if (coin not in selected and len(selected) < pool_size
-                and coin.symbol not in STABLECOINS
-                and coin.price and MIN_PRICE <= coin.price <= MAX_PRICE):
-            selected.append(coin)
-
-    if len(selected) < 20:
-        affordable = [c for c in state.analyzer.coins
-                      if (c.symbol.upper() not in favorites_upper
-                          and c.symbol not in STABLECOINS
-                          and c.price and MIN_PRICE <= c.price <= MAX_PRICE)]
-        affordable.sort(key=lambda x: x.attractiveness_score, reverse=True)
-        for coin in affordable:
-            if coin not in selected and len(selected) < pool_size:
-                selected.append(coin)
-            if len(selected) >= pool_size:
-                break
-
-    return selected, recently_added_coins
 
 
 def _run_gem_analysis(coin_data_dict, coin_data_out):
@@ -166,122 +120,6 @@ def _run_agent_analysis(coin, coin_data_out):
 
 
 # ─── Routes ───────────────────────────────────────────────────
-
-@coins_bp.route('/api/stats')
-def get_stats():
-    from src.core.crypto_analyzer import CoinStatus
-    try:
-        total = len(state.analyzer.coins)
-        current = len(state.analyzer.filter_by_status(CoinStatus.CURRENT))
-        high_potential = len(state.analyzer.get_high_potential_coins())
-        trending_up = len([c for c in state.analyzer.coins if c.price_change_24h and c.price_change_24h > 0])
-        return jsonify({'total_coins': total, 'current_coins': current, 'high_potential': high_potential, 'trending_up': trending_up})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@coins_bp.route('/api/coins')
-def get_coins():
-    """Get coins data (excluding favorites) with integrated multi-agent analysis."""
-    try:
-        run_agents = request.args.get('agents', 'true').lower() == 'true'
-        limit = int(request.args.get('limit', 20))
-
-        favorites = load_favorites()
-        favorites_upper = [f.upper() for f in favorites]
-        selected, recently_added = _coin_selection(favorites_upper)
-
-        coins_data = []
-        for coin in selected[:limit]:
-            coins_data.append({
-                'symbol': coin.symbol,
-                'name': coin.name,
-                'score': coin.attractiveness_score,
-                'price': coin.price,
-                'price_change_24h': coin.price_change_24h or 0,
-                'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
-                'market_cap_rank': coin.market_cap_rank,
-                'recently_added': coin.symbol in [c.symbol for c in recently_added],
-                'ai_analysis': None,
-                'ai_sentiment': None,
-                'agent_analysis': None,
-            })
-
-        # Add AI analysis
-        for cd in coins_data:
-            matching = next((c for c in state.analyzer.coins if c.symbol == cd['symbol']), None)
-            if not matching:
-                continue
-
-            coin_dict = _prepare_coin_dict(matching)
-            ai_score = min(10, matching.attractiveness_score / 10)
-            done = _run_gem_analysis(coin_dict, cd)
-            if done:
-                ai_score = cd.get('enhanced_score', ai_score)
-            if not done:
-                _run_ml_fallback(matching, cd)
-            cd['enhanced_score'] = min(10, ai_score)
-
-            # Multi-agent analysis
-            if run_agents and state.GEM_DETECTOR_AVAILABLE and state.gem_detector and state.gem_detector.multi_agent_enabled:
-                _run_agent_analysis(matching, cd)
-
-        return jsonify({
-            'coins': coins_data,
-            'last_updated': datetime.now().isoformat(),
-            'cache_expires_in': 300,
-            'recently_added_count': len(recently_added),
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@coins_bp.route('/api/coins/enhanced')
-def get_enhanced_coins():
-    """Get coins data enhanced with ML predictions (excluding favorites)."""
-    try:
-        favorites = load_favorites()
-        favorites_upper = [f.upper() for f in favorites]
-        selected, recently_added = _coin_selection(favorites_upper)
-
-        coins_data = []
-        for coin in selected[:20]:
-            cd = {
-                'symbol': coin.symbol,
-                'name': coin.name,
-                'score': min(10, coin.attractiveness_score / 10),
-                'price': coin.price,
-                'price_change_24h': coin.price_change_24h or 0,
-                'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
-                'market_cap_rank': coin.market_cap_rank,
-                'recently_added': coin.symbol in [c.symbol for c in recently_added],
-                'ai_analysis': None,
-                'enhanced_score': min(10, coin.attractiveness_score / 10),
-            }
-            coin_dict = _prepare_coin_dict(coin)
-            _run_gem_analysis(coin_dict, cd)
-            coins_data.append(cd)
-
-        # Opt-in agent analysis
-        run_agents = request.args.get('agents', 'false').lower() == 'true'
-        if run_agents and state.GEM_DETECTOR_AVAILABLE and state.gem_detector and state.gem_detector.multi_agent_enabled:
-            for cd in coins_data:
-                matching = next((c for c in selected if c.symbol == cd['symbol']), None)
-                if matching:
-                    _run_agent_analysis(matching, cd)
-
-        coins_data.sort(key=lambda x: x['enhanced_score'], reverse=True)
-
-        return jsonify({
-            'coins': coins_data,
-            'last_updated': datetime.now().isoformat(),
-            'ml_enhanced': state.ML_AVAILABLE and state.ml_pipeline and state.ml_pipeline.model_loaded,
-            'recently_added_count': len(recently_added),
-            'cache_expires_in': 300,
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 
 @coins_bp.route('/api/refresh', methods=['POST'])
 def force_refresh():

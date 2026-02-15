@@ -36,10 +36,3 @@ function startRefreshTimer() {
         refreshData();
     }, 300000); // 5 minutes
 }
-
-function updateMLStatus(mlEnabled) {
-    const mlBadges = document.querySelectorAll('.badge-ai');
-    mlBadges.forEach(badge => {
-        badge.style.display = mlEnabled ? 'inline-block' : 'none';
-    });
-}

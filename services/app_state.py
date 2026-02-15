@@ -46,13 +46,13 @@ STABLECOINS = {
 }
 MIN_PRICE = 0.00000001
 MAX_PRICE = 1.25
-FAVORITES_FILE = "data/favorites.json"
+FAVORITES_FILE = os.path.join(project_root, "data", "favorites.json")
 
-# Idle / auto-shutdown
+# Idle / auto-shutdown (default OFF for production — enable for dev)
 IDLE_TIMEOUT = 300  # 5 minutes
 start_time = time.time()
 last_request_time = time.time()
-shutdown_enabled = os.environ.get('AUTO_SHUTDOWN', 'true').lower() in ('1', 'true', 'yes')
+shutdown_enabled = os.environ.get('AUTO_SHUTDOWN', 'false').lower() in ('1', 'true', 'yes')
 
 
 # ─── Initializers ─────────────────────────────────────────────
@@ -359,10 +359,8 @@ def fetch_and_add_new_symbol_data(symbol: str):
             "investment_highlights": ["Recently added symbol"],
             "risk_level": "medium",
             "market_cap_rank": coin_data.get('cmc_rank'),
-            "price_btc": None,
             "data": {
                 "price": price,
-                "price_btc": None,
                 "price_change_percentage_24h": {"usd": quote.get('percent_change_24h', 0)},
                 "market_cap": f"${quote.get('market_cap', 0):,}" if quote.get('market_cap') else "N/A",
                 "total_volume": f"${quote.get('volume_24h', 0):,}" if quote.get('volume_24h') else "N/A",

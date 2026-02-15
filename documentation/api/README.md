@@ -8,33 +8,17 @@ Base URL: `http://localhost:5001`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/coins` | All analysed coins (add `?agents=true` for AI analysis) |
-| GET | `/api/coins/enhanced` | Enhanced coin data with ML scores |
 | POST | `/api/refresh` | Force data refresh |
-| GET | `/api/stats` | Market statistics |
 
-### GET `/api/coins`
+---
 
-```bash
-curl "http://localhost:5001/api/coins?agents=true&limit=10"
-```
+## Favorites
 
-```json
-{
-  "coins": [{
-    "symbol": "BTC",
-    "price": 50000,
-    "gem_score": 85,
-    "ml_confidence": 0.82,
-    "agent_analysis": {
-      "overall_recommendation": "STRONG_BUY",
-      "confidence": 0.85,
-      "summary": "..."
-    }
-  }],
-  "stats": { "total_coins": 100, "gems_found": 15 }
-}
-```
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/favorites` | Get favorite coins with AI analysis |
+| POST | `/api/favorites/add` | Add coin to favorites |
+| POST | `/api/favorites/remove` | Remove coin from favorites |
 
 ---
 

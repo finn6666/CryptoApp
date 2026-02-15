@@ -33,7 +33,7 @@ cp .env.example .env
 nano .env  # Add API keys
 
 # Test
-python app.py  # http://<PI_IP>:5001
+uv run gunicorn -c gunicorn.conf.py wsgi:app  # http://<PI_IP>:5001
 ```
 
 ---
@@ -51,8 +51,8 @@ After=network.target
 Type=simple
 User=pi
 WorkingDirectory=/home/pi/CryptoApp
-Environment="PATH=/home/pi/.cargo/bin:/home/pi/CryptoApp/.venv/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/home/pi/CryptoApp/.venv/bin/python /home/pi/CryptoApp/app.py
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/env bash -lc 'cd /home/pi/CryptoApp && uv sync && uv run gunicorn -c gunicorn.conf.py wsgi:app'
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -93,6 +93,8 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_read_timeout 180;
+        proxy_connect_timeout 10;
     }
 }
 ```
@@ -108,7 +110,7 @@ sudo nginx -t && sudo systemctl restart nginx
 ## Updates
 
 ```bash
-cd ~/CryptoApp && git pull origin main
+cd ~/CryptoApp && git pull origin dev
 uv sync
 sudo systemctl restart cryptoapp
 ```

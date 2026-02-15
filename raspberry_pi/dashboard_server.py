@@ -26,7 +26,7 @@ def background_monitoring():
     while monitoring_active:
         try:
             monitor.run_monitoring_cycle()
-            time.sleep(monitor.config['cryptoapp_server']['check_interval'])
+            time.sleep(monitor.config['local_server']['check_interval'])
         except Exception as e:
             print(f"Monitoring error: {e}")
             time.sleep(10)
@@ -84,8 +84,8 @@ def get_status():
         'uptime_hours': monitor.get_dashboard_data()['uptime'],
         'total_alerts': len(monitor.alerts),
         'config': {
-            'server_url': monitor.config['cryptoapp_server']['url'],
-            'check_interval': monitor.config['cryptoapp_server']['check_interval']
+            'server_url': monitor.config['local_server']['url'],
+            'check_interval': monitor.config['local_server']['check_interval']
         }
     })
 
@@ -114,4 +114,4 @@ if __name__ == '__main__':
     start_monitoring()
     
     # Run Flask app
-    app.run(host='127.0.0.1', port=5002, debug=False)
+    app.run(host='0.0.0.0', port=5002, debug=False)

@@ -108,7 +108,10 @@ class TradingEngine:
         self._exchange = None
 
         # Token signing for approve/reject links
-        secret = os.getenv('SECRET_KEY', 'fallback-insecure-key')
+        secret = os.getenv('SECRET_KEY')
+        if not secret:
+            logger.error('SECRET_KEY not set — trade approval tokens will be insecure!')
+            secret = 'fallback-insecure-key'
         self._serializer = URLSafeTimedSerializer(secret, salt='trade-approval')
 
         # Load persisted state

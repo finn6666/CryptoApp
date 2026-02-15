@@ -3,10 +3,12 @@ name = "cryptoapp"
 version = "0.1.0"
 description = "Cryptocurrency Analysis and Investment Recommendation Tool"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31.0",
     "flask>=2.3.0",
+    "flask-cors>=4.0.0",
+    "flask-limiter>=3.5.0",
     "python-dotenv>=1.0.0",
     "scikit-learn>=1.6.1",
     "pandas>=2.3.3",
@@ -22,6 +24,8 @@ dependencies = [
     "google-adk>=1.23.0",
     "psutil>=5.9.0",
     "ccxt>=4.0.0",
+    "schedule>=1.2.0",
+    "itsdangerous>=2.1.0",
 ]
 
 [project.optional-dependencies]

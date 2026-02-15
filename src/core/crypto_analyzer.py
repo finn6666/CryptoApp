@@ -25,15 +25,11 @@ class Coin:
     investment_highlights: List[str]
     market_cap_rank: Optional[int]
     price: Optional[float]
-    price_btc: Optional[float]
     price_change_24h: Optional[float]
     price_change_7d: Optional[float]
     market_cap: Optional[str]
     total_volume: Optional[str]
     risk_level: Optional[RiskLevel] = None
-    launch_date: Optional[str] = None
-    presale_discount: Optional[str] = None
-    presale_price: Optional[float] = None
     
 class CryptoAnalyzer:
     """Main class for analyzing cryptocurrency data"""
@@ -76,8 +72,6 @@ class CryptoAnalyzer:
                             price = None
                     else:
                         price = data['price']
-                elif 'presale_price' in data:
-                    price = data['presale_price']
             
                 # Get price change
                 price_change = None
@@ -118,15 +112,11 @@ class CryptoAnalyzer:
                     investment_highlights=item.get('investment_highlights', []),
                     market_cap_rank=item.get('market_cap_rank'),
                     price=price,
-                    price_btc=float(item.get('price_btc', 0)) if item.get('price_btc') else None,
                     price_change_24h=price_change,
                     price_change_7d=price_change_7d,
                     market_cap=data.get('market_cap'),
                     total_volume=data.get('total_volume'),
                     risk_level=risk_level,
-                    launch_date=item.get('launch_date'),
-                    presale_discount=item.get('presale_discount'),
-                    presale_price=data.get('presale_price')
                 )
                 coins.append(coin)
             except Exception as e:
@@ -138,26 +128,6 @@ class CryptoAnalyzer:
             print(f"[WARNING] Skipped {len(skipped)} coins during load: {', '.join(skipped)}")
         
         return coins
-
-    def get_top_coins(self, limit: int = 10, status: Optional[CoinStatus] = None) -> List[Coin]:
-        """Get top coins by attractiveness score"""
-        coins = self.coins.copy()
-
-        # Filter by status if specified
-        if status:
-            coins = [coin for coin in coins if coin.status == status]
-            
-        # Sort by attractiveness score (highest first)
-        coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
-
-        # Remove coins with price None or price >= 200 as i dont want high price coins
-        coins = [coin for coin in coins if coin.price is not None and coin.price <= 200]
-
-        return coins[:limit]
-
-    def get_trending_coins(self) -> List[Coin]:
-        """Get trending coins sorted by attractiveness score"""
-        return sorted(self.coins, key=lambda x: x.attractiveness_score, reverse=True)
 
     def _parse_market_cap(self, market_cap_str: Optional[str]) -> float:
         """Helper method to parse market cap string and return numeric value"""
@@ -188,14 +158,6 @@ class CryptoAnalyzer:
         low_cap_coins.sort(key=lambda x: x.attractiveness_score, reverse=True)
         
         return low_cap_coins[:limit]
-
-    def filter_by_status(self, status: CoinStatus) -> List[Coin]:
-        """Filter coins by their status"""
-        return [coin for coin in self.coins if coin.status == status]
-
-    def get_high_potential_coins(self, min_score: float = 6.0) -> List[Coin]:
-        """Get coins with high potential (attractiveness score above threshold)"""
-        return [coin for coin in self.coins if coin.attractiveness_score >= min_score]
 
     def get_all_coins(self) -> List[Coin]:
         """Get all loaded coins"""

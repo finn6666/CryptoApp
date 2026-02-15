@@ -124,7 +124,7 @@ class CryptoMLPipeline:
             features = self.prepare_features(df)
             
             # Create target variable (next hour price change)
-            target = df['close'].shift(-1).pct_change().dropna()
+            target = df['close'].pct_change().shift(-1).dropna()
             
             # Align features and target
             min_length = min(len(features), len(target))

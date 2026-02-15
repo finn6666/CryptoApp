@@ -5,6 +5,7 @@ Simplified main entry point for the Crypto Investment Analyzer
 Focuses on low cap cryptocurrency opportunities
 """
 
+import os
 import sys
 from src.core.live_data_fetcher import fetch_and_update_data
 
@@ -34,7 +35,8 @@ def main():
         
         # Import and run the web app
         from app import app
-        app.run(debug=True, host='127.0.0.1', port=5001)
+        debug = os.environ.get('DEBUG', 'false').lower() in ('1', 'true', 'yes')
+        app.run(debug=debug, host='127.0.0.1', port=5001)
             
     except FileNotFoundError:
         print("[ERROR] Error: Required data files not found!")

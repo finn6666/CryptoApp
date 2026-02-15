@@ -241,12 +241,12 @@ class SIEMMonitor:
         vm_url = self.config['local_server']['url']
         
         try:
-            # Get current coin data from VM
-            response = requests.get(f"{vm_url}/api/coins", timeout=10)
+            # Get current coin data from VM (favorites)
+            response = requests.get(f"{vm_url}/api/favorites", timeout=10)
             if response.status_code != 200:
                 return {'status': 'error', 'message': 'Failed to fetch coin data'}
             
-            coins = response.json()
+            coins = response.json().get('favorites', [])
             anomalies = []
             
             for coin in coins[:self.config['market_monitoring']['top_n_coins']]:

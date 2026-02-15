@@ -3,13 +3,13 @@ import multiprocessing
 
 # Keep the app bound to localhost; expose via Nginx
 bind = "127.0.0.1:5001"
-# Reasonable default: (2 x $num_cores) + 1
-workers = max(2, multiprocessing.cpu_count() * 2 + 1)
+# Cap at 2 workers for Pi (each loads ML models into memory)
+workers = min(2, multiprocessing.cpu_count() + 1)
 worker_class = "gthread"  # good for mixed I/O
 threads = 2
 
-# Timeouts
-timeout = 60
+# Timeouts — agent orchestrator can take up to 120s
+timeout = 120
 graceful_timeout = 30
 keepalive = 2
 

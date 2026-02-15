@@ -26,7 +26,7 @@ class WeeklyReportGenerator:
         # Email configuration from environment variables
         self.email_from = os.getenv('REPORT_EMAIL_FROM', '')
         self.email_to = os.getenv('REPORT_EMAIL_TO', '')
-        self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
+        self.smtp_server = os.getenv('SMTP_HOST', 'smtp.gmail.com')
         self.smtp_port = int(os.getenv('SMTP_PORT', '587'))
         self.smtp_password = os.getenv('SMTP_PASSWORD', '')
         

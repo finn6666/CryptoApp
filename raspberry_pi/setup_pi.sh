@@ -51,7 +51,7 @@ pip install flask requests psutil
 echo "📋 Creating SIEM configuration..."
 cat > siem_config.json << 'EOF'
 {
-  "cryptoapp_server": {
+  "local_server": {
     "url": "http://localhost:5001",
     "check_interval": 60,
     "timeout": 10

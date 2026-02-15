@@ -2,8 +2,8 @@ import schedule
 import time
 import logging
 from datetime import datetime
-from training_pipeline import CryptoMLPipeline
-from weekly_report import WeeklyReportGenerator
+from ml.training_pipeline import CryptoMLPipeline
+from ml.weekly_report import WeeklyReportGenerator
 import os
 import requests
 import json
