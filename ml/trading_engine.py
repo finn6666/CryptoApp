@@ -711,8 +711,12 @@ def get_trading_engine() -> TradingEngine:
     if _engine is None:
         daily_budget = float(os.getenv("DAILY_TRADE_BUDGET_GBP", "0.05"))
         server_url = os.getenv("TRADE_SERVER_URL", "http://localhost:5001")
+        # Use first exchange from EXCHANGE_PRIORITY (default: kraken)
+        priority = os.getenv("EXCHANGE_PRIORITY", "kraken")
+        exchange_id = priority.split(",")[0].strip().lower()
         _engine = TradingEngine(
             daily_budget_gbp=daily_budget,
+            exchange_id=exchange_id,
             server_url=server_url,
         )
     return _engine
