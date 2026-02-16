@@ -16,6 +16,7 @@ from .research_agent import research_agent
 from .technical_agent import technical_agent
 from .risk_agent import risk_agent
 from .sentiment_agent import sentiment_agent
+from .trading_agent import trading_agent
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def _get_agent_memory():
 
 
 class CryptoAnalysisOutput(BaseModel):
-    """Structured output for comprehensive crypto analysis"""
+    """Structured output for comprehensive crypto analysis with trade decision"""
     symbol: str = Field(description="Cryptocurrency symbol analyzed")
     overall_recommendation: str = Field(description="Final recommendation: BUY/SELL/HOLD")
     confidence: int = Field(ge=0, le=100, description="Overall confidence 0-100")
@@ -42,6 +43,12 @@ class CryptoAnalysisOutput(BaseModel):
     key_insights: list[str] = Field(description="Most important insights")
     action_plan: str = Field(description="Specific action steps")
     price_targets: dict[str, float] = Field(description="Entry, stop loss, take profit levels")
+    should_trade: bool = Field(default=False, description="Whether to propose a real trade")
+    trade_side: str = Field(default="buy", description="Trade side: buy or sell")
+    trade_conviction: int = Field(default=0, ge=0, le=100, description="How strongly the trading agent feels about this trade 0-100")
+    trade_reasoning: str = Field(default="", description="2-3 sentence explanation of WHY this trade")
+    trade_risk_note: str = Field(default="", description="One sentence on the biggest trade risk")
+    trade_allocation_pct: float = Field(default=0, ge=0, le=100, description="What % of daily budget to use (0-100)")
 
 
 # Create main orchestrator agent with sub-agents
@@ -49,17 +56,19 @@ crypto_orchestrator = Agent(
     name="crypto_orchestrator",
     description="Master cryptocurrency analyst coordinating specialist agents",
     model="gemini-3-flash-preview",
-    instruction="""You coordinate 4 specialist agents to analyze low-cap cryptocurrencies under £1.
+    instruction="""You coordinate 5 specialist agents to analyze low-cap cryptocurrencies under £1 and decide whether to trade.
 
-**Team:** sentiment_specialist, research_specialist, technical_specialist, risk_specialist
+**Team:** sentiment_specialist, research_specialist, technical_specialist, risk_specialist, trading_specialist
 
 **Style:** Write like a sharp crypto analyst mate giving honest advice over a pint — direct, opinionated, no corporate waffle. Reference the SPECIFIC coin by name. Mention actual numbers (price, rank, volume). Tell the user what makes THIS coin interesting or rubbish compared to alternatives. Use the coin's real project name and what it actually does.
 
 **Workflow:**
-1. Delegate to all 4 specialists
+1. Delegate to all 4 analysis specialists (sentiment, research, technical, risk)
 2. Synthesize: weight Research 35%, Technical 35%, Risk 15%, Sentiment 15%
 3. Calculate consensus score (0-100)
 4. Give a clear BUY/SELL/HOLD with confidence
+5. Delegate to trading_specialist with your synthesized analysis — let it decide if this is worth REAL money
+6. Include the trading specialist's decision in your output (should_trade, trade_conviction, trade_reasoning, etc.)
 
 **Key rules:**
 - Every summary must mention the coin's actual name and use case — never say "this project" or "the token"
@@ -67,15 +76,17 @@ crypto_orchestrator = Agent(
 - Point out what's genuinely unique vs just another fork/copy
 - If the tools return generic data, use your knowledge of the real project to fill in specifics
 - Keep it punchy — 1-2 sentences per specialist summary, no filler
+- The trading_specialist makes the final call on whether to spend real money — include its full decision in the trade fields
 
-**Output:** Return valid JSON matching CryptoAnalysisOutput schema.""",
+**Output:** Return valid JSON matching CryptoAnalysisOutput schema (including all trade_ fields).""",
     
-    # Sub-agents for delegation
+    # Sub-agents for delegation — 4 analysts + 1 trader
     sub_agents=[
         sentiment_agent,
         research_agent,
         technical_agent,
         risk_agent,
+        trading_agent,
     ],
 )
 
@@ -136,11 +147,12 @@ async def analyze_crypto(
 
     prompt = f"""Analyze {symbol}: {market_data_str}
 
-Give me the real story on {symbol} — what does this project actually do, why should anyone care, and is it worth a punt at this price? Coordinate your team and be brutally honest. No generic filler.
-Return JSON matching CryptoAnalysisOutput schema with all fields."""
+Give me the real story on {symbol} — what does this project actually do, why should anyone care, and is it worth a punt at this price? Coordinate your team (all 5 specialists) and be brutally honest. No generic filler.
+After getting analysis from your 4 analysts, delegate to trading_specialist to decide if this is worth real money.
+Return JSON matching CryptoAnalysisOutput schema with ALL fields including should_trade, trade_side, trade_conviction, trade_reasoning, trade_risk_note and trade_allocation_pct."""
     
     try:
-        logger.info(f"Starting official ADK analysis for {symbol} (session: {session_id})")
+        logger.info(f"Starting official ADK multi-agent analysis for {symbol} (session: {session_id})")
         
         # Create Content message for ADK API
         user_message = types.Content(
@@ -149,19 +161,49 @@ Return JSON matching CryptoAnalysisOutput schema with all fields."""
         )
         
         # Run orchestrator using event streaming API
-        analysis_text = ""
+        # Capture text from all agents — the orchestrator delegates to sub-agents
+        # and each produces its own response. We combine them all.
+        last_author_text = {}
         for event in runner.run(
             user_id="crypto_user",
             session_id=session_id,
             new_message=user_message
         ):
-            # Process events to extract response
             if hasattr(event, 'content') and event.content:
+                author = getattr(event, 'author', 'orchestrator')
                 for part in event.content.parts:
                     if hasattr(part, 'text') and part.text:
-                        analysis_text += part.text
+                        if author not in last_author_text:
+                            last_author_text[author] = ""
+                        last_author_text[author] += part.text
         
-        logger.info(f"Official ADK analysis completed for {symbol}")
+        # Combine all agent texts for the full analysis
+        analysis_text = "\n".join(last_author_text.values())
+        
+        # Extract trade decision from the trading_specialist's output
+        import re as _re
+        import json as _json
+        
+        trade_decision = {}
+        trading_text = last_author_text.get("trading_specialist", "")
+        if trading_text:
+            json_match = _re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', trading_text, _re.DOTALL)
+            if json_match:
+                try:
+                    raw_decision = _json.loads(json_match.group())
+                    # Map TradeDecision fields → CryptoAnalysisOutput trade fields
+                    trade_decision = {
+                        "should_trade": raw_decision.get("should_trade", False),
+                        "trade_side": raw_decision.get("side", "buy"),
+                        "trade_conviction": raw_decision.get("conviction", 0),
+                        "trade_reasoning": raw_decision.get("reasoning", ""),
+                        "trade_risk_note": raw_decision.get("risk_note", ""),
+                        "trade_allocation_pct": raw_decision.get("suggested_allocation_pct", 0),
+                    }
+                except _json.JSONDecodeError:
+                    logger.warning(f"Could not parse trading specialist JSON for {symbol}")
+        
+        logger.info(f"Official ADK multi-agent analysis completed for {symbol}")
         
         return {
             "success": True,
@@ -169,9 +211,11 @@ Return JSON matching CryptoAnalysisOutput schema with all fields."""
             "session_id": session_id,
             "recommendation": "Analysis completed",
             "analysis": analysis_text,
-            "confidence": 85,
+            "all_agent_texts": last_author_text,
+            "trade_decision": trade_decision,
+            "confidence": trade_decision.get("trade_conviction", 85),
             "orchestrator": "crypto_orchestrator",
-            "agents_used": ["sentiment_specialist", "research_specialist", "technical_specialist", "risk_specialist"],
+            "agents_used": ["sentiment_specialist", "research_specialist", "technical_specialist", "risk_specialist", "trading_specialist"],
             "memory_enabled": use_memory,
         }
         

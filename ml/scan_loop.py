@@ -376,47 +376,55 @@ class ScanLoop:
         except Exception as e:
             logger.debug(f"Gem score tracking failed for {symbol}: {e}")
 
-        # Run trading agent evaluation
+        # Extract trade decision from the multi-agent orchestrator output
+        # The trading_specialist is now a sub-agent of the orchestrator, so its
+        # decision is extracted and mapped by the orchestrator wrapper.
         try:
-            from ml.agents.official.trading_agent import evaluate_trade
-            import re
-            import json as _json
+            trade_decision = analysis.get("trade_decision", {})
 
-            decision = state.run_async(
-                evaluate_trade(
-                    symbol, analysis, coin_data.get("price", 0), remaining
-                )
-            )
+            should_trade = trade_decision.get("should_trade", False)
+            conviction = trade_decision.get("trade_conviction", 0)
+            allocation_pct = trade_decision.get("trade_allocation_pct", 0)
+            trade_reasoning = trade_decision.get("trade_reasoning", "")
+            trade_side = trade_decision.get("trade_side", "buy")
 
-            if not decision.get("success"):
-                return {
-                    "outcome": "skipped",
-                    "reason": "Trading agent evaluation failed",
-                    "proposed": False,
-                }
+            # Fallback: if ADK didn't produce a trade_decision, check analysis text
+            if not trade_decision and analysis_source == "adk_orchestrator":
+                import re
+                import json as _json
+                analysis_text = analysis.get("analysis", "")
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', analysis_text, re.DOTALL)
+                if json_match:
+                    try:
+                        parsed = _json.loads(json_match.group())
+                        should_trade = parsed.get("should_trade", False)
+                        conviction = parsed.get("trade_conviction", parsed.get("conviction", 0))
+                        allocation_pct = parsed.get("trade_allocation_pct", parsed.get("suggested_allocation_pct", 0))
+                        trade_reasoning = parsed.get("trade_reasoning", parsed.get("reasoning", ""))
+                        trade_side = parsed.get("trade_side", parsed.get("side", "buy"))
+                    except _json.JSONDecodeError:
+                        pass
 
-            # Parse the trading agent's decision
-            decision_text = decision.get("decision_raw", "")
-            parsed = None
-            json_match = re.search(r'\{.*\}', decision_text, re.DOTALL)
-            if json_match:
-                try:
-                    parsed = _json.loads(json_match.group())
-                except _json.JSONDecodeError:
-                    pass
+            # Fallback for gem detector: check recommendation + confidence
+            if not should_trade and analysis_source == "gem_detector":
+                rec = analysis.get("recommendation", "HOLD").upper()
+                conf = analysis.get("confidence", 0)
+                if rec == "BUY" and conf >= 75:
+                    should_trade = True
+                    conviction = conf
+                    allocation_pct = min(50, conf - 25)
+                    trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
 
-            if parsed and parsed.get("should_trade"):
-                conviction = parsed.get("conviction", 0)
-                allocation_pct = parsed.get("suggested_allocation_pct", 50)
+            if should_trade and conviction >= 75:
                 amount = remaining * (allocation_pct / 100)
                 amount = min(amount, remaining)
 
                 result = engine.propose_trade(
                     symbol=symbol,
-                    side=parsed.get("side", "buy"),
+                    side=trade_side,
                     amount_gbp=round(amount, 4),
                     current_price=coin_data.get("price", 0),
-                    reason=parsed.get("reasoning", "Agent recommended trade")[:500],
+                    reason=trade_reasoning[:500] if trade_reasoning else "Multi-agent orchestrator recommended trade",
                     confidence=conviction,
                     recommendation=analysis.get("recommendation", "BUY"),
                 )
@@ -425,18 +433,18 @@ class ScanLoop:
                     "outcome": "proposed",
                     "proposed": result.get("success", False),
                     "confidence": conviction,
-                    "reason": parsed.get("reasoning", ""),
+                    "reason": trade_reasoning,
                     "proposal_id": result.get("proposal_id"),
                 }
             else:
                 return {
                     "outcome": "skipped",
                     "proposed": False,
-                    "reason": parsed.get("reasoning", "Agent decided not to trade") if parsed else "Could not parse decision",
+                    "reason": trade_reasoning or "Multi-agent system decided not to trade",
                 }
 
         except Exception as e:
-            logger.error(f"Trade evaluation failed for {symbol}: {e}")
+            logger.error(f"Trade decision extraction failed for {symbol}: {e}")
             return {"outcome": "error", "reason": str(e), "proposed": False}
 
     # ─── Audit Trail ──────────────────────────────────────────

@@ -345,11 +345,13 @@ def toggle_kill_switch():
 @require_trading_auth
 def auto_evaluate_trade():
     """
-    Run the trading agent on a coin's analysis to decide if it's worth a real trade.
-    Requires the coin to already have agent_analysis.
+    Run the full multi-agent orchestrator (including trading_specialist sub-agent)
+    on a coin to decide if it's worth a real trade.
+    Uses the ADK multi-agent system: 4 analysts + 1 trading specialist.
     """
     try:
         from ml.trading_engine import get_trading_engine
+        import services.app_state as state
         engine = get_trading_engine()
 
         data = request.json
@@ -357,59 +359,85 @@ def auto_evaluate_trade():
         analysis = data.get('analysis', {})
         current_price = float(data.get('current_price', 0))
 
-        if not symbol or not analysis or not current_price:
-            return jsonify({"error": "Missing symbol, analysis, or current_price"}), 400
+        if not symbol or not current_price:
+            return jsonify({"error": "Missing symbol or current_price"}), 400
 
         remaining = engine.get_remaining_budget()
         if remaining <= 0:
             return jsonify({"error": "Daily budget exhausted", "remaining": 0}), 400
 
-        # Run trading agent evaluation
-        from ml.agents.official.trading_agent import evaluate_trade
+        # Run the full multi-agent orchestrator (includes trading_specialist)
+        if not state.official_adk_available or not state.analyze_crypto_adk:
+            return jsonify({"error": "ADK multi-agent system not available"}), 500
 
-        loop = asyncio.new_event_loop()
-        decision = loop.run_until_complete(
-            evaluate_trade(symbol, analysis, current_price, remaining)
+        # Build coin_data for the orchestrator
+        coin_data = {
+            "symbol": symbol,
+            "price": current_price,
+            "name": data.get("name", symbol),
+            "price_change_24h": data.get("price_change_24h", 0),
+            "price_change_7d": data.get("price_change_7d", 0),
+            "market_cap_rank": data.get("market_cap_rank"),
+            "market_cap": data.get("market_cap"),
+            "volume_24h": data.get("volume_24h"),
+            "attractiveness_score": data.get("attractiveness_score", 0),
+        }
+
+        result = state.run_async(
+            state.analyze_crypto_adk(symbol, coin_data)
         )
-        loop.close()
 
-        if not decision.get("success"):
-            return jsonify(decision), 500
+        if not result or not result.get("success"):
+            return jsonify(result or {"error": "Analysis failed"}), 500
 
-        # Parse the trading agent's decision
-        decision_text = decision.get("decision_raw", "")
-        parsed = None
+        # Extract trade decision from the multi-agent orchestrator output
+        trade_decision = result.get("trade_decision", {})
+        should_trade = trade_decision.get("should_trade", False)
+        conviction = trade_decision.get("trade_conviction", 0)
+        allocation_pct = trade_decision.get("trade_allocation_pct", 0)
+        trade_reasoning = trade_decision.get("trade_reasoning", "")
+        trade_side = trade_decision.get("trade_side", "buy")
+        trade_risk_note = trade_decision.get("trade_risk_note", "")
 
-        json_match = re.search(r'\{.*\}', decision_text, re.DOTALL)
-        if json_match:
-            try:
-                parsed = _json.loads(json_match.group())
-            except _json.JSONDecodeError:
-                pass
+        # Fallback: parse analysis text if trade_decision is empty
+        if not trade_decision:
+            analysis_text = result.get("analysis", "")
+            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', analysis_text, re.DOTALL)
+            if json_match:
+                try:
+                    parsed = _json.loads(json_match.group())
+                    should_trade = parsed.get("should_trade", False)
+                    conviction = parsed.get("trade_conviction", parsed.get("conviction", 0))
+                    allocation_pct = parsed.get("trade_allocation_pct", parsed.get("suggested_allocation_pct", 0))
+                    trade_reasoning = parsed.get("trade_reasoning", parsed.get("reasoning", ""))
+                    trade_side = parsed.get("trade_side", parsed.get("side", "buy"))
+                    trade_risk_note = parsed.get("trade_risk_note", parsed.get("risk_note", ""))
+                except _json.JSONDecodeError:
+                    pass
 
-        if parsed and parsed.get("should_trade"):
-            conviction = parsed.get("conviction", 0)
-            allocation_pct = parsed.get("suggested_allocation_pct", 50)
+        if should_trade and conviction >= 75:
             amount = remaining * (allocation_pct / 100)
             amount = min(amount, remaining)
 
-            result = engine.propose_trade(
+            proposal = engine.propose_trade(
                 symbol=symbol,
-                side=parsed.get("side", "buy"),
+                side=trade_side,
                 amount_gbp=round(amount, 4),
                 current_price=current_price,
-                reason=parsed.get("reasoning", "Agent recommended trade"),
+                reason=trade_reasoning[:500] if trade_reasoning else "Multi-agent system recommended trade",
                 confidence=conviction,
-                recommendation=data.get("recommendation", "BUY"),
+                recommendation="BUY" if trade_side == "buy" else "SELL",
             )
-            result["agent_decision"] = parsed
-            return jsonify(result), 200
+            proposal["agent_decision"] = trade_decision
+            proposal["agents_used"] = result.get("agents_used", [])
+            return jsonify(proposal), 200
         else:
             return jsonify({
                 "success": True,
                 "should_trade": False,
-                "reason": parsed.get("reasoning", "Agent decided not to trade") if parsed else "Could not parse decision",
-                "risk_note": parsed.get("risk_note", "") if parsed else "",
+                "reason": trade_reasoning or "Multi-agent system decided not to trade",
+                "trade_risk_note": trade_risk_note,
+                "agents_used": result.get("agents_used", []),
             }), 200
 
     except Exception as e:

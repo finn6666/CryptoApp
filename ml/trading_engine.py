@@ -73,12 +73,13 @@ class TradingEngine:
     def __init__(
         self,
         daily_budget_gbp: float = 0.05,
-        exchange_id: str = "coinbase",
+        exchange_id: str = None,
         data_dir: str = "data/trades",
         server_url: str = "http://localhost:5001",
     ):
         self.daily_budget_gbp = daily_budget_gbp
-        self.exchange_id = exchange_id
+        # Default exchange from env (supports coinbase, kraken, etc.)
+        self.exchange_id = exchange_id or os.getenv("EXCHANGE_PRIORITY", "kraken,coinbase").split(",")[0].strip()
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.server_url = server_url
@@ -129,25 +130,44 @@ class TradingEngine:
     # ─── Exchange Connection ──────────────────────────────────
 
     def _get_exchange(self):
-        """Lazy-initialize exchange connection via ccxt."""
+        """Lazy-initialize exchange connection via ExchangeManager (multi-exchange)."""
         if self._exchange is None:
+            try:
+                from ml.exchange_manager import get_exchange_manager
+                mgr = get_exchange_manager()
+                self._exchange = mgr.get_exchange(self.exchange_id)
+                if self._exchange:
+                    logger.info(f"{self.exchange_id} exchange connected via ExchangeManager")
+                    return self._exchange
+            except Exception as e:
+                logger.debug(f"ExchangeManager fallback: {e}")
+
+            # Fallback: direct ccxt connection
             try:
                 import ccxt
 
-                api_key = os.getenv("COINBASE_API_KEY", "")
-                api_secret = os.getenv("COINBASE_API_SECRET", "")
+                config = {}
+                if self.exchange_id == "kraken":
+                    config = {
+                        "apiKey": os.getenv("KRAKEN_API_KEY", ""),
+                        "secret": os.getenv("KRAKEN_PRIVATE_KEY", ""),
+                    }
+                elif self.exchange_id == "coinbase":
+                    config = {
+                        "apiKey": os.getenv("COINBASE_API_KEY", ""),
+                        "secret": os.getenv("COINBASE_API_SECRET", ""),
+                    }
 
-                if not api_key or not api_secret:
-                    logger.warning("Exchange API keys not configured — trades will fail")
+                if not config.get("apiKey") or not config.get("secret"):
+                    logger.warning(f"Exchange API keys not configured for {self.exchange_id} — trades will fail")
 
-                self._exchange = ccxt.coinbase({
-                    "apiKey": api_key,
-                    "secret": api_secret,
+                exchange_class = getattr(ccxt, self.exchange_id)
+                self._exchange = exchange_class({
+                    **config,
                     "enableRateLimit": True,
                 })
-                # Test connection
                 self._exchange.load_markets()
-                logger.info("Coinbase exchange connected successfully")
+                logger.info(f"{self.exchange_id} exchange connected directly via ccxt")
             except ImportError:
                 logger.error("ccxt not installed — run: pip install ccxt")
                 raise
