@@ -10,7 +10,7 @@ Trading endpoints require `Authorization: Bearer <TRADING_API_KEY>` header.
 |-------|-------------|
 | `/` | Main dashboard |
 | `/trades` | Trade journal |
-| `/monitor` | System monitor |
+| `/health-dashboard` | Server health |
 
 ## Coin Data
 

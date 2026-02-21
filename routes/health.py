@@ -5,7 +5,7 @@ Health, metrics, and debug routes.
 import time
 import logging
 from datetime import datetime
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, render_template
 
 import services.app_state as state
 
@@ -35,6 +35,12 @@ def get_idle_status():
 def health():
     """Simple health check endpoint for load balancers and smoke tests"""
     return jsonify({'status': 'ok', 'time': datetime.now().isoformat()}), 200
+
+
+@health_bp.route('/health-dashboard')
+def health_dashboard():
+    """Server health dashboard page"""
+    return render_template('health.html')
 
 
 @health_bp.route('/api/health')
@@ -73,6 +79,18 @@ def api_health():
     except Exception:
         scan_status = {'scheduler_running': False}
 
+    # System metrics (lightweight — no interval sleep)
+    system_metrics = {}
+    try:
+        import psutil
+        system_metrics = {
+            'cpu_percent': psutil.cpu_percent(interval=0),
+            'memory_percent': psutil.virtual_memory().percent,
+            'disk_percent': psutil.disk_usage('/').percent,
+        }
+    except Exception:
+        pass
+
     return jsonify({
         'status': 'online',
         'timestamp': datetime.now().isoformat(),
@@ -87,6 +105,7 @@ def api_health():
         'cache': {
             'analysis_entries': len(state.agent_analysis_cache),
         },
+        'system': system_metrics,
         'uptime_hours': round((time.time() - state.start_time) / 3600, 2),
     }), 200
 

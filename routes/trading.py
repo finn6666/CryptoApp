@@ -728,12 +728,6 @@ def trades_page():
     return render_template('trades.html')
 
 
-@trading_bp.route('/monitor')
-def monitor_page():
-    """System monitoring dashboard."""
-    return render_template('monitor.html')
-
-
 @trading_bp.route('/api/rl/report-trade', methods=['POST'])
 def report_trade():
     """Report a trade outcome to teach the RL system"""
@@ -869,44 +863,6 @@ def sell_automation_check():
         }), 200
     except Exception as e:
         logger.error(f"Sell automation check failed: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-# ─── Monitoring ───────────────────────────────────────────────
-
-@trading_bp.route('/api/monitoring/stats')
-def monitoring_stats():
-    """Get ML monitoring statistics."""
-    try:
-        from ml.monitoring import ml_monitor
-        hours = request.args.get('hours', 24, type=int)
-        stats = ml_monitor.get_detailed_stats(hours)
-        return jsonify({'success': True, **stats}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@trading_bp.route('/api/monitoring/alerts')
-def monitoring_alerts():
-    """Get active ML monitoring alerts."""
-    try:
-        from ml.monitoring import ml_monitor
-        include_resolved = request.args.get('resolved', 'false').lower() == 'true'
-        alerts = ml_monitor.get_alerts(include_resolved)
-        return jsonify({'success': True, 'alerts': alerts}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@trading_bp.route('/api/monitoring/history')
-def monitoring_history():
-    """Get persistent ML monitoring history."""
-    try:
-        from ml.monitoring import ml_monitor
-        limit = request.args.get('limit', 200, type=int)
-        history = ml_monitor.get_persistent_history(limit)
-        return jsonify({'success': True, 'entries': history}), 200
-    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

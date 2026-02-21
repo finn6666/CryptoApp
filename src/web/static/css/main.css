@@ -2340,6 +2340,73 @@ body::before {
 
 /* ===== END PORTFOLIO ANALYSIS ===== */
 
+/* ===== HEALTH (shared styles used by health.html) ===== */
+
+/* Status dot */
+.health-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+    background: var(--border);
+}
+.health-dot--ok {
+    background: var(--success);
+    box-shadow: 0 0 6px var(--success);
+}
+.health-dot--err {
+    background: var(--error);
+    box-shadow: 0 0 6px var(--error);
+    animation: health-pulse 1.5s infinite;
+}
+@keyframes health-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.health-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.health-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.health-chip--ok {
+    color: var(--success);
+    border-color: rgba(72, 187, 120, 0.3);
+    background: rgba(72, 187, 120, 0.08);
+}
+.health-chip--err {
+    color: var(--error);
+    border-color: rgba(245, 101, 101, 0.3);
+    background: rgba(245, 101, 101, 0.08);
+}
+.health-chip--warn {
+    color: var(--warning);
+    border-color: rgba(237, 137, 54, 0.3);
+    background: rgba(237, 137, 54, 0.08);
+}
+.health-chip--info {
+    color: var(--accent-primary);
+    border-color: rgba(102, 126, 234, 0.25);
+    background: rgba(102, 126, 234, 0.06);
+}
+
+/* ===== END HEALTH ===== */
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 12px; }
 ::-webkit-scrollbar-track { background: var(--primary-bg); }

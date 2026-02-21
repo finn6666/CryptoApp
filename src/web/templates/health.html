@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Health - CryptoApp</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <style>
+        .health-page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .health-page-header h1 {
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .health-page-header p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin-top: 2px;
+        }
+        .health-nav {
+            display: flex;
+            gap: 8px;
+        }
+        .health-nav .btn {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Status banner */
+        .health-banner {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+        .health-banner--ok {
+            background: rgba(72, 187, 120, 0.1);
+            border: 1px solid rgba(72, 187, 120, 0.3);
+            color: var(--success);
+        }
+        .health-banner--err {
+            background: rgba(245, 101, 101, 0.1);
+            border: 1px solid rgba(245, 101, 101, 0.3);
+            color: var(--error);
+        }
+        .health-banner .health-dot {
+            width: 14px;
+            height: 14px;
+        }
+        .health-banner-meta {
+            font-weight: 400;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-left: auto;
+        }
+
+        /* Cards grid */
+        .health-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .health-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 16px var(--shadow);
+            backdrop-filter: blur(10px);
+        }
+        .health-card-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .health-card-title .icon {
+            font-size: 1rem;
+        }
+
+        /* Metrics rows inside cards */
+        .health-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+        .health-metric:last-child { border-bottom: none; }
+        .health-metric-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .health-metric-value {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        /* System resource bars */
+        .resource-bar-wrap {
+            margin-top: 6px;
+        }
+        .resource-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .resource-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s ease;
+        }
+        .resource-bar-fill--ok   { background: var(--success); }
+        .resource-bar-fill--warn { background: var(--warning); }
+        .resource-bar-fill--err  { background: var(--error); }
+
+        .resource-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        /* Polling indicator */
+        .poll-indicator {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            padding: 12px;
+            opacity: 0.6;
+        }
+
+        @media (max-width: 768px) {
+            .health-cards { grid-template-columns: 1fr; }
+            .health-page-header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="health-page-header">
+                <div>
+                    <h1>🖥️ Server Health</h1>
+                    <p>Live system status — auto-refreshes every 10 seconds</p>
+                </div>
+                <div class="health-nav">
+                    <a href="/" class="btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 600; padding: 8px 18px; border: none; font-size: 14px;">
+                        ← Dashboard
+                    </a>
+                    <a href="/trades" class="btn" style="background: rgba(255,255,255,0.08); color: #fff; font-weight: 500; padding: 8px 18px; border: 1px solid var(--border); font-size: 14px;">
+                        📈 Trades
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Banner -->
+        <div class="health-banner health-banner--ok" id="healthBanner">
+            <span class="health-dot health-dot--ok" id="healthDot"></span>
+            <span id="healthBannerText">Connecting...</span>
+            <span class="health-banner-meta" id="healthBannerMeta"></span>
+        </div>
+
+        <!-- Health Cards -->
+        <div class="health-cards" id="healthCards">
+            <div class="health-card">
+                <div class="loading">Loading health data...</div>
+            </div>
+        </div>
+
+        <div class="poll-indicator" id="pollIndicator">
+            Refreshing every 10 seconds
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/health.js') }}?v=20260221b"></script>
+</body>
+</html>

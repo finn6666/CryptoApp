@@ -12,7 +12,7 @@
 | RL | Q-learning (no PyTorch) |
 | Data | CoinMarketCap API |
 | Frontend | Vanilla HTML/CSS/JS |
-| Deploy | Raspberry Pi, systemd, nginx |
+| Deploy | systemd, nginx |
 
 Monthly cost: ~£2.50 (Gemini ~£2, Pi power ~£0.50).
 
@@ -37,7 +37,6 @@ ml/
   simple_rl.py              # Q-learning
   agent_memory.py           # Short/long-term context
   scheduler.py              # Weekly retrain + reports
-  monitoring.py             # Prediction logging, alerts
 routes/                     # Flask blueprints (coins, health, ml, symbols, trading)
 services/app_state.py       # Global state, caching
 src/core/                   # CoinMarketCap data fetching
