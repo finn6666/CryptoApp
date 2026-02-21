@@ -6,7 +6,7 @@ Auto-records every trade execution, tracks holdings, and calculates P&L.
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 
@@ -56,7 +56,7 @@ class PortfolioTracker:
         Called automatically by the trading engine after execution.
         """
         trade = {
-            "id": f"trade_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{symbol}",
+            "id": f"trade_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{symbol}",
             "symbol": symbol.upper(),
             "side": side.lower(),
             "quantity": quantity,
@@ -68,7 +68,7 @@ class PortfolioTracker:
             "reasoning": reasoning,
             "confidence": confidence,
             "proposal_id": proposal_id,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         self.trade_log.append(trade)
@@ -189,6 +189,101 @@ class PortfolioTracker:
         """Get full trade log, most recent first."""
         return list(reversed(self.trade_log[-limit:]))
 
+    def get_closed_positions(self) -> List[Dict[str, Any]]:
+        """Get all fully sold (closed) positions with outcomes."""
+        closed = []
+        for sym, h in self.holdings.items():
+            if h.get("quantity", 0) > 0:
+                continue
+            closed.append({
+                "symbol": sym,
+                "total_cost_gbp": round(h.get("total_cost_gbp", 0), 4),
+                "realised_pnl_gbp": round(h.get("realised_pnl_gbp", 0), 4),
+                "total_fees_gbp": round(h.get("total_fees_gbp", 0), 4),
+                "trades": h.get("trades", 0),
+                "first_buy_at": h.get("first_buy_at", ""),
+                "closed_at": h.get("closed_at", ""),
+                "exchange": h.get("exchange", ""),
+                "won": h.get("realised_pnl_gbp", 0) > 0,
+            })
+        return sorted(closed, key=lambda x: x.get("closed_at", ""), reverse=True)
+
+    def get_performance_summary(self) -> Dict[str, Any]:
+        """
+        Aggregated performance metrics for tracking app progress.
+        Includes win/loss ratio, average return, best/worst trades.
+        """
+        if not self.trade_log:
+            return {
+                "total_trades": 0,
+                "total_buys": 0,
+                "total_sells": 0,
+                "total_invested_gbp": 0,
+                "total_fees_gbp": 0,
+                "realised_pnl_gbp": 0,
+                "winning_trades": 0,
+                "losing_trades": 0,
+                "win_rate_pct": 0,
+                "avg_trade_gbp": 0,
+                "best_trade": None,
+                "worst_trade": None,
+                "unique_coins_traded": 0,
+                "first_trade_at": None,
+                "last_trade_at": None,
+            }
+
+        buys = [t for t in self.trade_log if t.get("side") == "buy"]
+        sells = [t for t in self.trade_log if t.get("side") == "sell"]
+        sells_with_pnl = [t for t in sells if "realised_pnl_gbp" in t]
+
+        total_invested = sum(t.get("amount_gbp", 0) for t in buys)
+        total_fees = sum(t.get("fee_gbp", 0) for t in self.trade_log)
+        total_realised = sum(
+            h.get("realised_pnl_gbp", 0) for h in self.holdings.values()
+        )
+
+        winning = [t for t in sells_with_pnl if t["realised_pnl_gbp"] > 0]
+        losing = [t for t in sells_with_pnl if t["realised_pnl_gbp"] <= 0]
+        win_rate = (
+            (len(winning) / len(sells_with_pnl) * 100)
+            if sells_with_pnl
+            else 0
+        )
+
+        best = max(sells_with_pnl, key=lambda t: t["realised_pnl_gbp"], default=None)
+        worst = min(sells_with_pnl, key=lambda t: t["realised_pnl_gbp"], default=None)
+
+        coins = {t.get("symbol", "") for t in self.trade_log}
+        timestamps = [t.get("timestamp", "") for t in self.trade_log if t.get("timestamp")]
+
+        return {
+            "total_trades": len(self.trade_log),
+            "total_buys": len(buys),
+            "total_sells": len(sells),
+            "total_invested_gbp": round(total_invested, 4),
+            "total_fees_gbp": round(total_fees, 4),
+            "realised_pnl_gbp": round(total_realised, 4),
+            "winning_trades": len(winning),
+            "losing_trades": len(losing),
+            "win_rate_pct": round(win_rate, 1),
+            "avg_trade_gbp": round(
+                sum(t.get("amount_gbp", 0) for t in self.trade_log) / len(self.trade_log), 4
+            ),
+            "best_trade": {
+                "symbol": best["symbol"],
+                "pnl_gbp": round(best["realised_pnl_gbp"], 4),
+                "timestamp": best.get("timestamp", ""),
+            } if best else None,
+            "worst_trade": {
+                "symbol": worst["symbol"],
+                "pnl_gbp": round(worst["realised_pnl_gbp"], 4),
+                "timestamp": worst.get("timestamp", ""),
+            } if worst else None,
+            "unique_coins_traded": len(coins),
+            "first_trade_at": min(timestamps) if timestamps else None,
+            "last_trade_at": max(timestamps) if timestamps else None,
+        }
+
     # ─── Sell Signal Detection ────────────────────────────────
 
     def check_sell_signals(
@@ -237,7 +332,7 @@ class PortfolioTracker:
         state = {
             "holdings": self.holdings,
             "trade_log": self.trade_log,
-            "last_updated": datetime.utcnow().isoformat(),
+            "last_updated": datetime.now(timezone.utc).isoformat(),
         }
         try:
             with open(PORTFOLIO_FILE, "w") as f:

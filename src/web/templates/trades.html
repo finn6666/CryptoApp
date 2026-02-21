@@ -430,17 +430,91 @@
                 </div>
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
                     <div style="font-size: 20px; font-weight: 700;" id="portfolioPnl">£0.00</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Total P&L</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Unrealised P&L</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700;" id="portfolioRealisedPnl">£0.00</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Realised P&L</div>
                 </div>
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
                     <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="portfolioCount">0</div>
                     <div style="font-size: 12px; color: var(--text-secondary);">Holdings</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="portfolioTotalTrades">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Total Trades</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="portfolioFees">£0.00</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Fees Paid</div>
                 </div>
             </div>
             <div id="holdingsList">
                 <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
                     No holdings yet. The portfolio tracker records every executed trade automatically.
                 </p>
+            </div>
+        </div>
+
+        <!-- Performance Summary Section -->
+        <div class="section-card">
+            <h2 class="section-header">📊 Performance Summary</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700;" id="perfWinRate">0%</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Win Rate</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: #48bb78;" id="perfWins">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Winning Sells</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: #fc8181;" id="perfLosses">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Losing Sells</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="perfAvgTrade">£0.00</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Avg Trade Size</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="perfCoins">0</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Coins Traded</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="perfInvested">£0.00</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">Total Invested</div>
+                </div>
+            </div>
+            <div id="perfBestWorst" style="display: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                <div style="background: rgba(72,187,120,0.08); border: 1px solid rgba(72,187,120,0.3); border-radius: 8px; padding: 14px;">
+                    <div style="font-size: 12px; color: #48bb78; font-weight: 600; margin-bottom: 4px;">Best Trade</div>
+                    <div id="perfBest" style="font-size: 14px; color: var(--text-primary);">—</div>
+                </div>
+                <div style="background: rgba(252,129,129,0.08); border: 1px solid rgba(252,129,129,0.3); border-radius: 8px; padding: 14px;">
+                    <div style="font-size: 12px; color: #fc8181; font-weight: 600; margin-bottom: 4px;">Worst Trade</div>
+                    <div id="perfWorst" style="font-size: 14px; color: var(--text-primary);">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Closed Positions Section -->
+        <div class="section-card">
+            <h2 class="section-header">🏁 Closed Positions</h2>
+            <div id="closedPositions">
+                <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No closed positions yet.</p>
+            </div>
+        </div>
+
+        <!-- Trade Log Section -->
+        <div class="section-card">
+            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                📜 Trade Log
+                <button onclick="loadTradeLog()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+                    🔄 Refresh
+                </button>
+            </h2>
+            <div id="tradeLog" style="max-height: 400px; overflow-y: auto;">
+                <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trades recorded yet.</p>
             </div>
         </div>
 
@@ -517,6 +591,9 @@
             loadExecutedTrades();
             loadScanStatus();
             loadPortfolio();
+            loadPerformance();
+            loadClosedPositions();
+            loadTradeLog();
             loadActivityLog();
             // Refresh live data periodically
             setInterval(loadPendingProposals, 30000);
@@ -775,11 +852,18 @@
                 // Summary cards
                 document.getElementById('portfolioValue').textContent = `£${(summary.total_value_gbp || 0).toFixed(4)}`;
                 document.getElementById('portfolioCount').textContent = summary.active_holdings || 0;
+                document.getElementById('portfolioTotalTrades').textContent = summary.total_trades || 0;
+                document.getElementById('portfolioFees').textContent = `£${(summary.total_fees_gbp || 0).toFixed(4)}`;
 
                 const pnlEl = document.getElementById('portfolioPnl');
-                const totalPnl = summary.total_pnl_gbp || 0;
-                pnlEl.textContent = `${totalPnl >= 0 ? '+' : ''}£${totalPnl.toFixed(4)}`;
-                pnlEl.style.color = totalPnl >= 0 ? 'var(--success)' : 'var(--error)';
+                const unrealisedPnl = summary.unrealised_pnl_gbp || 0;
+                pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : ''}£${unrealisedPnl.toFixed(4)}`;
+                pnlEl.style.color = unrealisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
+
+                const realisedEl = document.getElementById('portfolioRealisedPnl');
+                const realisedPnl = summary.realised_pnl_gbp || 0;
+                realisedEl.textContent = `${realisedPnl >= 0 ? '+' : ''}£${realisedPnl.toFixed(4)}`;
+                realisedEl.style.color = realisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
 
                 // Holdings list
                 const container = document.getElementById('holdingsList');
@@ -811,6 +895,121 @@
                 }
             } catch (e) {
                 console.error('Error loading portfolio:', e);
+            }
+        }
+
+        // ─── Performance Summary ─────────────────────────────
+
+        async function loadPerformance() {
+            try {
+                const response = await fetch('/api/portfolio/performance');
+                const data = await response.json();
+
+                document.getElementById('perfWinRate').textContent = `${data.win_rate_pct || 0}%`;
+                document.getElementById('perfWinRate').style.color = (data.win_rate_pct || 0) >= 50 ? '#48bb78' : '#fc8181';
+                document.getElementById('perfWins').textContent = data.winning_trades || 0;
+                document.getElementById('perfLosses').textContent = data.losing_trades || 0;
+                document.getElementById('perfAvgTrade').textContent = `£${(data.avg_trade_gbp || 0).toFixed(4)}`;
+                document.getElementById('perfCoins').textContent = data.unique_coins_traded || 0;
+                document.getElementById('perfInvested').textContent = `£${(data.total_invested_gbp || 0).toFixed(4)}`;
+
+                const bestWorstEl = document.getElementById('perfBestWorst');
+                if (data.best_trade || data.worst_trade) {
+                    bestWorstEl.style.display = 'grid';
+                    document.getElementById('perfBest').textContent = data.best_trade
+                        ? `${data.best_trade.symbol} +£${data.best_trade.pnl_gbp.toFixed(4)}`
+                        : '—';
+                    document.getElementById('perfWorst').textContent = data.worst_trade
+                        ? `${data.worst_trade.symbol} £${data.worst_trade.pnl_gbp.toFixed(4)}`
+                        : '—';
+                } else {
+                    bestWorstEl.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('Error loading performance:', e);
+            }
+        }
+
+        // ─── Closed Positions ────────────────────────────────
+
+        async function loadClosedPositions() {
+            try {
+                const response = await fetch('/api/portfolio/closed');
+                const data = await response.json();
+                const positions = data.positions || [];
+                const container = document.getElementById('closedPositions');
+
+                if (positions.length > 0) {
+                    container.innerHTML = positions.map(p => {
+                        const won = p.won;
+                        const pnlColor = won ? '#48bb78' : '#fc8181';
+                        const icon = won ? '✅' : '❌';
+                        const closedDate = p.closed_at ? new Date(p.closed_at).toLocaleDateString() : '—';
+                        return `
+                            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${pnlColor}; border-radius: 8px; padding: 14px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span style="font-weight: 700; font-size: 15px;">${icon} ${p.symbol}</span>
+                                        <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${p.trades} trades</span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-weight: 700; color: ${pnlColor}; font-size: 14px;">${p.realised_pnl_gbp >= 0 ? '+' : ''}£${p.realised_pnl_gbp.toFixed(4)}</div>
+                                        <div style="font-size: 11px; color: var(--text-secondary);">Cost: £${p.total_cost_gbp.toFixed(4)} • Fees: £${p.total_fees_gbp.toFixed(4)}</div>
+                                    </div>
+                                </div>
+                                <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">
+                                    Exchange: ${p.exchange || '—'} • Closed: ${closedDate}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No closed positions yet.</p>';
+                }
+            } catch (e) {
+                console.error('Error loading closed positions:', e);
+            }
+        }
+
+        // ─── Trade Log ───────────────────────────────────────
+
+        async function loadTradeLog() {
+            try {
+                const response = await fetch('/api/portfolio/history?limit=100');
+                const data = await response.json();
+                const trades = data.trades || [];
+                const container = document.getElementById('tradeLog');
+
+                if (trades.length > 0) {
+                    container.innerHTML = trades.map(t => {
+                        const isBuy = t.side === 'buy';
+                        const sideColor = isBuy ? '#48bb78' : '#fc8181';
+                        const sideIcon = isBuy ? '🟢' : '🔴';
+                        const time = new Date(t.timestamp).toLocaleString();
+                        const pnlStr = t.realised_pnl_gbp !== undefined
+                            ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(4)}`
+                            : '';
+                        return `
+                            <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
+                                <span>${sideIcon}</span>
+                                <div style="flex: 1;">
+                                    <span style="font-weight: 700;">${t.symbol}</span>
+                                    <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${t.side.toUpperCase()}</span>
+                                    <span style="color: var(--text-secondary);"> ${(t.quantity || 0).toFixed(6)} @ £${(t.price || 0).toFixed(6)}</span>
+                                    <div style="color: var(--text-secondary); font-size: 11px; margin-top: 3px;">
+                                        £${(t.amount_gbp || 0).toFixed(4)} • ${t.exchange || '—'} • Fee: £${(t.fee_gbp || 0).toFixed(4)}${pnlStr}
+                                    </div>
+                                    ${t.reasoning ? `<div style="color: var(--text-secondary); font-size: 11px; margin-top: 2px; font-style: italic;">"${t.reasoning.substring(0, 100)}${t.reasoning.length > 100 ? '…' : ''}"</div>` : ''}
+                                </div>
+                                <span style="color: var(--text-secondary); font-size: 11px; white-space: nowrap;">${time}</span>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trades recorded yet.</p>';
+                }
+            } catch (e) {
+                console.error('Error loading trade log:', e);
             }
         }
 

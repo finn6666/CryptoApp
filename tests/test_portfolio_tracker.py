@@ -146,3 +146,73 @@ class TestPortfolioTracker:
             tracker2 = PortfolioTracker()
         assert "TEST" in tracker2.holdings
         assert len(tracker2.trade_log) == 1
+
+    def test_get_closed_positions_empty(self, tracker):
+        assert tracker.get_closed_positions() == []
+
+    def test_get_closed_positions_after_full_sell(self, tracker):
+        tracker.record_trade(
+            symbol="TEST", side="buy", quantity=100,
+            price=0.05, amount_gbp=5.0, fee_gbp=0.01,
+        )
+        tracker.record_trade(
+            symbol="TEST", side="sell", quantity=100,
+            price=0.10, amount_gbp=10.0, fee_gbp=0.02,
+        )
+        closed = tracker.get_closed_positions()
+        assert len(closed) == 1
+        assert closed[0]["symbol"] == "TEST"
+        assert closed[0]["won"] is True
+        assert closed[0]["total_fees_gbp"] == 0.03
+        assert "closed_at" in closed[0]
+
+    def test_get_closed_positions_excludes_open(self, tracker):
+        tracker.record_trade(
+            symbol="TEST", side="buy", quantity=100,
+            price=0.05, amount_gbp=5.0,
+        )
+        closed = tracker.get_closed_positions()
+        assert len(closed) == 0
+
+    def test_performance_summary_empty(self, tracker):
+        perf = tracker.get_performance_summary()
+        assert perf["total_trades"] == 0
+        assert perf["win_rate_pct"] == 0
+        assert perf["best_trade"] is None
+
+    def test_performance_summary_with_trades(self, tracker):
+        # Buy and sell at profit
+        tracker.record_trade(
+            symbol="TEST", side="buy", quantity=100,
+            price=0.05, amount_gbp=5.0, fee_gbp=0.01,
+        )
+        tracker.record_trade(
+            symbol="TEST", side="sell", quantity=100,
+            price=0.10, amount_gbp=10.0, fee_gbp=0.02,
+        )
+        perf = tracker.get_performance_summary()
+        assert perf["total_trades"] == 2
+        assert perf["total_buys"] == 1
+        assert perf["total_sells"] == 1
+        assert perf["winning_trades"] == 1
+        assert perf["losing_trades"] == 0
+        assert perf["win_rate_pct"] == 100.0
+        assert perf["unique_coins_traded"] == 1
+        assert perf["best_trade"] is not None
+        assert perf["best_trade"]["symbol"] == "TEST"
+        assert perf["total_fees_gbp"] == 0.03
+
+    def test_performance_summary_losing_trade(self, tracker):
+        tracker.record_trade(
+            symbol="TEST", side="buy", quantity=100,
+            price=0.10, amount_gbp=10.0,
+        )
+        tracker.record_trade(
+            symbol="TEST", side="sell", quantity=100,
+            price=0.05, amount_gbp=5.0,
+        )
+        perf = tracker.get_performance_summary()
+        assert perf["winning_trades"] == 0
+        assert perf["losing_trades"] == 1
+        assert perf["win_rate_pct"] == 0
+        assert perf["worst_trade"]["symbol"] == "TEST"

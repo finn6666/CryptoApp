@@ -35,18 +35,12 @@ uv run gunicorn -c gunicorn.conf.py wsgi:app
 
 ## 2. Systemd Service
 
-Copy the service file:
+The service file defaults to `User=pi` and `/home/pi/CryptoApp`. If your username or path differs, edit the file after copying:
 
 ```bash
 sudo cp ~/CryptoApp/deploy/cryptoapp.service /etc/systemd/system/
-```
-
-Edit it with your username and path:
-
-```bash
-sudo nano /etc/systemd/system/cryptoapp.service
-# Replace YOUR_USERNAME with your Pi username
-# Replace /path/to/CryptoApp with your actual path (e.g. /home/pi/CryptoApp)
+# Only needed if not using default pi user:
+# sudo nano /etc/systemd/system/cryptoapp.service
 ```
 
 Enable and start:
@@ -60,24 +54,12 @@ sudo systemctl status cryptoapp
 
 ## 3. Nginx Reverse Proxy
 
-Copy the nginx config:
+The nginx config accepts any hostname by default (`server_name _`):
 
 ```bash
 sudo cp ~/CryptoApp/deploy/nginx-cryptoapp.conf /etc/nginx/sites-available/cryptoapp
 sudo ln -s /etc/nginx/sites-available/cryptoapp /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-```
-
-Edit the server name:
-
-```bash
-sudo nano /etc/nginx/sites-available/cryptoapp
-# Replace YOUR_DOMAIN_OR_IP with your Pi's LAN IP (e.g. 192.168.1.100)
-```
-
-Test and reload:
-
-```bash
 sudo nginx -t && sudo systemctl restart nginx
 ```
 
@@ -85,10 +67,10 @@ Now access via `http://<PI_IP>` (port 80).
 
 ## 4. Set TRADE_SERVER_URL
 
-Update `.env` so email approval links point to the Pi:
+Update `.env` so email approval links point to the Pi (use port 80 since nginx fronts gunicorn):
 
 ```bash
-TRADE_SERVER_URL=http://<PI_IP>:5001
+TRADE_SERVER_URL=http://<PI_IP>
 ```
 
 Then restart: `sudo systemctl restart cryptoapp`
@@ -99,7 +81,6 @@ Then restart: `sudo systemctl restart cryptoapp`
 sudo apt install -y ufw
 sudo ufw allow 22
 sudo ufw allow 80
-sudo ufw allow 5001
 sudo ufw enable
 ```
 
@@ -132,24 +113,22 @@ df -h                                  # Disk
 
 - **Swap**: Set `CONF_SWAPSIZE=2048` in `/etc/dphys-swapfile`, then `sudo systemctl restart dphys-swapfile`
 - **Disable bluetooth**: `sudo systemctl disable bluetooth`
-- **Never hard-power-off** — always `sudo shutdown -h now` to avoid SD corruption
+- **Never hard-power-off** - always `sudo shutdown -h now` to avoid SD corruption
 
 ## Backups
 
 ```bash
 mkdir -p ~/backups
 cp ~/CryptoApp/.env ~/backups/
-cp ~/CryptoApp/models/rl_simple_learner.json ~/backups/
-cp ~/CryptoApp/data/favorites.json ~/backups/
-cp ~/CryptoApp/data/portfolio.json ~/backups/
+cp ~/CryptoApp/data/portfolio.json ~/backups/ 2>/dev/null
 ```
 
-## SSL (Later)
+## SSL (Optional)
 
-When you have a domain, use the SSL setup script:
+The included `deploy/setup-ssl-rhel.sh` is for RHEL/Fedora servers. On Raspberry Pi OS (Debian), install certbot manually:
 
 ```bash
-sudo ./deploy/setup-ssl-rhel.sh yourdomain.com your@email.com
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com -m your@email.com --agree-tos
+# Auto-renewal is configured automatically
 ```
-
-This installs certbot, gets a Let's Encrypt cert, configures nginx HTTPS, and sets up auto-renewal.

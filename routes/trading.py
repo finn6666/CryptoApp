@@ -563,6 +563,30 @@ def portfolio_sell_signals():
         return jsonify({"error": "Failed to check sell signals"}), 500
 
 
+@trading_bp.route('/api/portfolio/performance')
+def portfolio_performance():
+    """Aggregated performance metrics — win rate, average return, best/worst trades."""
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+        return jsonify(tracker.get_performance_summary()), 200
+    except Exception as e:
+        logger.error(f"Portfolio performance error: {e}")
+        return jsonify({"error": "Failed to get performance summary"}), 500
+
+
+@trading_bp.route('/api/portfolio/closed')
+def portfolio_closed():
+    """Get all fully-sold (closed) positions with outcomes."""
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+        return jsonify({"positions": tracker.get_closed_positions()}), 200
+    except Exception as e:
+        logger.error(f"Portfolio closed positions error: {e}")
+        return jsonify({"error": "Failed to get closed positions"}), 500
+
+
 # ========================================
 # RL Outcome Feedback for Live Trades
 # ========================================

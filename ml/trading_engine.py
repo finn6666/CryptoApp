@@ -109,6 +109,13 @@ class TradingEngine:
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
+        # Sell-side control: require manual approval for sells (cannot be bypassed)
+        self.sell_require_approval = os.getenv(
+            "SELL_REQUIRE_APPROVAL", "true"
+        ).lower() in ("1", "true", "yes")
+        if self.sell_require_approval:
+            logger.info("🔒 Sell-side: manual approval REQUIRED — sells will never auto-execute")
+
         # Exchange (lazy init — prefers ExchangeManager for multi-exchange)
         self._exchange = None
 
@@ -507,27 +514,38 @@ class TradingEngine:
         approve_url = f"{self.server_url}/api/trades/confirm/{approve_token}"
         reject_url = f"{self.server_url}/api/trades/confirm/{reject_token}"
 
-        subject = f"🔔 Trade Proposal: {proposal.side.upper()} {proposal.symbol} — £{proposal.amount_gbp:.4f}"
+        subject = f"{'[SELL]' if proposal.side == 'sell' else '[Trade]'} Proposal: {proposal.side.upper()} {proposal.symbol} - GBP {proposal.amount_gbp:.4f}"
+
+        is_sell = proposal.side == "sell"
+        header_gradient = "linear-gradient(90deg, #e53e3e, #c53030)" if is_sell else "linear-gradient(90deg, #667eea, #764ba2)"
+        sell_warning = ""
+        if is_sell:
+            sell_warning = """
+                    <div style="background: rgba(229,62,62,0.15); border: 1px solid rgba(229,62,62,0.4); border-radius: 8px; padding: 12px; margin: 12px 0; font-size: 13px; color: #fc8181;">
+                        &#9888;&#65039; <strong>SELL order</strong> &#8212; This will liquidate your position. Review carefully before approving.
+                    </div>"""
 
         body = f"""
         <html>
+        <head><meta charset="utf-8"></head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
-                <div style="background: linear-gradient(90deg, #667eea, #764ba2); padding: 16px 20px;">
+                <div style="background: {header_gradient}; padding: 16px 20px;">
                     <h2 style="margin: 0; color: white; font-size: 18px;">
-                        {'🟢' if proposal.side == 'buy' else '🔴'} {proposal.side.upper()} {proposal.symbol}
+                        {'&#x1F7E2;' if proposal.side == 'buy' else '&#x1F534;'} {proposal.side.upper()} {proposal.symbol}
                     </h2>
                 </div>
                 
                 <div style="padding: 20px;">
+                    {sell_warning}
                     <table style="width: 100%; border-collapse: collapse;">
                         <tr>
                             <td style="padding: 8px 0; color: #a0aec0;">Amount</td>
-                            <td style="padding: 8px 0; text-align: right; font-weight: 700;">£{proposal.amount_gbp:.4f}</td>
+                            <td style="padding: 8px 0; text-align: right; font-weight: 700;">&#163;{proposal.amount_gbp:.4f}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px 0; color: #a0aec0;">Price</td>
-                            <td style="padding: 8px 0; text-align: right;">£{proposal.price_at_proposal:.6f}</td>
+                            <td style="padding: 8px 0; text-align: right;">&#163;{proposal.price_at_proposal:.6f}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px 0; color: #a0aec0;">Confidence</td>
@@ -545,16 +563,16 @@ class TradingEngine:
                     </div>
                     
                     <div style="font-size: 11px; color: #a0aec0; margin-bottom: 16px;">
-                        Daily budget remaining: £{self.get_remaining_budget():.4f} / £{self.daily_budget_gbp:.4f}<br>
+                        Daily budget remaining: &#163;{self.get_remaining_budget():.4f} / &#163;{self.daily_budget_gbp:.4f}<br>
                         Expires in 1 hour. Proposal ID: {proposal.id}
                     </div>
                     
                     <div style="display: flex; gap: 12px;">
                         <a href="{approve_url}" style="flex: 1; display: block; text-align: center; padding: 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
-                            ✅ APPROVE
+                            APPROVE
                         </a>
                         <a href="{reject_url}" style="flex: 1; display: block; text-align: center; padding: 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; text-decoration: none; border-radius: 8px; font-weight: 700; font-size: 15px;">
-                            ❌ REJECT
+                            REJECT
                         </a>
                     </div>
                 </div>
@@ -570,23 +588,22 @@ class TradingEngine:
         if not self.smtp_user or not self.smtp_password:
             return False
 
-        subject = f"✅ Trade Executed: {proposal.side.upper()} {proposal.symbol} — £{proposal.amount_gbp:.4f}"
+        subject = f"Trade Executed: {proposal.side.upper()} {proposal.symbol} - GBP {proposal.amount_gbp:.4f}"
 
         body = f"""
-        <html>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+        <html>        <head><meta charset="utf-8"></head>        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; padding: 20px;">
-                <h2 style="color: #48bb78; margin-top: 0;">✅ Trade Executed</h2>
+                <h2 style="color: #48bb78; margin-top: 0;">Trade Executed</h2>
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{proposal.symbol}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">£{proposal.amount_gbp:.4f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{proposal.quantity:.8f}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">£{proposal.execution_price:.6f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{proposal.execution_price:.6f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Order ID</td><td style="text-align: right; font-size: 11px;">{proposal.order_id}</td></tr>
                 </table>
                 <div style="margin-top: 16px; font-size: 12px; color: #a0aec0;">
-                    Remaining daily budget: £{self.get_remaining_budget():.4f}
+                    Remaining daily budget: &#163;{self.get_remaining_budget():.4f}
                 </div>
             </div>
         </body>
@@ -602,7 +619,7 @@ class TradingEngine:
             msg["Subject"] = subject
             msg["From"] = self.smtp_user
             msg["To"] = self.email_to
-            msg.attach(MIMEText(html_body, "html"))
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
 
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 server.starttls()
