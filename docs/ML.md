@@ -2,15 +2,15 @@
 
 ## Multi-Agent System (Google ADK + Gemini)
 
-Five agents coordinated by an orchestrator (`gemini-3-flash-preview`):
+Five agents coordinated by an orchestrator (`gemini-3.0-flash`):
 
 | Agent | Model | Weight | Role |
 |-------|-------|--------|------|
-| Research | gemini-2.5-flash | 40% | Fundamentals, team, roadmap |
-| Technical | gemini-2.5-flash | 40% | Charts, indicators, S/R |
-| Risk | gemini-2.5-flash | 20% | Position sizing, exits |
-| Sentiment | gemini-2.5-flash | Integrated | Social sentiment, FUD/FOMO |
-| Trading | gemini-2.5-flash | Decision | Final buy/sell (conviction ≥75%) |
+| Research | gemini-3-flash-preview | 40% | Fundamentals, team, roadmap |
+| Technical | gemini-3-flash-preview | 40% | Charts, indicators, S/R |
+| Risk | gemini-3-flash-preview | 20% | Position sizing, exits |
+| Sentiment | gemini-3-flash-preview | Integrated | Social sentiment, FUD/FOMO |
+| Trading | gemini-3-flash-preview | Decision | Final buy/sell (conviction ≥75%) |
 
 Agents run in parallel (max 3 concurrent). Scores combined via weighted voting.
 

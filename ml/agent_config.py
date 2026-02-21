@@ -21,7 +21,7 @@ class ModelConfig:
     
     # Google Gemini Config
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
-    GEMINI_MODEL = "gemini-2.5-flash"  # Fast and cost-effective
+    GEMINI_MODEL = "gemini-3-flash-preview"  # Fast and cost-effective
     GEMINI_PRO_MODEL = "gemini-2.5-pro"  # For complex tasks
     
     # Temperature settings

@@ -101,7 +101,7 @@ def check_gemini_quota():
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         try:
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai.GenerativeModel('gemini-3-flash-preview')
             response = model.generate_content("Say 'OK'")
             return jsonify({'status': 'SUCCESS', 'message': '✅ Gemini API is working!', 'test_response': response.text})
         except Exception as e:
