@@ -188,6 +188,91 @@ body::before {
     box-shadow: none;
 }
 
+/* ===== OVERVIEW CARDS ===== */
+.overview-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.overview-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 4px 16px var(--shadow);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.overview-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    border-color: var(--accent-primary);
+}
+
+.overview-card-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(102, 126, 234, 0.08);
+    border-radius: 10px;
+}
+
+.overview-card-body {
+    min-width: 0;
+    flex: 1;
+}
+
+.overview-card-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.overview-card-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.overview-card-sub {
+    font-size: 0.72rem;
+    margin-top: 3px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.overview-card-sub.positive { color: var(--success); }
+.overview-card-sub.negative { color: var(--error); }
+.overview-card-sub.neutral  { color: var(--text-secondary); }
+
+@media (max-width: 1024px) {
+    .overview-cards { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+    .overview-cards { grid-template-columns: 1fr; }
+    .overview-card { padding: 12px 14px; }
+    .overview-card-value { font-size: 1.1rem; }
+}
+
 /* ===== CARDS & CONTAINERS ===== */
 .dashboard-card,
 .coins-container,

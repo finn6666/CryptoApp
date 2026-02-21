@@ -9,8 +9,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('CryptoApp Dashboard initializing...');
     
     try {
-        // Load favorites and market conditions
+        // Load overview cards, favorites and market conditions
         await Promise.all([
+            loadOverviewCards(),
             loadFavorites(false),
             loadMarketConditions()
         ]);

@@ -196,6 +196,7 @@ async function trainMLModel() {
 
 async function refreshData() {
     await Promise.all([
+        loadOverviewCards(),
         loadFavorites(false),
         loadMarketConditions()
     ]);

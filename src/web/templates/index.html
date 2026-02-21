@@ -49,6 +49,46 @@
         </div>
 
         <div class="dashboard-grid">
+            <!-- Overview Cards -->
+            <div class="overview-cards" id="overviewCards">
+                <!-- Portfolio Summary -->
+                <div class="overview-card" id="cardPortfolio">
+                    <div class="overview-card-icon">💰</div>
+                    <div class="overview-card-body">
+                        <div class="overview-card-title">Portfolio</div>
+                        <div class="overview-card-value" id="portfolioValue">—</div>
+                        <div class="overview-card-sub" id="portfolioPnL">Loading...</div>
+                    </div>
+                </div>
+                <!-- Trading Engine -->
+                <div class="overview-card" id="cardTrading">
+                    <div class="overview-card-icon">⚙️</div>
+                    <div class="overview-card-body">
+                        <div class="overview-card-title">Trading Engine</div>
+                        <div class="overview-card-value" id="tradingBudget">—</div>
+                        <div class="overview-card-sub" id="tradingSub">Loading...</div>
+                    </div>
+                </div>
+                <!-- Scan Loop -->
+                <div class="overview-card" id="cardScan">
+                    <div class="overview-card-icon">🔍</div>
+                    <div class="overview-card-body">
+                        <div class="overview-card-title">Scanner</div>
+                        <div class="overview-card-value" id="scanStatus">—</div>
+                        <div class="overview-card-sub" id="scanSub">Loading...</div>
+                    </div>
+                </div>
+                <!-- Exchange Status -->
+                <div class="overview-card" id="cardExchange">
+                    <div class="overview-card-icon">🏦</div>
+                    <div class="overview-card-body">
+                        <div class="overview-card-title">Exchanges</div>
+                        <div class="overview-card-value" id="exchangeStatus">—</div>
+                        <div class="overview-card-sub" id="exchangeSub">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Portfolio Analysis Container (PHASE 5) -->
             <div class="portfolio-container" id="portfolioContainer" style="display: none;">
                 <div class="coins-header">
@@ -103,6 +143,7 @@
     <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260204c"></script>
     <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260204c"></script>
     <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260222a"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}?v=20260204c"></script>
 </body>
 </html>
