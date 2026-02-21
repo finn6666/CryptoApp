@@ -489,11 +489,6 @@ def get_tools_for_agent(agent_type: str) -> List:
             generate_exit_strategy,
             get_market_data,
         ],
-        'deepseek_sentiment': [
-            analyze_social_sentiment,
-            detect_fud_fomo,
-            get_market_data,
-        ]
     }
     
     return tool_mapping.get(agent_type, [get_market_data])

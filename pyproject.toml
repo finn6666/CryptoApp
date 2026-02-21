@@ -16,6 +16,7 @@ dependencies = [
     "joblib>=1.5.2",
     "onnx>=1.19.1",
     "skl2onnx>=1.19.1",
+    "onnxruntime>=1.18.0",
     "scipy>=1.13.1",
     "aiohttp>=3.13.2",
     "gunicorn>=21.2",

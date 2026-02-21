@@ -44,11 +44,12 @@ class PortfolioTracker:
         quantity: float,
         price: float,
         amount_gbp: float,
-        exchange: str = "coinbase",
+        exchange: str = "kraken",
         order_id: str = "",
         reasoning: str = "",
         confidence: int = 0,
         proposal_id: str = "",
+        fee_gbp: float = 0.0,
     ) -> Dict[str, Any]:
         """
         Record a trade execution and update holdings.
@@ -61,6 +62,7 @@ class PortfolioTracker:
             "quantity": quantity,
             "price": price,
             "amount_gbp": amount_gbp,
+            "fee_gbp": fee_gbp,
             "exchange": exchange,
             "order_id": order_id,
             "reasoning": reasoning,
@@ -85,6 +87,7 @@ class PortfolioTracker:
                 h["last_buy_price"] = price
                 h["last_buy_at"] = trade["timestamp"]
                 h["trades"] += 1
+                h["total_fees_gbp"] = h.get("total_fees_gbp", 0) + fee_gbp
             else:
                 self.holdings[sym] = {
                     "symbol": sym,
@@ -96,14 +99,18 @@ class PortfolioTracker:
                     "last_buy_price": price,
                     "exchange": exchange,
                     "trades": 1,
+                    "total_fees_gbp": fee_gbp,
                 }
         elif side.lower() == "sell":
             if sym in self.holdings:
                 h = self.holdings[sym]
                 h["quantity"] -= quantity
                 realised_pnl = (price - h["avg_entry_price"]) * quantity
+                # Deduct fees from realised P&L for accurate accounting
+                realised_pnl -= fee_gbp
                 h.setdefault("realised_pnl_gbp", 0)
                 h["realised_pnl_gbp"] += realised_pnl
+                h["total_fees_gbp"] = h.get("total_fees_gbp", 0) + fee_gbp
                 h["last_sell_at"] = trade["timestamp"]
                 h["last_sell_price"] = price
                 trade["realised_pnl_gbp"] = realised_pnl
@@ -163,12 +170,17 @@ class PortfolioTracker:
             h.get("realised_pnl_gbp", 0) for h in self.holdings.values()
         )
 
+        total_fees = sum(
+            h.get("total_fees_gbp", 0) for h in self.holdings.values()
+        )
+
         return {
             "total_cost_gbp": round(total_cost, 4),
             "total_value_gbp": round(total_value, 4),
             "unrealised_pnl_gbp": round(total_unrealised, 4),
             "realised_pnl_gbp": round(total_realised, 4),
             "total_pnl_gbp": round(total_unrealised + total_realised, 4),
+            "total_fees_gbp": round(total_fees, 4),
             "active_holdings": len(holdings),
             "total_trades": len(self.trade_log),
         }

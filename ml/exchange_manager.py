@@ -1,7 +1,7 @@
 """
-Multi-Exchange Manager
-Manages multiple exchange connections (Coinbase + Kraken) with pair caching,
-tradeable coin filtering, and priority-based order routing.
+Exchange Manager
+Manages the Kraken exchange connection with pair caching,
+tradeable coin filtering, and order routing.
 """
 
 import os
@@ -35,9 +35,10 @@ class ExchangeManager:
         self._exchanges: Dict[str, Any] = {}
         self._pairs: Dict[str, set] = {}  # exchange_id → set of "BASE/QUOTE" pairs
         self._coin_exchange_map: Dict[str, List[str]] = {}  # symbol → [exchange_ids]
+        self._fx_cache: Dict[str, float] = {}  # FX rate cache (per session)
 
         # Exchange priority from env (comma-separated)
-        priority_str = os.getenv("EXCHANGE_PRIORITY", "coinbase,kraken")
+        priority_str = os.getenv("EXCHANGE_PRIORITY", "kraken")
         self.exchange_priority: List[str] = [
             e.strip().lower() for e in priority_str.split(",") if e.strip()
         ]
@@ -90,12 +91,7 @@ class ExchangeManager:
 
     def _get_exchange_config(self, exchange_id: str) -> Optional[Dict[str, str]]:
         """Get API credentials for an exchange from env vars."""
-        if exchange_id == "coinbase":
-            key = os.getenv("COINBASE_API_KEY", "")
-            secret = os.getenv("COINBASE_API_SECRET", "")
-            if key and secret:
-                return {"apiKey": key, "secret": secret}
-        elif exchange_id == "kraken":
+        if exchange_id == "kraken":
             key = os.getenv("KRAKEN_API_KEY", "")
             secret = os.getenv("KRAKEN_PRIVATE_KEY", "")
             if key and secret:
@@ -275,6 +271,8 @@ class ExchangeManager:
     ) -> Dict[str, Any]:
         """
         Execute an order on the best available exchange.
+        Converts GBP to the pair's quote currency when needed.
+        Verifies exchange balance before placing orders.
         Tries exchanges in priority order until one succeeds.
         """
         result = self.find_best_pair(symbol)
@@ -296,12 +294,48 @@ class ExchangeManager:
             # Get current price (with retry)
             ticker = self._fetch_ticker_with_retry(exchange, pair)
             current_price = ticker["last"]
-            quantity = amount_gbp / current_price
+
+            # Convert GBP amount to quote currency if pair isn't GBP-quoted
+            quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
+            fx_rate = 1.0
+            if quote_currency != "GBP":
+                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange)
+                if fx_rate is None:
+                    return {
+                        "success": False,
+                        "error": f"Cannot convert GBP to {quote_currency} — no FX rate available",
+                    }
+
+            # amount in quote currency, then divide by price to get quantity
+            amount_in_quote = amount_gbp * fx_rate
+            quantity = amount_in_quote / current_price
+
+            # Enforce exchange-specific minimum order sizes
+            min_qty = self._get_min_order_quantity(exchange, pair)
+            if quantity < min_qty:
+                return {
+                    "success": False,
+                    "error": (
+                        f"Order quantity {quantity:.8f} below minimum {min_qty:.8f} "
+                        f"for {pair} on {exchange_id}"
+                    ),
+                }
+
+            # Verify exchange balance before placing order
+            balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
+            if not balance_check["ok"]:
+                return {
+                    "success": False,
+                    "error": balance_check["error"],
+                }
 
             # Place market order (with retry)
             order = self._place_order_with_retry(
                 exchange, pair, side, quantity
             )
+
+            # Extract fee from order response
+            fee_gbp = self._extract_fee_gbp(order, fx_rate)
 
             return {
                 "success": True,
@@ -312,6 +346,9 @@ class ExchangeManager:
                 "quantity": order.get("filled", quantity),
                 "price": order.get("average", current_price),
                 "amount_gbp": amount_gbp,
+                "fee_gbp": fee_gbp,
+                "fx_rate": fx_rate,
+                "quote_currency": quote_currency,
             }
         except Exception as e:
             logger.error(f"Order failed on {exchange_id}: {e}")
@@ -350,7 +387,7 @@ class ExchangeManager:
     def _try_order_on_exchange(
         self, exchange_id: str, symbol: str, side: str, amount_gbp: float
     ) -> Dict[str, Any]:
-        """Try to execute an order on a specific exchange."""
+        """Try to execute an order on a specific exchange (with FX conversion)."""
         exchange = self.get_exchange(exchange_id)
         if not exchange:
             return {"success": False, "error": f"Cannot connect to {exchange_id}"}
@@ -361,11 +398,27 @@ class ExchangeManager:
             if pair in pairs:
                 ticker = self._fetch_ticker_with_retry(exchange, pair)
                 current_price = ticker["last"]
-                quantity = amount_gbp / current_price
+
+                # FX conversion
+                fx_rate = 1.0
+                if quote != "GBP":
+                    fx_rate = self._get_fx_rate("GBP", quote, exchange)
+                    if fx_rate is None:
+                        continue  # Skip this quote, try next
+
+                amount_in_quote = amount_gbp * fx_rate
+                quantity = amount_in_quote / current_price
+
+                # Balance check
+                balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
+                if not balance_check["ok"]:
+                    continue
 
                 order = self._place_order_with_retry(
                     exchange, pair, side, quantity
                 )
+
+                fee_gbp = self._extract_fee_gbp(order, fx_rate)
 
                 return {
                     "success": True,
@@ -376,9 +429,157 @@ class ExchangeManager:
                     "quantity": order.get("filled", quantity),
                     "price": order.get("average", current_price),
                     "amount_gbp": amount_gbp,
+                    "fee_gbp": fee_gbp,
+                    "fx_rate": fx_rate,
+                    "quote_currency": quote,
                 }
 
         return {"success": False, "error": f"No pair for {symbol} on {exchange_id}"}
+
+    # ─── FX Conversion ───────────────────────────────────────
+
+    def _get_fx_rate(self, from_currency: str, to_currency: str, exchange) -> Optional[float]:
+        """
+        Get exchange rate from one fiat/stable to another.
+        Uses the exchange's own ticker data (e.g. GBP/USD pair).
+        Falls back to hardcoded approximate rates if no direct pair exists.
+        """
+        if from_currency == to_currency:
+            return 1.0
+
+        cache_key = f"{from_currency}/{to_currency}"
+        if cache_key in self._fx_cache:
+            return self._fx_cache[cache_key]
+
+        # Try direct pair on exchange (e.g. GBP/USD)
+        for direct_pair in [f"{from_currency}/{to_currency}", f"{to_currency}/{from_currency}"]:
+            try:
+                if direct_pair in getattr(exchange, "markets", {}):
+                    ticker = exchange.fetch_ticker(direct_pair)
+                    rate = ticker.get("last", 0)
+                    if rate and rate > 0:
+                        if direct_pair.startswith(from_currency):
+                            self._fx_cache[cache_key] = rate
+                            return rate
+                        else:
+                            self._fx_cache[cache_key] = 1.0 / rate
+                            return 1.0 / rate
+            except Exception:
+                continue
+
+        # Fallback: approximate rates (GBP base)
+        approx_rates = {
+            "GBP/USD": 1.27, "GBP/USDT": 1.27, "GBP/USDC": 1.27,
+            "GBP/EUR": 1.17, "GBP/BTC": 0.000012,
+        }
+        if cache_key in approx_rates:
+            rate = approx_rates[cache_key]
+            self._fx_cache[cache_key] = rate
+            logger.warning(f"Using approximate FX rate: {cache_key} = {rate}")
+            return rate
+
+        # Try inverse
+        inverse_key = f"{to_currency}/{from_currency}"
+        if inverse_key in approx_rates:
+            rate = 1.0 / approx_rates[inverse_key]
+            self._fx_cache[cache_key] = rate
+            logger.warning(f"Using approximate FX rate (inverse): {cache_key} = {rate:.6f}")
+            return rate
+
+        logger.error(f"No FX rate available for {cache_key}")
+        return None
+
+    # ─── Balance Verification ─────────────────────────────────
+
+    def _check_balance(
+        self, exchange, exchange_id: str, side: str, pair: str,
+        quantity: float, amount_in_quote: float,
+    ) -> Dict[str, Any]:
+        """
+        Verify the exchange account has sufficient balance for the order.
+        Returns {"ok": True} or {"ok": False, "error": "..."}.
+        """
+        try:
+            # Timeout-safe balance fetch (Pi has limited bandwidth)
+            balance = exchange.fetch_balance(params={"timeout": 10000})  # 10s
+            base, quote = pair.split("/") if "/" in pair else (pair, "GBP")
+
+            if side == "buy":
+                # Need enough quote currency to cover the order
+                available = balance.get(quote, {}).get("free", 0) or 0
+                if available < amount_in_quote:
+                    msg = (
+                        f"Insufficient {quote} balance on {exchange_id}: "
+                        f"have {available:.4f}, need {amount_in_quote:.4f}"
+                    )
+                    logger.warning(msg)
+                    return {"ok": False, "error": msg}
+            else:
+                # Need enough base currency to sell
+                available = balance.get(base, {}).get("free", 0) or 0
+                if available < quantity:
+                    msg = (
+                        f"Insufficient {base} balance on {exchange_id}: "
+                        f"have {available:.8f}, need {quantity:.8f}"
+                    )
+                    logger.warning(msg)
+                    return {"ok": False, "error": msg}
+
+            return {"ok": True}
+        except Exception as e:
+            # If balance check fails, log but allow the order to proceed
+            # (the exchange will reject if funds are truly insufficient)
+            logger.warning(f"Balance check failed on {exchange_id} (proceeding anyway): {e}")
+            return {"ok": True}
+
+    # ─── Fee Extraction ───────────────────────────────────────
+
+    @staticmethod
+    def _extract_fee_gbp(order: Dict[str, Any], fx_rate: float) -> float:
+        """
+        Extract trading fee from ccxt order response and convert to GBP.
+        ccxt returns fee as {"cost": <float>, "currency": "<CODE>"}.
+        """
+        try:
+            fee_info = order.get("fee") or {}
+            fee_cost = fee_info.get("cost", 0) or 0
+            if fee_cost <= 0:
+                return 0.0
+            # Convert fee to GBP (fee is in quote currency, fx_rate is GBP→quote)
+            if fx_rate > 0:
+                return round(fee_cost / fx_rate, 6)
+            return round(fee_cost, 6)
+        except Exception:
+            return 0.0
+
+    @staticmethod
+    def _get_min_order_quantity(exchange, pair: str) -> float:
+        """Get minimum order quantity for a pair on an exchange."""
+        try:
+            market = exchange.market(pair)
+            limits = market.get("limits", {}).get("amount", {})
+            return limits.get("min", 0) or 0
+        except Exception:
+            return 0
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get connectivity and configuration status for all exchanges."""
+        status = {
+            "priority": self.exchange_priority,
+            "pairs_loaded": self._pairs_loaded,
+            "total_coins": len(self._coin_exchange_map),
+            "exchanges": {},
+        }
+        for eid in self.exchange_priority:
+            has_keys = self._get_exchange_config(eid) is not None
+            connected = eid in self._exchanges
+            pair_count = len(self._pairs.get(eid, set()))
+            status["exchanges"][eid] = {
+                "configured": has_keys,
+                "connected": connected,
+                "pairs": pair_count,
+            }
+        return status
 
 
 # ─── Singleton ────────────────────────────────────────────────

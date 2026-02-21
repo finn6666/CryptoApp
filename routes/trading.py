@@ -362,6 +362,12 @@ def auto_evaluate_trade():
         if not symbol or not current_price:
             return jsonify({"error": "Missing symbol or current_price"}), 400
 
+        # Verify coin is tradeable on Kraken before analysis
+        from ml.exchange_manager import get_exchange_manager
+        exchange_mgr = get_exchange_manager()
+        if not exchange_mgr.is_tradeable(symbol):
+            return jsonify({"error": f"{symbol} is not available on Kraken"}), 400
+
         remaining = engine.get_remaining_budget()
         if remaining <= 0:
             return jsonify({"error": "Daily budget exhausted", "remaining": 0}), 400
@@ -653,11 +659,17 @@ def check_trade_outcomes():
 
 @trading_bp.route('/api/exchanges/status')
 def exchange_status():
-    """Get multi-exchange status and tradeable pair counts."""
+    """Get multi-exchange status, connectivity, and tradeable pair counts."""
     try:
         from ml.exchange_manager import get_exchange_manager
         mgr = get_exchange_manager()
-        return jsonify(mgr.get_tradeable_summary()), 200
+        status = mgr.get_status()
+        summary = mgr.get_tradeable_summary()
+        return jsonify({
+            "success": True,
+            **status,
+            "total_tradeable_coins": summary.get("total_tradeable_coins", 0),
+        }), 200
     except Exception as e:
         logger.error(f"Exchange status error: {e}")
         return jsonify({"error": "Failed to get exchange status"}), 500
@@ -690,6 +702,12 @@ def check_symbol_tradeable(symbol):
 def trades_page():
     """Trade journal page for reporting trades and RL learning"""
     return render_template('trades.html')
+
+
+@trading_bp.route('/monitor')
+def monitor_page():
+    """System monitoring dashboard."""
+    return render_template('monitor.html')
 
 
 @trading_bp.route('/api/rl/report-trade', methods=['POST'])
@@ -785,3 +803,176 @@ def rl_trades():
     except Exception as e:
         logger.error(f"Error getting trades: {e}")
         return jsonify({'success': False, 'error': 'Failed to get trades', 'trades': []}), 500
+
+
+# ─── Sell Automation ──────────────────────────────────────────
+
+@trading_bp.route('/api/trades/sell-automation/status')
+def sell_automation_status():
+    """Get sell automation status and configuration."""
+    try:
+        from ml.sell_automation import get_sell_automation
+        auto = get_sell_automation()
+        return jsonify({'success': True, **auto.get_status()}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/trades/sell-automation/check', methods=['POST'])
+@require_trading_auth
+def sell_automation_check():
+    """Manually trigger a sell-side check on all holdings."""
+    try:
+        from ml.sell_automation import get_sell_automation
+        import services.app_state as state
+
+        auto = get_sell_automation()
+
+        # Build live prices
+        live_prices = {}
+        if state.analyzer and state.analyzer.coins:
+            for coin in state.analyzer.coins:
+                live_prices[coin.symbol.upper()] = getattr(coin, 'price', 0)
+
+        if not live_prices:
+            return jsonify({'success': False, 'error': 'No live price data available'}), 400
+
+        proposals = auto.check_and_propose_sells(live_prices, force_agent_recheck=True)
+        return jsonify({
+            'success': True,
+            'sell_proposals': len(proposals),
+            'details': proposals,
+        }), 200
+    except Exception as e:
+        logger.error(f"Sell automation check failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ─── Monitoring ───────────────────────────────────────────────
+
+@trading_bp.route('/api/monitoring/stats')
+def monitoring_stats():
+    """Get ML monitoring statistics."""
+    try:
+        from ml.monitoring import ml_monitor
+        hours = request.args.get('hours', 24, type=int)
+        stats = ml_monitor.get_detailed_stats(hours)
+        return jsonify({'success': True, **stats}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/monitoring/alerts')
+def monitoring_alerts():
+    """Get active ML monitoring alerts."""
+    try:
+        from ml.monitoring import ml_monitor
+        include_resolved = request.args.get('resolved', 'false').lower() == 'true'
+        alerts = ml_monitor.get_alerts(include_resolved)
+        return jsonify({'success': True, 'alerts': alerts}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/monitoring/history')
+def monitoring_history():
+    """Get persistent ML monitoring history."""
+    try:
+        from ml.monitoring import ml_monitor
+        limit = request.args.get('limit', 200, type=int)
+        history = ml_monitor.get_persistent_history(limit)
+        return jsonify({'success': True, 'entries': history}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ========================================
+# Backtesting endpoints
+# ========================================
+
+@trading_bp.route('/api/backtest/run', methods=['POST'])
+@require_trading_auth
+def backtest_run():
+    """Run a backtest with synthetic or provided data."""
+    try:
+        from ml.backtesting import BacktestEngine
+        body = request.get_json(silent=True) or {}
+        engine = BacktestEngine(
+            initial_capital_gbp=body.get('initial_capital', 1.0),
+            daily_budget_gbp=body.get('daily_budget', 0.05),
+            fee_pct=body.get('fee_pct', 0.5),
+            slippage_pct=body.get('slippage_pct', 0.1),
+            profit_target_pct=body.get('profit_target_pct', 20.0),
+            stop_loss_pct=body.get('stop_loss_pct', -15.0),
+        )
+
+        historical_data = body.get('historical_data')
+        if not historical_data:
+            days = body.get('days', 90)
+            historical_data = BacktestEngine.generate_synthetic_data(days=days)
+
+        from dataclasses import asdict
+        result = engine.run_backtest(
+            historical_data=historical_data,
+            strategy_name=body.get('strategy_name', 'api_backtest'),
+            min_confidence=body.get('min_confidence', 75),
+            use_gem_detector=body.get('use_gem_detector', False),
+        )
+        summary = {k: v for k, v in asdict(result).items() if k not in ('trades', 'equity_curve')}
+        summary['trade_count'] = len(result.trades)
+        summary['equity_points'] = len(result.equity_curve)
+        return jsonify({'success': True, 'result': summary}), 200
+    except Exception as e:
+        logger.exception("Backtest failed")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/backtest/results')
+def backtest_results():
+    """List saved backtest results."""
+    try:
+        from ml.backtesting import BacktestEngine
+        results = BacktestEngine.list_results()
+        return jsonify({'success': True, 'results': results}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
+# ========================================
+# ML Retraining endpoints
+# ========================================
+
+@trading_bp.route('/api/retrain/status')
+def retrain_status():
+    """Get ML retraining scheduler status."""
+    try:
+        from ml.scheduler import get_ml_scheduler
+        sched = get_ml_scheduler()
+        return jsonify({'success': True, **sched.get_status()}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/retrain/trigger', methods=['POST'])
+@require_trading_auth
+def retrain_trigger():
+    """Manually trigger a model retrain."""
+    try:
+        import threading
+        from ml.scheduler import get_ml_scheduler
+        sched = get_ml_scheduler()
+        threading.Thread(target=sched.weekly_retrain, daemon=True).start()
+        return jsonify({'success': True, 'message': 'Retraining started in background'}), 202
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/cache/status')
+def cache_status():
+    """Get Redis cache statistics."""
+    try:
+        from services.redis_cache import get_cache_stats
+        return jsonify({'success': True, **get_cache_stats()}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

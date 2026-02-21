@@ -161,23 +161,63 @@ class PortfolioManager:
         return total_risk / len(results)
     
     def _calculate_diversification(self, results: List[Dict]) -> float:
-        """Calculate diversification score (0-100)"""
+        """
+        Calculate diversification score (0-100) based on multiple factors:
+        - Recommendation variety
+        - Position concentration (Herfindahl index)
+        - Risk level distribution
+        - Market cap tier spread
+        """
         if not results or len(results) < 2:
             return 0.0
-        
-        # Simple diversification based on variety of recommendations
+
+        total = len(results)
+
+        # 1. Recommendation variety (0-25)
         recommendations = [r['analysis'].get('recommendation', 'HOLD') for r in results]
         unique_recs = len(set(recommendations))
-        
-        # Higher score for more variety (but not too much AVOID)
-        avoid_ratio = recommendations.count('AVOID') / len(recommendations)
-        variety_score = (unique_recs / 3) * 50  # Max 50 for variety
-        
-        # Penalize too many AVOIDs
-        avoid_penalty = avoid_ratio * 30
-        
-        diversification = min(100, variety_score + 50 - avoid_penalty)
-        return max(0, diversification)
+        variety_score = min(25, (unique_recs / 3) * 25)
+
+        # 2. Concentration analysis via Herfindahl (0-25)
+        # Lower HHI = more diversified
+        gem_scores = [r['analysis'].get('gem_score', 50) for r in results]
+        total_score = sum(gem_scores) or 1
+        shares = [(s / total_score) for s in gem_scores]
+        hhi = sum(s ** 2 for s in shares)
+        # Perfect diversification: HHI = 1/n, full concentration: HHI = 1
+        min_hhi = 1 / total
+        concentration_score = max(0, 25 * (1 - (hhi - min_hhi) / (1 - min_hhi))) if total > 1 else 0
+
+        # 3. Risk level distribution (0-25)
+        risk_levels = [r['analysis'].get('risk_level', 'Medium') for r in results]
+        unique_risks = len(set(risk_levels))
+        risk_dist = min(25, (unique_risks / 4) * 25)
+        # Penalise if everything is the same risk level
+        most_common_pct = max(risk_levels.count(rl) for rl in set(risk_levels)) / total
+        if most_common_pct > 0.7:
+            risk_dist *= 0.5
+
+        # 4. Market cap tier spread (0-25)
+        caps = []
+        for r in results:
+            mcap = r['coin'].get('market_cap', 0)
+            if mcap > 1e9:
+                caps.append('large')
+            elif mcap > 1e7:
+                caps.append('mid')
+            elif mcap > 0:
+                caps.append('micro')
+            else:
+                caps.append('unknown')
+        unique_tiers = len(set(caps) - {'unknown'})
+        tier_score = min(25, (unique_tiers / 3) * 25)
+
+        # Penalty for too many AVOIDs
+        avoid_ratio = recommendations.count('AVOID') / total if total > 0 else 0
+        avoid_penalty = avoid_ratio * 15
+
+        diversification = min(100, variety_score + concentration_score + risk_dist + tier_score - avoid_penalty)
+        return max(0, round(diversification, 1))
     
     def _determine_market_sentiment(self, results: List[Dict]) -> str:
         """Determine overall market sentiment"""
@@ -255,33 +295,55 @@ class PortfolioManager:
         return warnings
     
     def _generate_allocation_strategy(self, buy_recs: List[Dict]) -> Dict[str, float]:
-        """Generate allocation percentages for top coins"""
+        """
+        Generate risk-adjusted allocation percentages for top coins.
+        Uses a modified Kelly-style approach: higher confidence + lower risk = larger allocation,
+        but caps individual position size to prevent over-concentration.
+        """
         if not buy_recs:
             return {}
-        
+
+        MAX_SINGLE_POSITION = 35.0  # Cap any single coin at 35%
+        MIN_POSITION = 5.0  # Minimum allocation if included
+
         # Take top 5 buy recommendations
         top_buys = buy_recs[:5]
-        
-        # Calculate weights based on gem_score and confidence
+
+        # Risk multipliers — higher risk → smaller position
+        risk_multipliers = {
+            'Low': 1.0,
+            'Medium': 0.85,
+            'High': 0.65,
+            'Very High': 0.45,
+            'High Upside': 0.70,
+            'Extreme Moonshot': 0.40,
+        }
+
         weights = []
         for rec in top_buys:
-            weight = (rec['gem_score'] / 100) * (rec['confidence'] / 100)
-            
-            # Slight boost for high-upside plays rather than penalty
-            if rec['risk_level'] in ['High', 'Very High', 'High Upside', 'Extreme Moonshot']:
-                weight *= 0.9  # Minor adjustment, not heavy penalty
-            
-            weights.append(weight)
-        
+            gem = rec.get('gem_score', 50) / 100
+            conf = rec.get('confidence', 50) / 100
+            risk_factor = risk_multipliers.get(rec.get('risk_level', 'Medium'), 0.7)
+            # Blended score: 40% gem, 30% confidence, 30% risk-adjusted
+            weight = (0.4 * gem + 0.3 * conf + 0.3 * risk_factor)
+            weights.append(max(weight, 0.01))
+
         total_weight = sum(weights)
-        
         if total_weight == 0:
             return {}
-        
-        # Calculate percentages
+
+        # Calculate raw percentages
         allocations = {}
         for rec, weight in zip(top_buys, weights):
-            percentage = (weight / total_weight) * 100
-            allocations[rec['symbol']] = round(percentage, 1)
-        
+            pct = (weight / total_weight) * 100
+            # Apply caps and floors
+            pct = min(pct, MAX_SINGLE_POSITION)
+            pct = max(pct, MIN_POSITION)
+            allocations[rec['symbol']] = round(pct, 1)
+
+        # Normalise so they sum to 100
+        alloc_total = sum(allocations.values())
+        if alloc_total > 0:
+            allocations = {k: round(v / alloc_total * 100, 1) for k, v in allocations.items()}
+
         return allocations

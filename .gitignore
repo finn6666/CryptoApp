@@ -82,10 +82,20 @@ wheels/
 *.tar
 *.tar.bz2
 
-## Data Files (add specific patterns if needed)
+## Data Files (runtime data — regenerated on startup)
 data/favorites.json
 data/live_api.json
 data/Coinmarketcap.api
+data/portfolio.json
+data/ml_monitor.jsonl
+data/ml_alerts.json
+data/agent_analysis_cache.json
+data/exchange_pairs_cache.json
+data/trades/
+data/scan_logs/
+data/agent_memory/
+data/agent_cache/
+data/backtest_results/
 *.api
 .env
 DEPLOYMENT_CHECKLIST.md

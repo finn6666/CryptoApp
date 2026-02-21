@@ -96,7 +96,7 @@ class HiddenGemDetector:
     - Cross-asset relationships (network effects)
     - Smart money vs crowd behavior patterns
     - Asymmetric risk-reward opportunities
-    - AI-powered sentiment analysis (DeepSeek integration)
+    - AI-powered sentiment analysis (Gemini agent integration)
     """
     
     def __init__(self, model_dir='models'):
@@ -795,7 +795,7 @@ class HiddenGemDetector:
             # Base gem score from BOOSTED probability
             base_gem_score = float(boosted_probability * 100)
             
-            # Build enhanced data structure (without DeepSeek)
+            # Build enhanced data structure
             enhanced_data = {
                 'enhanced_score': base_gem_score,
                 'sentiment_boost': 0
@@ -835,7 +835,7 @@ class HiddenGemDetector:
                     'innovation_score': features['technology_score'],
                     'community_strength': features['community_growth']
                 },
-                'ai_sentiment': enhanced_data.get('sentiment'),  # AI insights from DeepSeek
+                'ai_sentiment': enhanced_data.get('sentiment'),  # AI insights from agents
                 'ai_enabled': enhanced_data.get('ai_enabled', False),
                 'rl_recommendation': rl_data.get('action') if self.rl_enabled else None,
                 'rl_confidence': rl_data.get('confidence') if self.rl_enabled else None,
@@ -1088,7 +1088,7 @@ class HiddenGemDetector:
         base_score = min(base_score, 95.0)
         gem_probability = base_score / 100.0
         
-        # Build aggressive result (DeepSeek integration removed - using Gemini agents instead)
+        # Build aggressive result (using Gemini agents)
         cap_label = ('Nano' if features.get('is_nano_cap') else 
                      'Micro' if features.get('is_micro_cap') else 
                      'Small' if features.get('is_low_cap') else None)

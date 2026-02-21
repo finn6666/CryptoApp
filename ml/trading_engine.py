@@ -1,6 +1,6 @@
 """
 Live Trading Engine with Safety Rails
-Executes real trades on Coinbase via ccxt with strict daily budget limits
+Executes real trades on Kraken via ccxt with strict daily budget limits
 and email-based approval workflow.
 """
 
@@ -48,11 +48,14 @@ class TradeProposal:
 
 @dataclass
 class DailyBudget:
-    """Track daily spending."""
+    """Track daily spending (buys and sells tracked separately)."""
     date: str
-    spent_gbp: float = 0.0
+    spent_gbp: float = 0.0  # buy-side spend only
     trades_executed: int = 0
     trades_proposed: int = 0
+    sell_proceeds_gbp: float = 0.0  # sell-side total
+    sells_executed: int = 0
+    fees_gbp: float = 0.0  # total exchange fees paid
 
 
 # ─── Trading Engine ───────────────────────────────────────────
@@ -78,8 +81,8 @@ class TradingEngine:
         server_url: str = "http://localhost:5001",
     ):
         self.daily_budget_gbp = daily_budget_gbp
-        # Default exchange from env (supports coinbase, kraken, etc.)
-        self.exchange_id = exchange_id or os.getenv("EXCHANGE_PRIORITY", "kraken,coinbase").split(",")[0].strip()
+        # Default exchange from env
+        self.exchange_id = exchange_id or os.getenv("EXCHANGE_PRIORITY", "kraken").split(",")[0].strip()
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.server_url = server_url
@@ -92,9 +95,10 @@ class TradingEngine:
 
         # Safety: max single trade = 50% of daily budget
         self.max_trade_pct = float(os.getenv("MAX_TRADE_PCT", "50")) / 100
-        # Cooldown: minimum minutes between proposals
+        # Cooldown: minimum minutes between proposals (per-side)
         self.trade_cooldown_min = int(os.getenv("TRADE_COOLDOWN_MIN", "60"))
-        self._last_proposal_time: Optional[datetime] = None
+        self._last_buy_proposal_time: Optional[datetime] = None
+        self._last_sell_proposal_time: Optional[datetime] = None
 
         # Email config (from env)
         self.email_to = os.getenv("TRADE_NOTIFICATION_EMAIL", "")
@@ -152,11 +156,6 @@ class TradingEngine:
                         "apiKey": os.getenv("KRAKEN_API_KEY", ""),
                         "secret": os.getenv("KRAKEN_PRIVATE_KEY", ""),
                     }
-                elif self.exchange_id == "coinbase":
-                    config = {
-                        "apiKey": os.getenv("COINBASE_API_KEY", ""),
-                        "secret": os.getenv("COINBASE_API_SECRET", ""),
-                    }
 
                 if not config.get("apiKey") or not config.get("secret"):
                     logger.warning(f"Exchange API keys not configured for {self.exchange_id} — trades will fail")
@@ -190,10 +189,12 @@ class TradingEngine:
         budget = self._get_today_budget()
         return max(0, self.daily_budget_gbp - budget.spent_gbp)
 
-    def can_afford_trade(self, amount_gbp: float) -> bool:
-        """Check if a trade fits within today's budget."""
+    def can_afford_trade(self, amount_gbp: float, side: str = "buy") -> bool:
+        """Check if a trade fits within today's budget. Sells are always affordable."""
         if self.kill_switch:
             return False
+        if side == "sell":
+            return True  # Sells don't consume buy budget
         return amount_gbp <= self.get_remaining_budget()
 
     # ─── Trade Proposal ───────────────────────────────────────
@@ -216,35 +217,39 @@ class TradingEngine:
         if self.kill_switch:
             return {"success": False, "error": "Trading is halted (kill switch active)"}
 
-        # Cap amount to remaining budget
-        remaining = self.get_remaining_budget()
-        if remaining <= 0:
-            return {
-                "success": False,
-                "error": f"Daily budget exhausted (£{self.daily_budget_gbp} spent today)",
-            }
+        is_sell = side.lower() == "sell"
 
-        if amount_gbp > remaining:
-            amount_gbp = remaining
-            logger.info(f"Capped trade to remaining budget: £{amount_gbp:.4f}")
+        # Budget checks only apply to buys — sells don't consume buy budget
+        if not is_sell:
+            remaining = self.get_remaining_budget()
+            if remaining <= 0:
+                return {
+                    "success": False,
+                    "error": f"Daily budget exhausted (£{self.daily_budget_gbp} spent today)",
+                }
 
-        # Hard cap — never exceed daily budget in a single trade
-        amount_gbp = min(amount_gbp, self.daily_budget_gbp)
+            if amount_gbp > remaining:
+                amount_gbp = remaining
+                logger.info(f"Capped trade to remaining budget: £{amount_gbp:.4f}")
 
-        # Safety: cap single trade to max_trade_pct of daily budget
-        max_single = self.daily_budget_gbp * self.max_trade_pct
-        if amount_gbp > max_single:
-            amount_gbp = max_single
-            logger.info(f"Capped trade to max single trade: £{amount_gbp:.4f}")
+            # Hard cap — never exceed daily budget in a single trade
+            amount_gbp = min(amount_gbp, self.daily_budget_gbp)
 
-        # Cooldown check
-        if self._last_proposal_time:
-            elapsed = (datetime.utcnow() - self._last_proposal_time).total_seconds() / 60
+            # Safety: cap single trade to max_trade_pct of daily budget
+            max_single = self.daily_budget_gbp * self.max_trade_pct
+            if amount_gbp > max_single:
+                amount_gbp = max_single
+                logger.info(f"Capped trade to max single trade: £{amount_gbp:.4f}")
+
+        # Per-side cooldown check (buys and sells have independent cooldowns)
+        last_time = self._last_sell_proposal_time if is_sell else self._last_buy_proposal_time
+        if last_time:
+            elapsed = (datetime.utcnow() - last_time).total_seconds() / 60
             if elapsed < self.trade_cooldown_min:
                 remaining_min = self.trade_cooldown_min - elapsed
                 return {
                     "success": False,
-                    "error": f"Cooldown active — wait {remaining_min:.0f} more minutes",
+                    "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
                 }
 
         proposal = TradeProposal(
@@ -259,7 +264,10 @@ class TradingEngine:
         )
 
         self.proposals[proposal.id] = proposal
-        self._last_proposal_time = datetime.utcnow()
+        if proposal.side == "sell":
+            self._last_sell_proposal_time = datetime.utcnow()
+        else:
+            self._last_buy_proposal_time = datetime.utcnow()
 
         # Update daily counter
         budget = self._get_today_budget()
@@ -298,8 +306,8 @@ class TradingEngine:
             self._save_state()
             return {"success": False, "error": "Proposal expired (>1 hour old)"}
 
-        # Check budget again (might have been spent since proposal)
-        if not self.can_afford_trade(proposal.amount_gbp):
+        # Check budget again (might have been spent since proposal) — only for buys
+        if not self.can_afford_trade(proposal.amount_gbp, side=proposal.side):
             proposal.status = "rejected"
             proposal.error = "Budget exhausted since proposal"
             self._save_state()
@@ -366,10 +374,20 @@ class TradingEngine:
                 proposal.quantity = order.get("filled", quantity)
                 proposal.order_id = order.get("id", "unknown")
 
-            # Update daily budget
+            # Extract fee info from order result
+            fee_gbp = 0.0
+            if order_result:
+                fee_gbp = order_result.get("fee_gbp", 0.0)
+
+            # Update daily budget — buys consume budget, sells track separately
             budget = self._get_today_budget()
-            budget.spent_gbp += proposal.amount_gbp
+            if proposal.side == "buy":
+                budget.spent_gbp += proposal.amount_gbp
+            else:
+                budget.sell_proceeds_gbp += proposal.amount_gbp
+                budget.sells_executed += 1
             budget.trades_executed += 1
+            budget.fees_gbp += fee_gbp
 
             # Log trade to history
             trade_record = {
@@ -384,11 +402,12 @@ class TradingEngine:
                 "confidence": proposal.confidence,
                 "timestamp": proposal.executed_at,
                 "exchange": exchange_used,
+                "fee_gbp": fee_gbp,
             }
             self.trade_history.append(trade_record)
 
             # Auto-record to portfolio tracker
-            self._record_to_portfolio(proposal, exchange_used)
+            self._record_to_portfolio(proposal, exchange_used, fee_gbp=fee_gbp)
 
             # Send confirmation email
             self._send_execution_email(proposal)
@@ -434,7 +453,7 @@ class TradingEngine:
             logger.debug(f"Exchange manager not available, using legacy: {e}")
             return None
 
-    def _record_to_portfolio(self, proposal: TradeProposal, exchange: str):
+    def _record_to_portfolio(self, proposal: TradeProposal, exchange: str, fee_gbp: float = 0.0):
         """Auto-record executed trade to portfolio tracker."""
         try:
             from ml.portfolio_tracker import get_portfolio_tracker
@@ -450,6 +469,7 @@ class TradingEngine:
                 reasoning=proposal.reason,
                 confidence=proposal.confidence,
                 proposal_id=proposal.id,
+                fee_gbp=fee_gbp,
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")
@@ -640,6 +660,9 @@ class TradingEngine:
             "daily_budget_gbp": self.daily_budget_gbp,
             "spent_today_gbp": round(budget.spent_gbp, 4),
             "remaining_today_gbp": round(self.get_remaining_budget(), 4),
+            "sell_proceeds_today_gbp": round(budget.sell_proceeds_gbp, 4),
+            "sells_today": budget.sells_executed,
+            "fees_today_gbp": round(budget.fees_gbp, 4),
             "trades_today": budget.trades_executed,
             "proposals_today": budget.trades_proposed,
             "pending_proposals": len(pending),
@@ -647,7 +670,7 @@ class TradingEngine:
             "exchange": exchange_info,
             "email_configured": bool(self.smtp_user and self.smtp_password),
             "exchange_configured": bool(
-                os.getenv("COINBASE_API_KEY") and os.getenv("COINBASE_API_SECRET")
+                os.getenv("KRAKEN_API_KEY") and os.getenv("KRAKEN_PRIVATE_KEY")
             ),
             "max_trade_pct": self.max_trade_pct * 100,
             "trade_cooldown_min": self.trade_cooldown_min,

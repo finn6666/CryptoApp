@@ -176,10 +176,15 @@ def scan_for_hidden_gems():
     if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
         return jsonify({'error': 'Hidden Gem Detector not available'}), 503
     try:
+        from ml.exchange_manager import get_exchange_manager
+        exchange_mgr = get_exchange_manager()
         limit = int(request.args.get('limit', 20))
         min_prob = float(request.args.get('min_probability', 0.6))
         gems, processed = [], 0
         for coin in state.analyzer.coins[:100]:
+            # Only scan coins tradeable on Kraken
+            if not exchange_mgr.is_tradeable(coin.symbol):
+                continue
             try:
                 processed += 1
                 cd = {
@@ -273,9 +278,14 @@ def get_top_hidden_gems(count):
     if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
         return jsonify({'error': 'Hidden Gem Detector not available'}), 503
     try:
+        from ml.exchange_manager import get_exchange_manager
+        exchange_mgr = get_exchange_manager()
         count = min(count, 50)
         analyzed = []
         for coin in state.analyzer.coins[:count * 3]:
+            # Only include coins tradeable on Kraken
+            if not exchange_mgr.is_tradeable(coin.symbol):
+                continue
             try:
                 cd = {
                     'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
@@ -321,6 +331,12 @@ def analyze_with_agents(symbol):
     if not state.gem_detector.multi_agent_enabled:
         return jsonify({'error': 'Multi-agent system not available'}), 503
     try:
+        # Verify coin is tradeable on Kraken
+        from ml.exchange_manager import get_exchange_manager
+        exchange_mgr = get_exchange_manager()
+        if not exchange_mgr.is_tradeable(symbol):
+            return jsonify({'error': f'{symbol} is not available on Kraken'}), 400
+
         coin = next((c for c in state.analyzer.coins if c.symbol.upper() == symbol.upper()), None)
         if not coin:
             return jsonify({'error': f'Coin {symbol} not found'}), 404

@@ -363,7 +363,7 @@
             </h2>
 
             <div id="configWarning" style="display: none; background: rgba(237,137,54,0.15); border: 1px solid rgba(237,137,54,0.4); border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: #ecc94b;">
-                ⚠️ <strong>Setup required:</strong> Add your Coinbase API keys and Gmail app password to <code>.env</code> — see <code>.env.example</code>
+                ⚠️ <strong>Setup required:</strong> Add your Kraken API keys and Gmail app password to <code>.env</code> — see <code>.env.example</code>
             </div>
 
             <!-- Pending Proposals -->
@@ -554,7 +554,7 @@
                 if (!data.exchange_configured || !data.email_configured) {
                     configWarning.style.display = 'block';
                     let warnings = [];
-                    if (!data.exchange_configured) warnings.push('Coinbase API keys');
+                    if (!data.exchange_configured) warnings.push('Kraken API keys');
                     if (!data.email_configured) warnings.push('Gmail SMTP credentials');
                     configWarning.innerHTML = `⚠️ <strong>Setup required:</strong> Add ${warnings.join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
                 } else {

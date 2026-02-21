@@ -10,7 +10,6 @@ from enum import Enum
 
 class AgentType(Enum):
     """Types of agents in the system"""
-    DEEPSEEK_SENTIMENT = "deepseek_sentiment"
     GEMINI_RESEARCH = "gemini_research"
     GEMINI_TECHNICAL = "gemini_technical"
     GEMINI_RISK = "gemini_risk"
@@ -19,11 +18,6 @@ class AgentType(Enum):
 
 class ModelConfig:
     """LLM Model configurations"""
-    
-    # DeepSeek Config
-    DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY', '')
-    DEEPSEEK_MODEL = "deepseek-chat"
-    DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
     
     # Google Gemini Config
     GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY', '')
@@ -40,16 +34,6 @@ class AgentConfig:
     """Individual agent configurations"""
     
     AGENTS = {
-        AgentType.DEEPSEEK_SENTIMENT: {
-            "name": "Sentiment Analyst",
-            "description": "Analyzes social media, news sentiment, FUD/FOMO detection",
-            "model": ModelConfig.DEEPSEEK_MODEL,
-            "temperature": ModelConfig.TEMPERATURE_CREATIVE,
-            "max_tokens": 2000,
-            "timeout": 30,
-            "cache_ttl": 3600,  # 1 hour
-            "priority": 1,  # High priority
-        },
         AgentType.GEMINI_RESEARCH: {
             "name": "Research Analyst",
             "description": "Fundamentals, team, tech, partnerships, roadmap analysis",
@@ -101,10 +85,9 @@ class OrchestratorConfig:
     # Conflict resolution
     CONFLICT_RESOLUTION_STRATEGY = "weighted_voting"  # or "expert_override"
     AGENT_WEIGHTS = {
-        AgentType.DEEPSEEK_SENTIMENT: 0.15,
-        AgentType.GEMINI_RESEARCH: 0.35,
-        AgentType.GEMINI_TECHNICAL: 0.35,
-        AgentType.GEMINI_RISK: 0.15,
+        AgentType.GEMINI_RESEARCH: 0.40,
+        AgentType.GEMINI_TECHNICAL: 0.40,
+        AgentType.GEMINI_RISK: 0.20,
     }
     
     # Timeouts
@@ -145,7 +128,6 @@ def get_agent_config(agent_type: AgentType) -> Dict[str, Any]:
 def validate_api_keys() -> Dict[str, bool]:
     """Validate that required API keys are set"""
     return {
-        "deepseek": bool(ModelConfig.DEEPSEEK_API_KEY),
         "google": bool(ModelConfig.GOOGLE_API_KEY),
     }
 
@@ -159,7 +141,6 @@ if __name__ == "__main__":
     print(f"API Keys Status: {api_status}")
     
     for agent_type in [
-        AgentType.DEEPSEEK_SENTIMENT,
         AgentType.GEMINI_RESEARCH,
         AgentType.GEMINI_TECHNICAL,
         AgentType.GEMINI_RISK

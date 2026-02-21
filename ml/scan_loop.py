@@ -160,6 +160,32 @@ class ScanLoop:
             scan_result["success"] = True
             self._last_scan_time = datetime.utcnow()
 
+            # ── Step 5: Sell-side automation ──
+            try:
+                from ml.sell_automation import get_sell_automation
+                sell_auto = get_sell_automation()
+
+                # Build live prices from analyser
+                import services.app_state as state
+                live_prices = {}
+                if state.analyzer and state.analyzer.coins:
+                    for coin in state.analyzer.coins:
+                        live_prices[coin.symbol.upper()] = getattr(coin, "price", 0)
+
+                if live_prices:
+                    sell_proposals = sell_auto.check_and_propose_sells(live_prices)
+                    scan_result["sell_proposals"] = len(sell_proposals)
+                    for sp in sell_proposals:
+                        self._audit("sell_proposal", {
+                            "scan_id": scan_id,
+                            "symbol": sp.get("symbol"),
+                            "trigger": sp.get("trigger"),
+                        })
+                    logger.info(f"[Scan {scan_id}] Sell check: {len(sell_proposals)} sell proposals")
+            except Exception as e:
+                logger.warning(f"[Scan {scan_id}] Sell automation error: {e}")
+                scan_result["errors"].append(f"Sell automation: {str(e)}")
+
         except Exception as e:
             logger.error(f"[Scan {scan_id}] Scan failed: {e}")
             scan_result["errors"].append(str(e))

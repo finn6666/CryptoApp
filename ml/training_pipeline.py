@@ -21,6 +21,16 @@ class CryptoMLPipeline:
         self.model_loaded = False
         self.last_training_time = None
         self.training_status = "Not trained"
+
+        # ONNX inference engine (fast path)
+        self._onnx_engine = None
+        try:
+            from ml.onnx_inference import get_onnx_engine
+            self._onnx_engine = get_onnx_engine()
+            if self._onnx_engine.onnx_available:
+                logging.info("ONNX inference engine active — predictions will use ONNX fast path")
+        except Exception as e:
+            logging.debug(f"ONNX engine not available: {e}")
     
     def prepare_features(self, df):
         """Extract and engineer features for ML model"""
@@ -66,13 +76,15 @@ class CryptoMLPipeline:
     
     def get_status(self):
         """Get current ML pipeline status for web interface"""
-        return {
+        status = {
             "model_loaded": self.model_loaded,
             "last_training_time": self.last_training_time.isoformat() if self.last_training_time else None,
             "training_status": self.training_status,
             "feature_columns": self.feature_columns,
-            "model_type": "RandomForestRegressor" if self.model else None
+            "model_type": "RandomForestRegressor" if self.model else None,
+            "onnx_available": self._onnx_engine.onnx_available if self._onnx_engine else False,
         }
+        return status
     
     def load_existing_model(self, model_dir=None):
         """Load previously trained model"""
@@ -170,7 +182,13 @@ class CryptoMLPipeline:
             raise
     
     def predict(self, features_dict):
-        """Make prediction for new data"""
+        """Make prediction for new data. Uses ONNX fast path when available."""
+        # Try ONNX fast path first (no scaler needed — ONNX model is self-contained)
+        if self._onnx_engine and self._onnx_engine.onnx_available:
+            onnx_result = self._onnx_engine.predict(features_dict)
+            if onnx_result is not None:
+                return onnx_result
+
         if self.model is None:
             raise ValueError("Model not trained yet")
             
