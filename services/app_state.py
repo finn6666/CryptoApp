@@ -206,7 +206,21 @@ def init_all():
 
     load_analysis_cache()
 
-    analyzer = CryptoAnalyzer(data_file='data/live_api.json')
+    # Auto-fetch live data if the cache file doesn't exist yet
+    data_file = 'data/live_api.json'
+    if not os.path.exists(data_file):
+        logger.info("No live data cache found — fetching live data on first start...")
+        try:
+            from src.core.live_data_fetcher import fetch_and_update_data
+            result = fetch_and_update_data(force_refresh=True)
+            if result:
+                logger.info("Live data fetched successfully on startup")
+            else:
+                logger.warning("Live data fetch returned no data — dashboard may show empty state")
+        except Exception as e:
+            logger.warning(f"Could not fetch live data on startup: {e}")
+
+    analyzer = CryptoAnalyzer(data_file=data_file)
     logger.info(
         f"System ready - ML: {ML_AVAILABLE}, Gem Detector: {GEM_DETECTOR_AVAILABLE}, "
         f"ADK: {official_adk_available}, Coins: {len(analyzer.coins)}"

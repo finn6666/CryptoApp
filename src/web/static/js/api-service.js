@@ -43,13 +43,30 @@ async function loadMarketConditions() {
             return;
         }
 
-        // Update opportunity bar (invert: high opportunity_score = good)
+        // Update opportunity bar
         const oppFill = document.getElementById('opportunityFill');
         const oppText = document.getElementById('opportunityText');
         
         if (oppFill && oppText) {
             oppFill.style.width = `${data.opportunity_percentage}%`;
             oppText.textContent = data.message;
+            
+            // If data isn't loaded yet, show muted style and auto-refresh
+            if (data.opportunity_level === 'UNKNOWN') {
+                oppFill.style.background = 'linear-gradient(90deg, #4a5568, #2d3748)';
+                // Auto-trigger a data refresh if market data isn't loaded
+                try {
+                    const refreshRes = await fetch('/api/refresh', { method: 'POST' });
+                    const refreshData = await refreshRes.json();
+                    if (refreshData.success) {
+                        // Reload after successful refresh
+                        setTimeout(() => loadMarketConditions(), 2000);
+                    }
+                } catch (e) {
+                    console.warn('Auto-refresh failed:', e);
+                }
+                return;
+            }
             
             // Color: high opportunity = green/gold, low = muted
             if (data.opportunity_score >= 75) {

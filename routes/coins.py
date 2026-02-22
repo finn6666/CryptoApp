@@ -145,9 +145,9 @@ def force_refresh():
 @coins_bp.route('/api/market/conditions')
 def get_market_conditions():
     try:
-        all_coins = state.analyzer.get_all_coins()
+        all_coins = state.analyzer.get_all_coins() if state.analyzer else []
         if not all_coins:
-            return jsonify({'opportunity_level': 'UNKNOWN', 'opportunity_score': 50, 'opportunity_percentage': 50, 'message': 'Insufficient data', 'indicators': {}})
+            return jsonify({'opportunity_level': 'UNKNOWN', 'opportunity_score': 50, 'opportunity_percentage': 50, 'message': 'Waiting for data — click Refresh', 'indicators': {}})
 
         total = len(all_coins)
         avg_change = sum(c.price_change_24h or 0 for c in all_coins) / max(total, 1)
