@@ -1,7 +1,6 @@
 ## To Do
 
-### ~~Getting an 'unsuffecient data' text at the top of the page~~ ✅
-Root cause: `data/live_api.json` didn't exist on fresh start. Fixed by auto-fetching live data on startup if the cache file is missing. Also changed the message from "Insufficient data" to "Waiting for data — click Refresh", and auto-triggers a data refresh from the frontend.
+### ~~Dashboard data takes ~15 mins to appear~~ ✅
+Three issues combined: (1) auto-refresh only reloaded market conditions, not overview cards/favorites — fixed to reload the full dashboard. (2) `/api/refresh` blocked on fetching individual missing symbols — moved to background thread. (3) No fast retry — added 10-second retry loop for the first 2 minutes after page load. Data now appears within seconds of becoming available.
 
-### ~~dashboard just says loading against everything, eg porfolio loading, trading engine-loading~~ ✅
-Changed default card text from "Loading..." to sensible defaults ("$0.00 / No open positions", "Connecting...") so the dashboard looks correct immediately. The overview cards update once data loads rather than sitting on "Loading" forever.
+### 

@@ -36,3 +36,22 @@ function startRefreshTimer() {
         refreshData();
     }, 300000); // 5 minutes
 }
+
+// Fast retry loop: polls every 10s until data appears (max 2 min)
+let _initialRetryCount = 0;
+function startInitialRetry() {
+    const maxRetries = 12; // 12 × 10s = 2 minutes
+    const timer = setInterval(async () => {
+        _initialRetryCount++;
+        // Check if market data is loaded by inspecting the opportunity text
+        const oppText = document.getElementById('opportunityText');
+        const hasData = oppText && !oppText.textContent.includes('Waiting') && !oppText.textContent.includes('Connecting');
+        if (hasData || _initialRetryCount >= maxRetries) {
+            clearInterval(timer);
+            if (hasData) console.log('Initial data loaded after', _initialRetryCount * 10, 'seconds');
+            return;
+        }
+        console.log(`Retry ${_initialRetryCount}/${maxRetries}: refreshing dashboard...`);
+        await refreshData();
+    }, 10000); // every 10 seconds
+}

@@ -59,8 +59,8 @@ async function loadMarketConditions() {
                     const refreshRes = await fetch('/api/refresh', { method: 'POST' });
                     const refreshData = await refreshRes.json();
                     if (refreshData.success) {
-                        // Reload after successful refresh
-                        setTimeout(() => loadMarketConditions(), 2000);
+                        // Reload the entire dashboard after successful refresh
+                        setTimeout(() => refreshData_afterAutoLoad(), 2000);
                     }
                 } catch (e) {
                     console.warn('Auto-refresh failed:', e);
@@ -222,6 +222,16 @@ async function refreshData() {
     ]);
     // Then load agent analyses in background
     loadAgentAnalysesInBackground();
+}
+
+// Called after auto-refresh succeeds — reloads entire dashboard
+async function refreshData_afterAutoLoad() {
+    console.log('Data became available — reloading entire dashboard...');
+    await Promise.all([
+        loadOverviewCards(),
+        loadFavorites(false),
+        loadMarketConditions()
+    ]);
 }
 
 // Background agent analysis loader - fetches favorites with agent analysis and updates cards

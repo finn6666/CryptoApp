@@ -21,7 +21,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Load agent analyses in background (non-blocking)
         loadAgentAnalysesInBackground();
         
-        // Start auto-refresh timer
+        // Fast retry: if market data isn't loaded yet, retry every 10s for up to 2 min
+        startInitialRetry();
+        
+        // Start auto-refresh timer (5 min interval)
         startRefreshTimer();
         
     } catch (error) {

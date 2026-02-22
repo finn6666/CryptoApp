@@ -123,19 +123,24 @@ def _run_agent_analysis(coin, coin_data_out):
 
 @coins_bp.route('/api/refresh', methods=['POST'])
 def force_refresh():
+    import threading
     from src.core.live_data_fetcher import fetch_and_update_data
     try:
-        live_data = fetch_and_update_data()
+        live_data = fetch_and_update_data(force_refresh=True)
         if live_data:
-            if state.SYMBOLS_AVAILABLE and state.data_pipeline:
-                current_symbols = [c.symbol for c in state.analyzer.coins]
-                for symbol in state.data_pipeline.supported_symbols:
-                    if symbol not in current_symbols:
-                        try:
-                            fetch_and_add_new_symbol_data(symbol)
-                        except Exception as e:
-                            logger.warning(f"Could not fetch data for {symbol}: {e}")
             state.analyzer.load_data()
+            # Fetch missing supported symbols in background so response returns fast
+            if state.SYMBOLS_AVAILABLE and state.data_pipeline:
+                current_symbols = {c.symbol for c in state.analyzer.coins}
+                missing = [s for s in state.data_pipeline.supported_symbols if s not in current_symbols]
+                if missing:
+                    def _backfill():
+                        for symbol in missing:
+                            try:
+                                fetch_and_add_new_symbol_data(symbol)
+                            except Exception as e:
+                                logger.warning(f"Could not fetch data for {symbol}: {e}")
+                    threading.Thread(target=_backfill, daemon=True).start()
             return jsonify({'success': True, 'message': 'Live data refreshed successfully'})
         return jsonify({'success': False, 'error': 'Failed to fetch live data'}), 500
     except Exception as e:
