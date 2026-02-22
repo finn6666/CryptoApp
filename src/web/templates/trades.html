@@ -864,7 +864,23 @@
                     statusEl.style.color = 'var(--text-secondary)';
                 }
 
-                document.getElementById('scanNextTime').textContent = status.scan_time || '—';
+                // Show next scan: use estimated next_scan time, or fall back to interval description
+                if (status.next_scan) {
+                    const next = new Date(status.next_scan);
+                    const now = new Date();
+                    const diffMs = next - now;
+                    if (diffMs > 0) {
+                        const diffH = Math.floor(diffMs / 3600000);
+                        const diffM = Math.floor((diffMs % 3600000) / 60000);
+                        document.getElementById('scanNextTime').textContent = diffH > 0 ? `${diffH}h ${diffM}m` : `${diffM}m`;
+                    } else {
+                        document.getElementById('scanNextTime').textContent = 'Soon';
+                    }
+                } else if (status.scan_interval_hours && status.scan_interval_hours > 0) {
+                    document.getElementById('scanNextTime').textContent = `Every ${status.scan_interval_hours}h`;
+                } else {
+                    document.getElementById('scanNextTime').textContent = status.scan_time || '—';
+                }
                 document.getElementById('scanLastRun').textContent = status.last_scan
                     ? new Date(status.last_scan).toLocaleString()
                     : 'Never';
