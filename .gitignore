@@ -84,6 +84,7 @@ wheels/
 
 ## ML Models & Training Data (regenerated at runtime)
 models/*.onnx
+models/*.pkl
 models/*.csv
 data/training_data_*.csv
 
@@ -96,11 +97,14 @@ data/ml_monitor.jsonl
 data/ml_alerts.json
 data/agent_analysis_cache.json
 data/exchange_pairs_cache.json
+data/gem_score_history.jsonl
 data/trades/
 data/scan_logs/
 data/agent_memory/
 data/agent_cache/
 data/backtest_results/
+data/monitor_logs/
+data/gem_score_summaries/
 *.api
 .env
 DEPLOYMENT_CHECKLIST.md
