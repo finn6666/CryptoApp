@@ -72,6 +72,15 @@ class MarketMonitor:
         self.quick_scan_top_n = int(os.getenv("MONITOR_QUICK_SCAN_TOP_N", "20"))
         self.quick_scan_min_gem = float(os.getenv("MONITOR_QUICK_SCAN_MIN_GEM", "6.0"))
 
+        # ── Opportunistic buy triggers ──
+        self.auto_buy_enabled = os.getenv("MONITOR_AUTO_BUY", "true").lower() in ("1", "true", "yes")
+        self.auto_buy_min_gem = float(os.getenv("MONITOR_AUTO_BUY_MIN_GEM", "7.0"))  # higher bar than quick scan
+        self.auto_buy_min_confidence = int(os.getenv("MONITOR_AUTO_BUY_MIN_CONFIDENCE", "55"))
+        self.auto_buy_momentum_pct = float(os.getenv("MONITOR_AUTO_BUY_MOMENTUM_PCT", "15"))  # % move to trigger
+        self.auto_buy_max_per_day = int(os.getenv("MONITOR_AUTO_BUY_MAX_PER_DAY", "3"))
+        self._auto_buys_today = 0
+        self._auto_buy_date = datetime.utcnow().date()
+
         # ── Internal state ──
         self._running = False
         self._thread: Optional[threading.Thread] = None
@@ -92,6 +101,8 @@ class MarketMonitor:
             "data_refreshes": 0,
             "alerts_fired": 0,
             "sell_proposals": 0,
+            "buy_triggers": 0,
+            "buy_proposals": 0,
             "started_at": None,
             "last_price_check": None,
             "last_momentum_check": None,
@@ -215,6 +226,15 @@ class MarketMonitor:
                             "price": price,
                         })
                         self._mark_alerted(alert_key)
+
+                        # ── Opportunistic buy on strong upward momentum ──
+                        if (self.auto_buy_enabled
+                                and direction == "up"
+                                and pct_1h >= self.auto_buy_momentum_pct):
+                            self._trigger_buy_analysis(
+                                {"symbol": symbol, "price": price, "pct_1h": pct_1h},
+                                trigger="momentum_surge",
+                            )
 
                 # ── Check: volume spike ──
                 # Compare current volume vs historical average from snapshots
@@ -359,11 +379,124 @@ class MarketMonitor:
                     "top_gems": new_gems[:5],
                 })
 
+                # ── Opportunistic buy: feed high-scoring gems to trading pipeline ──
+                if self.auto_buy_enabled:
+                    for gem in new_gems:
+                        if gem["gem_score"] >= self.auto_buy_min_gem:
+                            self._trigger_buy_analysis(gem, trigger="quick_scan_gem")
+
             self._stats["quick_scans"] += 1
             self._stats["last_quick_scan"] = datetime.utcnow().isoformat()
 
         except Exception as e:
             logger.warning(f"[Monitor] Quick scan error: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # Opportunistic Buy Trigger
+    # ═══════════════════════════════════════════════════════════
+
+    def _trigger_buy_analysis(self, coin_info: Dict, trigger: str):
+        """
+        Feed a monitor discovery into the scan loop's analysis pipeline.
+
+        This uses the SAME _analyse_and_evaluate method the deep scan uses,
+        so all safety rails apply: budget cap, kill switch, cooldowns,
+        max trade %, email approval for sells, etc.
+
+        Only uses 1 Gemini API call per trigger (or falls back to local ML
+        if ADK is unavailable). Capped at MONITOR_AUTO_BUY_MAX_PER_DAY.
+        """
+        symbol = coin_info.get("symbol", "?")
+
+        try:
+            # Reset daily counter if date changed
+            today = datetime.utcnow().date()
+            if today != self._auto_buy_date:
+                self._auto_buys_today = 0
+                self._auto_buy_date = today
+
+            # Daily cap check
+            if self._auto_buys_today >= self.auto_buy_max_per_day:
+                logger.debug(f"[Monitor] Auto-buy cap reached ({self.auto_buy_max_per_day}/day), skipping {symbol}")
+                return
+
+            # Budget check before spending an API call
+            from ml.trading_engine import get_trading_engine
+            engine = get_trading_engine()
+            if engine.kill_switch:
+                return
+            if engine.get_remaining_budget() <= 0:
+                logger.debug(f"[Monitor] No budget remaining, skipping auto-buy for {symbol}")
+                return
+
+            # Don't re-buy coins we already hold
+            try:
+                from ml.portfolio_tracker import get_portfolio_tracker
+                tracker = get_portfolio_tracker()
+                if symbol.upper() in tracker.holdings:
+                    logger.debug(f"[Monitor] Already holding {symbol}, skipping auto-buy")
+                    return
+            except Exception:
+                pass
+
+            # Build coin_data dict for the scan loop's analyser
+            import services.app_state as state
+            coin_data = None
+            if state.analyzer and state.analyzer.coins:
+                for coin in state.analyzer.coins:
+                    if coin.symbol.upper() == symbol.upper():
+                        coin_data = state.coin_to_dict(coin)
+                        break
+
+            if not coin_data:
+                logger.debug(f"[Monitor] No coin data for {symbol}, skipping auto-buy")
+                return
+
+            # Add exchange info
+            from ml.exchange_manager import get_exchange_manager
+            exchange_mgr = get_exchange_manager()
+            exchanges = exchange_mgr.get_exchanges_for_coin(symbol)
+            if not exchanges:
+                logger.debug(f"[Monitor] {symbol} not tradeable on any exchange")
+                return
+            coin_data["tradeable_exchanges"] = exchanges
+            coin_data["primary_exchange"] = exchanges[0]
+
+            logger.info(f"[Monitor] 🎯 Auto-buy trigger: {symbol} (trigger={trigger})")
+            self._stats["buy_triggers"] += 1
+
+            # Use the scan loop's existing analysis pipeline
+            from ml.scan_loop import get_scan_loop
+            scanner = get_scan_loop()
+            result = scanner._analyse_and_evaluate(coin_data)
+
+            proposed = result.get("proposed", False)
+            outcome = result.get("outcome", "skipped")
+
+            if proposed:
+                self._auto_buys_today += 1
+                self._stats["buy_proposals"] += 1
+                logger.info(
+                    f"[Monitor] ✅ Auto-buy proposed for {symbol}: "
+                    f"outcome={outcome}, confidence={result.get('confidence', 0)}"
+                )
+            else:
+                logger.info(
+                    f"[Monitor] Auto-buy skipped for {symbol}: "
+                    f"{result.get('reason', 'agent decided not to trade')}"
+                )
+
+            self._log_alert("auto_buy_trigger", {
+                "symbol": symbol,
+                "trigger": trigger,
+                "outcome": outcome,
+                "proposed": proposed,
+                "reason": result.get("reason", ""),
+                "confidence": result.get("confidence", 0),
+            })
+
+        except Exception as e:
+            logger.warning(f"[Monitor] Auto-buy analysis failed for {symbol}: {e}")
 
     # ═══════════════════════════════════════════════════════════
     # Data Refresh (lightweight CMC pull — ~96 calls/day)
@@ -582,6 +715,14 @@ class MarketMonitor:
                 "volume_spike_pct": self.volume_spike_pct,
                 "rapid_move_pct": self.rapid_move_pct,
                 "quick_scan_min_gem": self.quick_scan_min_gem,
+            },
+            "auto_buy": {
+                "enabled": self.auto_buy_enabled,
+                "min_gem_score": self.auto_buy_min_gem,
+                "min_confidence": self.auto_buy_min_confidence,
+                "momentum_trigger_pct": self.auto_buy_momentum_pct,
+                "max_per_day": self.auto_buy_max_per_day,
+                "used_today": self._auto_buys_today,
             },
             "stats": self._stats.copy(),
             "tracked_symbols": len(self._price_history),

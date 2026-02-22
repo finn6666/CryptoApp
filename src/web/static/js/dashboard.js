@@ -167,6 +167,9 @@ async function loadMonitorCard() {
         }
 
         let subParts = [];
+        if (stats.buy_proposals > 0) {
+            subParts.push(`${stats.buy_proposals} buys`);
+        }
         if (stats.alerts_fired > 0) {
             subParts.push(`${stats.alerts_fired} alerts`);
         }
