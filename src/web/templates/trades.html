@@ -563,23 +563,13 @@
             </form>
         </div>
 
-        <div class="section-card">
-            <h2 class="section-header">📊 Recent Trades</h2>
-            
-            <div class="loading" id="loading">
-                <div class="spinner"></div>
-                <p style="margin-top: 16px; color: var(--text-secondary);">Loading trades...</p>
-            </div>
-            
-            <div id="tradesList"></div>
-        </div>
+
     </div>
 
     <script>
         // Load stats and trades on page load
         document.addEventListener('DOMContentLoaded', function() {
             loadStats();
-            loadTrades();
             loadTradingStatus();
             loadPendingProposals();
             loadExecutedTrades();
@@ -1088,68 +1078,12 @@
                 
                 if (data.success) {
                     document.getElementById('totalTrades').textContent = data.total_trades || 0;
-                    document.getElementById('winRate').textContent = ((data.success_rate || 0) * 100).toFixed(1) + '%';
+                    document.getElementById('winRate').textContent = (data.success_rate || 0).toFixed(1) + '%';
                     document.getElementById('winningTrades').textContent = data.winning_trades || 0;
                     document.getElementById('losingTrades').textContent = (data.total_trades - data.winning_trades) || 0;
                 }
             } catch (error) {
                 console.error('Error loading stats:', error);
-            }
-        }
-
-        // Load recent trades
-        async function loadTrades() {
-            const loadingEl = document.getElementById('loading');
-            const listEl = document.getElementById('tradesList');
-            
-            loadingEl.style.display = 'block';
-            
-            try {
-                const response = await fetch('/api/rl/trades');
-                const data = await response.json();
-                
-                if (data.success && data.trades.length > 0) {
-                    listEl.innerHTML = data.trades.map(trade => {
-                        const profitClass = trade.profit_pct >= 0 ? 'positive' : 'negative';
-                        const profitSign = trade.profit_pct >= 0 ? '+' : '';
-                        const date = new Date(trade.timestamp).toLocaleString();
-                        
-                        return `
-                            <div class="trade-item">
-                                <div class="trade-header">
-                                    <span class="trade-symbol">${trade.symbol || 'N/A'}</span>
-                                    <span class="trade-profit ${profitClass}">${profitSign}${trade.profit_pct}%</span>
-                                </div>
-                                <div class="trade-details">
-                                    <div class="trade-detail">
-                                        <span class="trade-detail-label">Entry Price</span>
-                                        <span class="trade-detail-value">£${trade.entry_price ? trade.entry_price.toLocaleString() : 'N/A'}</span>
-                                    </div>
-                                    <div class="trade-detail">
-                                        <span class="trade-detail-label">Exit Price</span>
-                                        <span class="trade-detail-value">£${trade.exit_price ? trade.exit_price.toLocaleString() : 'N/A'}</span>
-                                    </div>
-                                    <div class="trade-detail">
-                                        <span class="trade-detail-label">Days Held</span>
-                                        <span class="trade-detail-value">${trade.days_held} days</span>
-                                    </div>
-                                    <div class="trade-detail">
-                                        <span class="trade-detail-label">Date</span>
-                                        <span class="trade-detail-value">${date}</span>
-                                    </div>
-                                </div>
-                                ${trade.notes ? `<div class="trade-notes">"${trade.notes}"</div>` : ''}
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    listEl.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 40px;">No trades reported yet. Report your first trade above!</p>';
-                }
-            } catch (error) {
-                console.error('Error loading trades:', error);
-                listEl.innerHTML = '<p style="color: var(--error); text-align: center;">Error loading trades</p>';
-            } finally {
-                loadingEl.style.display = 'none';
             }
         }
 
@@ -1199,9 +1133,9 @@
                     // Reset form
                     e.target.reset();
                     
-                    // Reload stats and trades
+                    // Reload stats and trade log
                     loadStats();
-                    loadTrades();
+                    loadExecutedTrades();
                 } else {
                     showAlert('❌ Error: ' + (result.error || 'Failed to report trade'), 'error');
                 }

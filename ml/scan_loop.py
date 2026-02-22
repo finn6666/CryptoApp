@@ -435,13 +435,13 @@ class ScanLoop:
             if not should_trade and analysis_source == "gem_detector":
                 rec = analysis.get("recommendation", "HOLD").upper()
                 conf = analysis.get("confidence", 0)
-                if rec == "BUY" and conf >= 55:
+                if rec == "BUY" and conf >= 45:
                     should_trade = True
                     conviction = conf
-                    allocation_pct = min(60, conf - 20)
+                    allocation_pct = min(80, conf - 10)
                     trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
 
-            if should_trade and conviction >= 60:
+            if should_trade and conviction >= 45:
                 amount = remaining * (allocation_pct / 100)
                 amount = min(amount, remaining)
 
@@ -478,7 +478,7 @@ class ScanLoop:
     def _audit(self, event: str, data: Dict[str, Any]):
         """Append an event to the persistent audit log (JSONL)."""
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "event": event,
             **data,
         }
@@ -587,16 +587,21 @@ class ScanLoop:
         return logs
 
     def get_audit_trail(self, limit: int = 100) -> List[Dict]:
-        """Get recent audit trail entries."""
+        """Get recent audit trail entries (reads only the tail of the file)."""
         if not AUDIT_LOG_FILE.exists():
             return []
         try:
+            import collections
+            tail: collections.deque = collections.deque(maxlen=limit)
             with open(AUDIT_LOG_FILE) as f:
-                lines = f.readlines()
+                for line in f:
+                    stripped = line.strip()
+                    if stripped:
+                        tail.append(stripped)
             entries = []
-            for line in reversed(lines[-limit:]):
+            for line in reversed(tail):
                 try:
-                    entries.append(json.loads(line.strip()))
+                    entries.append(json.loads(line))
                 except Exception:
                     pass
             return entries
