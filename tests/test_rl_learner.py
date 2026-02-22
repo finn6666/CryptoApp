@@ -25,7 +25,7 @@ class TestSimpleRLGemLearner:
         rl.discount_factor = 0.9
         rl.feature_weights = defaultdict(lambda: {'buy': 0.5, 'hold': 0.5})
         rl.trade_history = []
-        rl.success_rate = 0.5
+        rl.success_rate = 0.0
         rl.total_trades = 0
         rl.winning_trades = 0
         rl.save_dir = str(tmp_path)
@@ -82,7 +82,7 @@ class TestSimpleRLGemLearner:
         learner2.discount_factor = 0.9
         learner2.feature_weights = defaultdict(lambda: {'buy': 0.5, 'hold': 0.5})
         learner2.trade_history = []
-        learner2.success_rate = 0.5
+        learner2.success_rate = 0.0
         learner2.total_trades = 0
         learner2.winning_trades = 0
         learner2.save_path = learner.save_path

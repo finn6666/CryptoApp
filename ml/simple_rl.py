@@ -42,7 +42,7 @@ class SimpleRLGemLearner:
         
         # Track outcomes for statistics
         self.trade_history = []
-        self.success_rate = 0.5
+        self.success_rate = 0.0
         self.total_trades = 0
         self.winning_trades = 0
         
@@ -138,7 +138,7 @@ class SimpleRLGemLearner:
         self.total_trades += 1
         if success:
             self.winning_trades += 1
-        self.success_rate = self.winning_trades / self.total_trades if self.total_trades > 0 else 0.5
+        self.success_rate = self.winning_trades / self.total_trades if self.total_trades > 0 else 0.0
         
         # Save trade to history with full details
         trade_record = {
@@ -270,7 +270,7 @@ class SimpleRLGemLearner:
             )
             
             # Load statistics
-            self.success_rate = data.get('success_rate', 0.5)
+            self.success_rate = data.get('success_rate', 0.0)
             self.total_trades = data.get('total_trades', 0)
             self.winning_trades = data.get('winning_trades', 0)
             self.trade_history = data.get('trade_history', [])
@@ -294,7 +294,7 @@ class SimpleRLGemLearner:
         """Reset all learned weights (fresh start)"""
         self.feature_weights = defaultdict(lambda: {'buy': 0.5, 'hold': 0.5})
         self.trade_history = []
-        self.success_rate = 0.5
+        self.success_rate = 0.0
         self.total_trades = 0
         self.winning_trades = 0
         self.save_learning()
