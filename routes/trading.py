@@ -535,6 +535,47 @@ def audit_trail():
 
 
 # ========================================
+# Market Monitor Routes
+# ========================================
+
+@trading_bp.route('/api/monitor/status')
+def monitor_status():
+    """Get market monitor status — intervals, stats, alerts."""
+    try:
+        from ml.market_monitor import get_market_monitor
+        monitor = get_market_monitor()
+        return jsonify(monitor.get_status()), 200
+    except Exception as e:
+        logger.error(f"Monitor status error: {e}")
+        return jsonify({"error": "Market monitor not available"}), 500
+
+
+@trading_bp.route('/api/monitor/alerts')
+def monitor_alerts():
+    """Get recent market monitor alerts."""
+    try:
+        from ml.market_monitor import get_market_monitor
+        monitor = get_market_monitor()
+        limit = request.args.get('limit', 50, type=int)
+        return jsonify({"alerts": monitor.get_recent_alerts(limit=limit)}), 200
+    except Exception as e:
+        logger.error(f"Monitor alerts error: {e}")
+        return jsonify({"error": "Failed to get monitor alerts"}), 500
+
+
+@trading_bp.route('/api/monitor/price-history/<symbol>')
+def monitor_price_history(symbol):
+    """Get recent price snapshots for a symbol from the monitor."""
+    try:
+        from ml.market_monitor import get_market_monitor
+        monitor = get_market_monitor()
+        return jsonify({"symbol": symbol.upper(), "history": monitor.get_price_history(symbol)}), 200
+    except Exception as e:
+        logger.error(f"Price history error: {e}")
+        return jsonify({"error": "Failed to get price history"}), 500
+
+
+# ========================================
 # Portfolio Routes
 # ========================================
 
@@ -915,7 +956,7 @@ def backtest_run():
         body = request.get_json(silent=True) or {}
         engine = BacktestEngine(
             initial_capital_gbp=body.get('initial_capital', 1.0),
-            daily_budget_gbp=body.get('daily_budget', 0.05),
+            daily_budget_gbp=body.get('daily_budget', float(os.getenv('DAILY_TRADE_BUDGET_GBP', '3.00'))),
             fee_pct=body.get('fee_pct', 0.5),
             slippage_pct=body.get('slippage_pct', 0.1),
             profit_target_pct=body.get('profit_target_pct', 20.0),

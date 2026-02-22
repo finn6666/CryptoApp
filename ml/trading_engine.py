@@ -65,7 +65,7 @@ class TradingEngine:
     Core trading engine with safety limits and email approval.
     
     Safety features:
-    - Hard daily spend limit (default £0.05)
+    - Hard daily spend limit (from DAILY_TRADE_BUDGET_GBP env var)
     - Per-trade max (never exceed daily limit in one trade)
     - Email approval required before execution
     - Proposals expire after 1 hour
@@ -75,11 +75,13 @@ class TradingEngine:
 
     def __init__(
         self,
-        daily_budget_gbp: float = 0.05,
+        daily_budget_gbp: float = None,
         exchange_id: str = None,
         data_dir: str = "data/trades",
         server_url: str = "http://localhost:5001",
     ):
+        if daily_budget_gbp is None:
+            daily_budget_gbp = float(os.getenv("DAILY_TRADE_BUDGET_GBP", "3.00"))
         self.daily_budget_gbp = daily_budget_gbp
         # Default exchange from env
         self.exchange_id = exchange_id or os.getenv("EXCHANGE_PRIORITY", "kraken").split(",")[0].strip()
@@ -824,7 +826,7 @@ def get_trading_engine() -> TradingEngine:
     """Get or create the singleton trading engine."""
     global _engine
     if _engine is None:
-        daily_budget = float(os.getenv("DAILY_TRADE_BUDGET_GBP", "0.05"))
+        daily_budget = float(os.getenv("DAILY_TRADE_BUDGET_GBP", "3.00"))
         server_url = os.getenv("TRADE_SERVER_URL", "http://localhost:5001")
         # Use first exchange from EXCHANGE_PRIORITY (default: kraken)
         priority = os.getenv("EXCHANGE_PRIORITY", "kraken")

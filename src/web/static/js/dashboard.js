@@ -5,6 +5,7 @@ async function loadOverviewCards() {
         loadPortfolioCard(),
         loadTradingCard(),
         loadScanCard(),
+        loadMonitorCard(),
         loadExchangeCard(),
     ]);
 }
@@ -141,6 +142,57 @@ async function loadScanCard() {
         document.getElementById('scanStatus').textContent = '—';
         document.getElementById('scanSub').textContent = 'Unavailable';
         document.getElementById('scanSub').className = 'overview-card-sub neutral';
+    }
+}
+
+// ─── Market Monitor ──────────────────────────────────────────
+async function loadMonitorCard() {
+    try {
+        const res = await fetch('/api/monitor/status');
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        const valEl = document.getElementById('monitorStatus');
+        const subEl = document.getElementById('monitorSub');
+
+        const running = data.running ?? false;
+        const stats = data.stats || {};
+
+        if (running) {
+            valEl.textContent = '● Active';
+            valEl.style.color = 'var(--success)';
+        } else {
+            valEl.textContent = '○ Off';
+            valEl.style.color = 'var(--text-secondary)';
+        }
+
+        let subParts = [];
+        if (stats.alerts_fired > 0) {
+            subParts.push(`${stats.alerts_fired} alerts`);
+        }
+        if (stats.price_checks > 0) {
+            subParts.push(`${stats.price_checks} checks`);
+        }
+        if (stats.sell_proposals > 0) {
+            subParts.push(`${stats.sell_proposals} sells`);
+        }
+        if (stats.quick_scans > 0) {
+            subParts.push(`${stats.quick_scans} quick scans`);
+        }
+        if (subParts.length === 0 && running) {
+            subParts.push('Warming up...');
+        }
+        const intervals = data.intervals || {};
+        if (intervals.price_check_min) {
+            subParts.push(`every ${intervals.price_check_min}m`);
+        }
+        subEl.textContent = subParts.length > 0 ? subParts.join(' · ') : 'Not running';
+        subEl.className = 'overview-card-sub neutral';
+    } catch (e) {
+        console.warn('Monitor card:', e.message);
+        document.getElementById('monitorStatus').textContent = '—';
+        document.getElementById('monitorSub').textContent = 'Unavailable';
+        document.getElementById('monitorSub').className = 'overview-card-sub neutral';
     }
 }
 

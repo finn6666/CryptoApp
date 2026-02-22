@@ -1,0 +1,642 @@
+"""
+Market Monitor — Lightweight between-scan monitoring for the Pi.
+
+Runs three tiers of monitoring between deep scans, using only cached
+price data and local ML (no Gemini API calls):
+
+  Tier 1 — Price monitor    (every 5 min)   : stop-loss / take-profit / trailing-stop
+  Tier 2 — Momentum alerts  (every 15 min)  : volume spikes, rapid price moves
+  Tier 3 — Quick scan       (every 30 min)  : local gem detector on tradeable coins
+
+A single lightweight CMC data refresh runs every 15 min (~96 calls/day,
+well within the free-tier limit of 333/day).
+
+All tiers are CPU-friendly for Raspberry Pi — no heavy ML or LLM calls.
+"""
+
+import os
+import json
+import logging
+import threading
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
+
+MONITOR_LOG_DIR = Path("data/monitor_logs")
+MONITOR_STATE_FILE = Path("data/monitor_state.json")
+
+
+@dataclass
+class PriceSnapshot:
+    """A point-in-time price observation for a coin."""
+    symbol: str
+    price: float
+    volume_24h: float
+    pct_change_1h: float
+    pct_change_24h: float
+    timestamp: str = ""
+
+    def __post_init__(self):
+        if not self.timestamp:
+            self.timestamp = datetime.utcnow().isoformat()
+
+
+class MarketMonitor:
+    """
+    Lightweight market monitor that runs between deep scans.
+
+    Resource budget (Pi-friendly):
+      - CPU: negligible — just comparisons on cached data
+      - Memory: < 5 MB — holds recent snapshots in a rolling window
+      - Network: ~96 CMC calls/day (one every 15 min)
+      - Gemini API: ZERO — never called by the monitor
+    """
+
+    def __init__(self):
+        # ── Intervals (minutes) ──
+        self.price_check_interval = int(os.getenv("MONITOR_PRICE_INTERVAL_MIN", "5"))
+        self.momentum_interval = int(os.getenv("MONITOR_MOMENTUM_INTERVAL_MIN", "15"))
+        self.quick_scan_interval = int(os.getenv("MONITOR_QUICK_SCAN_INTERVAL_MIN", "30"))
+        self.data_refresh_interval = int(os.getenv("MONITOR_REFRESH_INTERVAL_MIN", "15"))
+
+        # ── Momentum thresholds ──
+        self.volume_spike_pct = float(os.getenv("MONITOR_VOLUME_SPIKE_PCT", "200"))
+        self.rapid_move_pct = float(os.getenv("MONITOR_RAPID_MOVE_PCT", "10"))
+        self.alert_cooldown_min = int(os.getenv("MONITOR_ALERT_COOLDOWN_MIN", "60"))
+
+        # ── Quick scan settings ──
+        self.quick_scan_top_n = int(os.getenv("MONITOR_QUICK_SCAN_TOP_N", "20"))
+        self.quick_scan_min_gem = float(os.getenv("MONITOR_QUICK_SCAN_MIN_GEM", "6.0"))
+
+        # ── Internal state ──
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+
+        # Rolling price history: symbol → [PriceSnapshot, ...]  (last ~2h)
+        self._price_history: Dict[str, List[PriceSnapshot]] = {}
+        self._max_history_minutes = 120  # keep 2 hours of snapshots
+
+        # Alert cooldowns: "type:symbol" → last_alert datetime
+        self._alert_cooldowns: Dict[str, datetime] = {}
+
+        # Counters for status
+        self._stats = {
+            "price_checks": 0,
+            "momentum_checks": 0,
+            "quick_scans": 0,
+            "data_refreshes": 0,
+            "alerts_fired": 0,
+            "sell_proposals": 0,
+            "started_at": None,
+            "last_price_check": None,
+            "last_momentum_check": None,
+            "last_quick_scan": None,
+            "last_data_refresh": None,
+        }
+
+        # Track when each tier last ran
+        self._last_price_check = datetime.min
+        self._last_momentum_check = datetime.min
+        self._last_quick_scan = datetime.min
+        self._last_data_refresh = datetime.min
+
+        MONITOR_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+        logger.info(
+            f"Market monitor initialised — "
+            f"price={self.price_check_interval}min, "
+            f"momentum={self.momentum_interval}min, "
+            f"quick_scan={self.quick_scan_interval}min, "
+            f"refresh={self.data_refresh_interval}min"
+        )
+
+    # ═══════════════════════════════════════════════════════════
+    # Tier 1 — Price Monitor (stop-loss / take-profit / trailing)
+    # ═══════════════════════════════════════════════════════════
+
+    def _run_price_check(self):
+        """Check held positions against exit thresholds using cached prices."""
+        try:
+            import services.app_state as state
+
+            if not state.analyzer or not state.analyzer.coins:
+                return
+
+            # Build live prices from cached analyser data (no API call!)
+            live_prices = {}
+            for coin in state.analyzer.coins:
+                if hasattr(coin, "price") and coin.price:
+                    live_prices[coin.symbol.upper()] = coin.price
+
+            if not live_prices:
+                return
+
+            # Check sell triggers
+            from ml.sell_automation import get_sell_automation
+            from ml.trading_engine import get_trading_engine
+
+            engine = get_trading_engine()
+            if engine.kill_switch:
+                return
+
+            sell_auto = get_sell_automation()
+            proposals = sell_auto.check_and_propose_sells(live_prices)
+
+            if proposals:
+                self._stats["sell_proposals"] += len(proposals)
+                for p in proposals:
+                    sym = p.get("symbol", "?")
+                    trigger = p.get("trigger", "unknown")
+                    logger.info(f"[Monitor] Sell trigger fired: {sym} — {trigger}")
+                    self._log_alert("sell_trigger", {
+                        "symbol": sym, "trigger": trigger, "details": p,
+                    })
+
+            self._stats["price_checks"] += 1
+            self._stats["last_price_check"] = datetime.utcnow().isoformat()
+
+        except Exception as e:
+            logger.warning(f"[Monitor] Price check error: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # Tier 2 — Momentum Alerts (volume spikes, rapid price moves)
+    # ═══════════════════════════════════════════════════════════
+
+    def _run_momentum_check(self):
+        """Detect volume spikes and rapid price moves from cached data."""
+        try:
+            import services.app_state as state
+
+            if not state.analyzer or not state.analyzer.coins:
+                return
+
+            alerts = []
+
+            for coin in state.analyzer.coins:
+                symbol = coin.symbol.upper()
+
+                # Skip stablecoins
+                if symbol in state.STABLECOINS:
+                    continue
+
+                price = getattr(coin, "price", 0) or 0
+                volume = getattr(coin, "volume_24h", 0) or getattr(coin, "total_volume", 0) or 0
+                pct_1h = getattr(coin, "percent_change_1h", 0) or getattr(coin, "price_change_percentage_1h", 0) or 0
+                pct_24h = getattr(coin, "percent_change_24h", 0) or getattr(coin, "price_change_percentage_24h", 0) or 0
+
+                if price <= 0:
+                    continue
+
+                # Record snapshot
+                snap = PriceSnapshot(
+                    symbol=symbol,
+                    price=price,
+                    volume_24h=volume,
+                    pct_change_1h=pct_1h,
+                    pct_change_24h=pct_24h,
+                )
+                self._record_snapshot(snap)
+
+                # ── Check: rapid price move (1h) ──
+                if abs(pct_1h) >= self.rapid_move_pct:
+                    direction = "up" if pct_1h > 0 else "down"
+                    alert_key = f"rapid_move:{symbol}"
+                    if self._can_alert(alert_key):
+                        alerts.append({
+                            "type": "rapid_move",
+                            "symbol": symbol,
+                            "direction": direction,
+                            "pct_1h": round(pct_1h, 2),
+                            "price": price,
+                        })
+                        self._mark_alerted(alert_key)
+
+                # ── Check: volume spike ──
+                # Compare current volume vs historical average from snapshots
+                history = self._price_history.get(symbol, [])
+                if len(history) >= 3:
+                    avg_vol = sum(s.volume_24h for s in history[:-1]) / len(history[:-1])
+                    if avg_vol > 0 and volume > avg_vol * (1 + self.volume_spike_pct / 100):
+                        alert_key = f"volume_spike:{symbol}"
+                        if self._can_alert(alert_key):
+                            alerts.append({
+                                "type": "volume_spike",
+                                "symbol": symbol,
+                                "current_volume": volume,
+                                "avg_volume": round(avg_vol, 2),
+                                "spike_pct": round((volume / avg_vol - 1) * 100, 1),
+                                "price": price,
+                            })
+                            self._mark_alerted(alert_key)
+
+                # ── Check: price reversal from our snapshots ──
+                if len(history) >= 4:
+                    oldest_price = history[0].price
+                    if oldest_price > 0:
+                        move_pct = ((price - oldest_price) / oldest_price) * 100
+                        if abs(move_pct) >= self.rapid_move_pct:
+                            alert_key = f"trend_move:{symbol}"
+                            if self._can_alert(alert_key):
+                                direction = "up" if move_pct > 0 else "down"
+                                alerts.append({
+                                    "type": "trend_move",
+                                    "symbol": symbol,
+                                    "direction": direction,
+                                    "move_pct": round(move_pct, 2),
+                                    "from_price": oldest_price,
+                                    "to_price": price,
+                                    "window_minutes": self._max_history_minutes,
+                                })
+                                self._mark_alerted(alert_key)
+
+            if alerts:
+                self._stats["alerts_fired"] += len(alerts)
+                logger.info(f"[Monitor] {len(alerts)} momentum alert(s) fired")
+                for a in alerts:
+                    self._log_alert("momentum", a)
+
+                # Email digest if significant alerts exist
+                self._send_alert_digest(alerts)
+
+            self._stats["momentum_checks"] += 1
+            self._stats["last_momentum_check"] = datetime.utcnow().isoformat()
+
+        except Exception as e:
+            logger.warning(f"[Monitor] Momentum check error: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # Tier 3 — Quick Scan (local gem detector — no API calls)
+    # ═══════════════════════════════════════════════════════════
+
+    def _run_quick_scan(self):
+        """
+        Lightweight gem score scan using local ML only.
+        No Gemini/ADK calls — just the local gem detector model.
+        Flags coins that have crossed the gem threshold since the last deep scan.
+        """
+        try:
+            import services.app_state as state
+
+            if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
+                logger.debug("[Monitor] Quick scan skipped — gem detector not available")
+                return
+
+            if not state.analyzer or not state.analyzer.coins:
+                return
+
+            from ml.exchange_manager import get_exchange_manager
+            exchange_mgr = get_exchange_manager()
+
+            new_gems = []
+            scored_count = 0
+
+            for coin in state.analyzer.coins:
+                symbol = coin.symbol.upper()
+                if symbol in state.STABLECOINS:
+                    continue
+
+                # Only score tradeable coins
+                exchanges = exchange_mgr.get_exchanges_for_coin(symbol)
+                if not exchanges:
+                    continue
+
+                coin_dict = state.coin_to_dict(coin)
+                try:
+                    gem_result = state.gem_detector.predict_hidden_gem(coin_dict)
+                    gem_score = gem_result.get("gem_score", 0)
+                    gem_prob = gem_result.get("gem_probability", 0)
+                    scored_count += 1
+
+                    if gem_score >= self.quick_scan_min_gem:
+                        new_gems.append({
+                            "symbol": symbol,
+                            "gem_score": round(gem_score, 2),
+                            "gem_probability": round(gem_prob, 4),
+                            "price": getattr(coin, "price", 0),
+                            "exchanges": exchanges[:2],
+                            "strengths": gem_result.get("key_strengths", [])[:3],
+                        })
+
+                except Exception:
+                    pass
+
+                # Cap to avoid hogging CPU on the Pi
+                if scored_count >= self.quick_scan_top_n:
+                    break
+
+            # Sort by gem score
+            new_gems.sort(key=lambda g: g["gem_score"], reverse=True)
+
+            if new_gems:
+                logger.info(
+                    f"[Monitor] Quick scan found {len(new_gems)} gems above "
+                    f"{self.quick_scan_min_gem}: "
+                    f"{', '.join(g['symbol'] for g in new_gems[:5])}"
+                )
+                # Record for gem score tracking
+                try:
+                    from ml.gem_score_tracker import get_gem_score_tracker
+                    tracker = get_gem_score_tracker()
+                    for gem in new_gems:
+                        tracker.record_score(
+                            symbol=gem["symbol"],
+                            gem_probability=gem["gem_probability"],
+                            gem_score=gem["gem_score"],
+                            recommendation="WATCH",
+                            source="monitor_quick_scan",
+                        )
+                except Exception:
+                    pass
+
+                self._log_alert("quick_scan", {
+                    "gems_found": len(new_gems),
+                    "scored": scored_count,
+                    "top_gems": new_gems[:5],
+                })
+
+            self._stats["quick_scans"] += 1
+            self._stats["last_quick_scan"] = datetime.utcnow().isoformat()
+
+        except Exception as e:
+            logger.warning(f"[Monitor] Quick scan error: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # Data Refresh (lightweight CMC pull — ~96 calls/day)
+    # ═══════════════════════════════════════════════════════════
+
+    def _refresh_data(self):
+        """
+        Lightweight data refresh from CoinMarketCap.
+        Uses the same call the app already does — just more frequently.
+        ~96 calls/day at 15-min intervals (free tier = 333/day).
+        """
+        try:
+            from src.core.live_data_fetcher import fetch_and_update_data
+            import services.app_state as state
+
+            result = fetch_and_update_data()
+            if result:
+                state.analyzer.load_data()
+                self._stats["data_refreshes"] += 1
+                self._stats["last_data_refresh"] = datetime.utcnow().isoformat()
+                logger.debug(f"[Monitor] Data refreshed — {len(state.analyzer.coins)} coins")
+            else:
+                logger.debug("[Monitor] Data refresh returned no data (may be cached)")
+
+        except Exception as e:
+            logger.warning(f"[Monitor] Data refresh error: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # Scheduler & Main Loop
+    # ═══════════════════════════════════════════════════════════
+
+    def start(self):
+        """Start the monitor in a background thread."""
+        if self._running:
+            logger.info("[Monitor] Already running")
+            return
+
+        self._stop_event.clear()
+        self._running = True
+        self._stats["started_at"] = datetime.utcnow().isoformat()
+
+        self._thread = threading.Thread(
+            target=self._monitor_loop, daemon=True, name="market-monitor"
+        )
+        self._thread.start()
+        logger.info(
+            f"📡 Market monitor started — "
+            f"price/{self.price_check_interval}m, "
+            f"momentum/{self.momentum_interval}m, "
+            f"quick_scan/{self.quick_scan_interval}m"
+        )
+
+    def stop(self):
+        """Stop the monitor."""
+        self._stop_event.set()
+        self._running = False
+        logger.info("[Monitor] Stopped")
+
+    def _monitor_loop(self):
+        """
+        Main loop — checks every 60s which tiers are due to run.
+        Staggers work so the Pi never runs multiple tiers simultaneously.
+        """
+        # Small initial delay to let the app finish starting up
+        self._stop_event.wait(30)
+
+        while not self._stop_event.is_set():
+            now = datetime.utcnow()
+
+            try:
+                # ── Data refresh (every 15 min) ──
+                if self._minutes_since(self._last_data_refresh) >= self.data_refresh_interval:
+                    self._last_data_refresh = now
+                    self._refresh_data()
+                    # Small pause to let data settle
+                    self._stop_event.wait(2)
+
+                # ── Tier 1: Price check (every 5 min) ──
+                if self._minutes_since(self._last_price_check) >= self.price_check_interval:
+                    self._last_price_check = now
+                    self._run_price_check()
+
+                # ── Tier 2: Momentum (every 15 min) ──
+                if self._minutes_since(self._last_momentum_check) >= self.momentum_interval:
+                    self._last_momentum_check = now
+                    self._run_momentum_check()
+
+                # ── Tier 3: Quick scan (every 30 min) ──
+                if self._minutes_since(self._last_quick_scan) >= self.quick_scan_interval:
+                    self._last_quick_scan = now
+                    self._run_quick_scan()
+
+            except Exception as e:
+                logger.error(f"[Monitor] Loop error: {e}")
+
+            # Sleep 60s between ticks (short enough for 5-min price checks)
+            self._stop_event.wait(60)
+
+    # ═══════════════════════════════════════════════════════════
+    # Helpers
+    # ═══════════════════════════════════════════════════════════
+
+    def _minutes_since(self, last: datetime) -> float:
+        return (datetime.utcnow() - last).total_seconds() / 60
+
+    def _record_snapshot(self, snap: PriceSnapshot):
+        """Add a snapshot to rolling history, prune old entries."""
+        if snap.symbol not in self._price_history:
+            self._price_history[snap.symbol] = []
+
+        history = self._price_history[snap.symbol]
+        history.append(snap)
+
+        # Prune entries older than the window
+        cutoff = datetime.utcnow() - timedelta(minutes=self._max_history_minutes)
+        cutoff_iso = cutoff.isoformat()
+        self._price_history[snap.symbol] = [
+            s for s in history if s.timestamp >= cutoff_iso
+        ]
+
+    def _can_alert(self, key: str) -> bool:
+        """Check if an alert key is past its cooldown."""
+        last = self._alert_cooldowns.get(key)
+        if not last:
+            return True
+        elapsed = (datetime.utcnow() - last).total_seconds() / 60
+        return elapsed >= self.alert_cooldown_min
+
+    def _mark_alerted(self, key: str):
+        """Mark an alert key as having just fired."""
+        self._alert_cooldowns[key] = datetime.utcnow()
+
+    def _log_alert(self, alert_type: str, data: Dict[str, Any]):
+        """Write an alert to the daily monitor log (JSONL)."""
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        log_file = MONITOR_LOG_DIR / f"monitor_{today}.jsonl"
+
+        entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "type": alert_type,
+            **data,
+        }
+        try:
+            with open(log_file, "a") as f:
+                f.write(json.dumps(entry, default=str) + "\n")
+        except Exception as e:
+            logger.error(f"[Monitor] Failed to write log: {e}")
+
+    def _send_alert_digest(self, alerts: List[Dict]):
+        """
+        Send an email digest for significant momentum alerts.
+        Only fires if there are alerts worth emailing about.
+        """
+        # Only email for big moves (>= 15% rapid moves or volume spikes on held coins)
+        significant = []
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            tracker = get_portfolio_tracker()
+            held_symbols = set(tracker.holdings.keys())
+        except Exception:
+            held_symbols = set()
+
+        for a in alerts:
+            sym = a.get("symbol", "")
+            if a["type"] == "rapid_move" and abs(a.get("pct_1h", 0)) >= 15:
+                significant.append(a)
+            elif a["type"] == "volume_spike" and sym in held_symbols:
+                significant.append(a)
+            elif a["type"] == "sell_trigger":
+                significant.append(a)
+
+        if not significant:
+            return
+
+        try:
+            from ml.error_handling import send_email_alert
+
+            lines = [f"⚡ Market Monitor — {len(significant)} alert(s)\n"]
+            for a in significant:
+                if a["type"] == "rapid_move":
+                    lines.append(
+                        f"  🚀 {a['symbol']}: {a['pct_1h']:+.1f}% in 1h "
+                        f"(price: ${a.get('price', 0):.6f})"
+                    )
+                elif a["type"] == "volume_spike":
+                    lines.append(
+                        f"  📊 {a['symbol']}: volume spike {a.get('spike_pct', 0):.0f}% "
+                        f"above average"
+                    )
+                elif a["type"] == "sell_trigger":
+                    lines.append(
+                        f"  🔔 {a['symbol']}: {a.get('trigger', 'exit trigger')}"
+                    )
+
+            send_email_alert("Market Monitor Alert", "\n".join(lines))
+            logger.info(f"[Monitor] Alert email sent ({len(significant)} alerts)")
+
+        except Exception as e:
+            logger.debug(f"[Monitor] Alert email failed: {e}")
+
+    # ═══════════════════════════════════════════════════════════
+    # Status & API
+    # ═══════════════════════════════════════════════════════════
+
+    def get_status(self) -> Dict[str, Any]:
+        """Get monitor status for the dashboard."""
+        return {
+            "running": self._running,
+            "intervals": {
+                "price_check_min": self.price_check_interval,
+                "momentum_min": self.momentum_interval,
+                "quick_scan_min": self.quick_scan_interval,
+                "data_refresh_min": self.data_refresh_interval,
+            },
+            "thresholds": {
+                "volume_spike_pct": self.volume_spike_pct,
+                "rapid_move_pct": self.rapid_move_pct,
+                "quick_scan_min_gem": self.quick_scan_min_gem,
+            },
+            "stats": self._stats.copy(),
+            "tracked_symbols": len(self._price_history),
+            "active_cooldowns": len(self._alert_cooldowns),
+        }
+
+    def get_recent_alerts(self, limit: int = 50) -> List[Dict]:
+        """Read recent alerts from today's monitor log."""
+        today = datetime.utcnow().strftime("%Y-%m-%d")
+        log_file = MONITOR_LOG_DIR / f"monitor_{today}.jsonl"
+
+        if not log_file.exists():
+            return []
+
+        try:
+            import collections
+            tail: collections.deque = collections.deque(maxlen=limit)
+            with open(log_file) as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped:
+                        tail.append(stripped)
+
+            entries = []
+            for line in reversed(tail):
+                try:
+                    entries.append(json.loads(line))
+                except Exception:
+                    pass
+            return entries
+        except Exception:
+            return []
+
+    def get_price_history(self, symbol: str) -> List[Dict]:
+        """Get recent price snapshots for a symbol."""
+        history = self._price_history.get(symbol.upper(), [])
+        return [
+            {
+                "price": s.price,
+                "volume_24h": s.volume_24h,
+                "pct_change_1h": s.pct_change_1h,
+                "timestamp": s.timestamp,
+            }
+            for s in history
+        ]
+
+
+# ─── Singleton ────────────────────────────────────────────────
+
+_monitor: Optional[MarketMonitor] = None
+
+
+def get_market_monitor() -> MarketMonitor:
+    """Get or create the singleton market monitor."""
+    global _monitor
+    if _monitor is None:
+        _monitor = MarketMonitor()
+    return _monitor

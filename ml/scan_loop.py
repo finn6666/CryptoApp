@@ -537,9 +537,28 @@ class ScanLoop:
         else:
             logger.info(f"📊 Scan scheduler started — daily scan at {self.scan_time}")
 
+        # Start the lightweight market monitor between deep scans
+        monitor_enabled = os.getenv("MONITOR_ENABLED", "true").lower() in ("1", "true", "yes")
+        if monitor_enabled:
+            try:
+                from ml.market_monitor import get_market_monitor
+                monitor = get_market_monitor()
+                monitor.start()
+            except Exception as e:
+                logger.warning(f"Market monitor not started: {e}")
+
     def stop_scheduler(self):
         """Stop the background scheduler."""
         self._stop_event.set()
+
+        # Also stop the market monitor
+        try:
+            from ml.market_monitor import get_market_monitor
+            monitor = get_market_monitor()
+            monitor.stop()
+        except Exception:
+            pass
+
         logger.info("Scan scheduler stopped")
 
     def _scheduler_loop(self):
@@ -568,6 +587,15 @@ class ScanLoop:
 
     def get_status(self) -> Dict[str, Any]:
         """Get scan loop status."""
+        # Include market monitor status
+        monitor_status = None
+        try:
+            from ml.market_monitor import get_market_monitor
+            monitor = get_market_monitor()
+            monitor_status = monitor.get_status()
+        except Exception:
+            pass
+
         return {
             "scan_time": self.scan_time,
             "scan_interval_hours": self.scan_interval_hours,
@@ -587,6 +615,7 @@ class ScanLoop:
             ),
             "next_scan": self._estimate_next_scan(),
             "cooldown_hours": self.cooldown_hours,
+            "market_monitor": monitor_status,
         }
 
     def _estimate_next_scan(self) -> Optional[str]:

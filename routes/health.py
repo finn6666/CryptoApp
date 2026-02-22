@@ -79,6 +79,22 @@ def api_health():
     except Exception:
         scan_status = {'scheduler_running': False}
 
+    # Market monitor status
+    monitor_status = {}
+    try:
+        from ml.market_monitor import get_market_monitor
+        monitor = get_market_monitor()
+        if monitor:
+            mon_info = monitor.get_status()
+            monitor_status = {
+                'running': mon_info.get('running', False),
+                'price_checks': mon_info.get('stats', {}).get('price_checks', 0),
+                'alerts_fired': mon_info.get('stats', {}).get('alerts_fired', 0),
+                'quick_scans': mon_info.get('stats', {}).get('quick_scans', 0),
+            }
+    except Exception:
+        monitor_status = {'running': False}
+
     # System metrics (lightweight — no interval sleep)
     system_metrics = {}
     try:
@@ -101,6 +117,7 @@ def api_health():
             'adk_orchestrator': state.official_adk_available,
             'trading_engine': trading_status,
             'scan_loop': scan_status,
+            'market_monitor': monitor_status,
         },
         'cache': {
             'analysis_entries': len(state.agent_analysis_cache),

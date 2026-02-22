@@ -54,16 +54,17 @@ class TestTradingEngine:
     def engine(self, tmp_data_dir):
         """Create a TradingEngine with temp storage."""
         return TradingEngine(
-            daily_budget_gbp=0.05,
+            daily_budget_gbp=float(os.getenv('DAILY_TRADE_BUDGET_GBP', '3.00')),
             exchange_id="kraken",
             data_dir=str(tmp_data_dir / "trades"),
             server_url="http://localhost:5001",
         )
 
     def test_initial_state(self, engine):
-        assert engine.daily_budget_gbp == 0.05
+        expected_budget = float(os.getenv('DAILY_TRADE_BUDGET_GBP', '3.00'))
+        assert engine.daily_budget_gbp == expected_budget
         assert engine.kill_switch is False
-        assert engine.get_remaining_budget() == 0.05
+        assert engine.get_remaining_budget() == expected_budget
 
     def test_can_afford_trade(self, engine):
         assert engine.can_afford_trade(0.02) is True

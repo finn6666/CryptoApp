@@ -11,6 +11,7 @@ Supports:
 
 import logging
 import json
+import os
 import numpy as np
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field, asdict
@@ -74,13 +75,15 @@ class BacktestEngine:
     def __init__(
         self,
         initial_capital_gbp: float = 1.0,
-        daily_budget_gbp: float = 0.05,
+        daily_budget_gbp: float = None,
         fee_pct: float = 0.5,
         slippage_pct: float = 0.1,
         profit_target_pct: float = 20.0,
         stop_loss_pct: float = -15.0,
     ):
         self.initial_capital = initial_capital_gbp
+        if daily_budget_gbp is None:
+            daily_budget_gbp = float(os.getenv("DAILY_TRADE_BUDGET_GBP", "3.00"))
         self.daily_budget = daily_budget_gbp
         self.fee_pct = fee_pct / 100
         self.slippage_pct = slippage_pct / 100
