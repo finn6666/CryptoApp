@@ -109,18 +109,12 @@ class TradingEngine:
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
-        # Buy-side auto-approve: quiet hours only (e.g. 22:00–08:00)
-        # During these hours buys execute immediately; outside → email approval
-        self._auto_approve_start = os.getenv("BUY_AUTO_APPROVE_START", "22:00")
-        self._auto_approve_end = os.getenv("BUY_AUTO_APPROVE_END", "08:00")
+        # Buy-side auto-approve: buys within budget execute immediately
         self.buy_auto_approve = os.getenv(
             "BUY_AUTO_APPROVE", "true"
         ).lower() in ("1", "true", "yes")
         if self.buy_auto_approve:
-            logger.info(
-                f"🤖 Buy-side: auto-approve ENABLED during quiet hours "
-                f"({self._auto_approve_start}–{self._auto_approve_end})"
-            )
+            logger.info("🤖 Buy-side: auto-approve ENABLED — buys within budget execute immediately")
 
         # Sell-side control: require manual approval for sells (cannot be bypassed)
         self.sell_require_approval = os.getenv(
@@ -308,27 +302,7 @@ class TradingEngine:
             "email_sent": email_sent,
         }
 
-    # ─── Auto-Approve (quiet hours) ─────────────────────────
-
-    def _is_quiet_hours(self) -> bool:
-        """Check if the current local time falls within auto-approve quiet hours."""
-        now = datetime.now()  # local time
-        try:
-            start_h, start_m = map(int, self._auto_approve_start.split(":"))
-            end_h, end_m = map(int, self._auto_approve_end.split(":"))
-        except (ValueError, AttributeError):
-            return False
-
-        current = now.hour * 60 + now.minute
-        start = start_h * 60 + start_m
-        end = end_h * 60 + end_m
-
-        if start <= end:
-            # e.g. 08:00–18:00
-            return start <= current < end
-        else:
-            # Overnight span, e.g. 22:00–08:00
-            return current >= start or current < end
+    # ─── Auto-Approve ────────────────────────────────────────
 
     def propose_and_auto_execute(
         self,
@@ -363,14 +337,14 @@ class TradingEngine:
         proposal_id = result["proposal_id"]
         is_sell = side.lower() == "sell"
 
-        # Only auto-approve buys when the flag is on AND we're in quiet hours
-        if is_sell or not self.buy_auto_approve or not self._is_quiet_hours():
+        # Only auto-approve buys; sells always need manual approval
+        if is_sell or not self.buy_auto_approve:
             return result  # normal email-approval flow
 
-        # Auto-approve: execute immediately (quiet hours)
+        # Auto-approve: execute immediately
         logger.info(
             f"🤖 Auto-approving BUY {symbol} £{amount_gbp:.4f} "
-            f"(confidence {confidence}%, quiet hours)"
+            f"(confidence {confidence}%)"
         )
         exec_result = self.approve_trade(proposal_id)
         exec_result["auto_approved"] = True
