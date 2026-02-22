@@ -49,6 +49,7 @@ class ScanLoop:
         # Cooldown: minimum hours between scans
         self.cooldown_hours = float(os.getenv("SCAN_COOLDOWN_HOURS", "1"))
         self._last_scan_time: Optional[datetime] = None
+        self._scheduler_started_at: Optional[datetime] = None
 
         SCAN_LOGS_DIR.mkdir(parents=True, exist_ok=True)
         AUDIT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -526,6 +527,7 @@ class ScanLoop:
             return
 
         self._stop_event.clear()
+        self._scheduler_started_at = datetime.utcnow()
         self._scheduler_thread = threading.Thread(
             target=self._scheduler_loop, daemon=True, name="scan-scheduler"
         )
@@ -590,8 +592,20 @@ class ScanLoop:
     def _estimate_next_scan(self) -> Optional[str]:
         """Estimate when the next scan will fire."""
         from datetime import timedelta
-        if self.scan_interval_hours > 0 and self._last_scan_time:
-            return (self._last_scan_time + timedelta(hours=self.scan_interval_hours)).isoformat()
+        if self.scan_interval_hours > 0:
+            if self._last_scan_time:
+                return (self._last_scan_time + timedelta(hours=self.scan_interval_hours)).isoformat()
+            elif self._scheduler_started_at:
+                # No scan yet — first scan fires one interval after scheduler start
+                return (self._scheduler_started_at + timedelta(hours=self.scan_interval_hours)).isoformat()
+        elif self.scan_time:
+            # Daily mode — next occurrence of scan_time today or tomorrow
+            now = datetime.utcnow()
+            h, m = map(int, self.scan_time.split(":"))
+            target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            return target.isoformat()
         return None
 
     def get_recent_logs(self, days: int = 7) -> List[Dict]:
