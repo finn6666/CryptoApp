@@ -1,0 +1,6 @@
+{"timestamp": "2026-02-22T12:01:34.030819", "date": "2026-02-22", "symbol": "UP", "gem_probability": 0.65, "gem_score": 65, "recommendation": "Analysis completed", "source": "adk_orchestrator"}
+{"timestamp": "2026-02-22T12:02:46.380620", "date": "2026-02-22", "symbol": "SUP", "gem_probability": 0.75, "gem_score": 75, "recommendation": "Analysis completed", "source": "adk_orchestrator"}
+{"timestamp": "2026-02-22T12:03:55.053675", "date": "2026-02-22", "symbol": "RNBW", "gem_probability": 0.65, "gem_score": 65, "recommendation": "Analysis completed", "source": "adk_orchestrator"}
+{"timestamp": "2026-02-22T12:05:07.519488", "date": "2026-02-22", "symbol": "COW", "gem_probability": 0.75, "gem_score": 75, "recommendation": "Analysis completed", "source": "adk_orchestrator"}
+{"timestamp": "2026-02-22T12:06:48.537561", "date": "2026-02-22", "symbol": "ESP", "gem_probability": 0.15, "gem_score": 15, "recommendation": "Analysis completed", "source": "adk_orchestrator"}
+{"timestamp": "2026-02-22T12:07:43.169157", "date": "2026-02-22", "symbol": "FIDD", "gem_probability": 0.65, "gem_score": 65, "recommendation": "Analysis completed", "source": "adk_orchestrator"}

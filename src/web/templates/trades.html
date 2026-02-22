@@ -585,6 +585,23 @@
             setInterval(loadScanStatus, 60000);
         });
 
+        // ─── Auth Helper ────────────────────────────────────
+
+        function getApiKey() {
+            let key = sessionStorage.getItem('tradingApiKey');
+            if (!key) {
+                key = prompt('Enter your TRADING_API_KEY:');
+                if (key) sessionStorage.setItem('tradingApiKey', key);
+            }
+            return key;
+        }
+
+        function authHeaders() {
+            const key = getApiKey();
+            if (!key) return null;
+            return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
+        }
+
         // ─── Live Trading Functions ──────────────────────────
 
         async function loadTradingStatus() {
@@ -760,13 +777,24 @@
             }
         }
         async function approveTrade(proposalId) {
+            if (!confirm('Approve and execute this trade?')) return;
+            const hdrs = authHeaders();
+            if (!hdrs) return;
             try {
-                const response = await fetch(`/api/trades/approve/${proposalId}`);
-                showAlert('Trade approved — executing...', 'success');
+                const response = await fetch(`/api/trades/approve/${proposalId}`, {
+                    method: 'POST', headers: hdrs
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showAlert(`✅ Trade approved — ${data.side?.toUpperCase()} ${data.symbol}`, 'success');
+                } else {
+                    showAlert(`⚠️ ${data.error || 'Could not approve'}`, 'error');
+                }
                 setTimeout(() => {
                     loadPendingProposals();
                     loadExecutedTrades();
                     loadTradingStatus();
+                    loadPortfolio();
                 }, 1000);
             } catch (e) {
                 showAlert('Error approving trade: ' + e.message, 'error');
@@ -774,9 +802,19 @@
         }
 
         async function rejectTrade(proposalId) {
+            if (!confirm('Reject this trade proposal?')) return;
+            const hdrs = authHeaders();
+            if (!hdrs) return;
             try {
-                const response = await fetch(`/api/trades/reject/${proposalId}`);
-                showAlert('Trade rejected', 'info');
+                const response = await fetch(`/api/trades/reject/${proposalId}`, {
+                    method: 'POST', headers: hdrs
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showAlert('Trade rejected', 'info');
+                } else {
+                    showAlert(`⚠️ ${data.error || 'Could not reject'}`, 'error');
+                }
                 loadPendingProposals();
             } catch (e) {
                 showAlert('Error rejecting trade: ' + e.message, 'error');
@@ -790,10 +828,12 @@
 
             if (!isHalted && !confirm('⛔ This will HALT all trading and reject pending proposals. Continue?')) return;
 
+            const hdrs = authHeaders();
+            if (!hdrs) return;
             try {
                 await fetch('/api/trades/kill-switch', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: hdrs,
                     body: JSON.stringify({action})
                 });
                 showAlert(isHalted ? 'Trading resumed' : 'Trading HALTED — all pending proposals rejected', isHalted ? 'success' : 'error');
@@ -852,15 +892,12 @@
             const resultEl = document.getElementById('scanResultMsg');
 
             try {
-                const apiKey = prompt('Enter your TRADING_API_KEY:');
-                if (!apiKey) { btn.disabled = false; btn.textContent = '🔍 Scan Now'; return; }
+                const hdrs = authHeaders();
+                if (!hdrs) { btn.disabled = false; btn.textContent = '🔍 Scan Now'; return; }
 
                 const response = await fetch('/api/trades/scan-now', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    }
+                    headers: hdrs
                 });
                 const data = await response.json();
 

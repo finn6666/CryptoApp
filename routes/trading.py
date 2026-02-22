@@ -238,6 +238,44 @@ def _error_page(title: str, message: str) -> str:
     """
 
 
+# ========================================
+# In-App Approve / Reject (no email token needed)
+# ========================================
+
+@trading_bp.route('/api/trades/approve/<proposal_id>', methods=['POST'])
+@limiter.limit('10 per minute')
+@require_trading_auth
+def approve_trade_api(proposal_id):
+    """Approve a pending trade proposal from the web UI."""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        result = engine.approve_trade(proposal_id)
+        if result.get('success'):
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        logger.error(f"Approve trade error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@trading_bp.route('/api/trades/reject/<proposal_id>', methods=['POST'])
+@limiter.limit('10 per minute')
+@require_trading_auth
+def reject_trade_api(proposal_id):
+    """Reject a pending trade proposal from the web UI."""
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        result = engine.reject_trade(proposal_id)
+        if result.get('success'):
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        logger.error(f"Reject trade error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @trading_bp.route('/api/trades/propose', methods=['POST'])
 @limiter.limit('10 per hour')
 @require_trading_auth
