@@ -35,6 +35,8 @@ class ScanLoop:
 
     def __init__(self):
         self.scan_time = os.getenv("SCAN_TIME", "12:00")
+        # Interval-based scanning: run every N hours (0 = once-daily at scan_time only)
+        self.scan_interval_hours = float(os.getenv("SCAN_INTERVAL_HOURS", "6"))
         self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "10"))
         self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "5.0"))
         self.scan_running = False
@@ -51,8 +53,9 @@ class ScanLoop:
         SCAN_LOGS_DIR.mkdir(parents=True, exist_ok=True)
         AUDIT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
+        interval_desc = f"every {self.scan_interval_hours}h" if self.scan_interval_hours > 0 else f"daily at {self.scan_time}"
         logger.info(
-            f"Scan loop initialised — time={self.scan_time}, "
+            f"Scan loop initialised — schedule={interval_desc}, "
             f"max_coins={self.max_coins_per_scan}, "
             f"max_proposals={self.max_proposals_per_scan}"
         )
@@ -445,7 +448,9 @@ class ScanLoop:
                 amount = remaining * (allocation_pct / 100)
                 amount = min(amount, remaining)
 
-                result = engine.propose_trade(
+                # Use auto-execute for scheduled scans so trades don't
+                # sit waiting for manual approval overnight.
+                result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side=trade_side,
                     amount_gbp=round(amount, 4),
@@ -455,9 +460,11 @@ class ScanLoop:
                     recommendation=analysis.get("recommendation", "BUY"),
                 )
 
+                outcome = "executed" if result.get("auto_approved") else "proposed"
                 return {
-                    "outcome": "proposed",
+                    "outcome": outcome,
                     "proposed": result.get("success", False),
+                    "auto_approved": result.get("auto_approved", False),
                     "confidence": conviction,
                     "reason": trade_reasoning,
                     "proposal_id": result.get("proposal_id"),
@@ -523,7 +530,10 @@ class ScanLoop:
             target=self._scheduler_loop, daemon=True, name="scan-scheduler"
         )
         self._scheduler_thread.start()
-        logger.info(f"📊 Scan scheduler started — daily scan at {self.scan_time}")
+        if self.scan_interval_hours > 0:
+            logger.info(f"📊 Scan scheduler started — scanning every {self.scan_interval_hours}h")
+        else:
+            logger.info(f"📊 Scan scheduler started — daily scan at {self.scan_time}")
 
     def stop_scheduler(self):
         """Stop the background scheduler."""
@@ -531,15 +541,22 @@ class ScanLoop:
         logger.info("Scan scheduler stopped")
 
     def _scheduler_loop(self):
-        """Background loop that triggers scans at the configured time."""
+        """Background loop that triggers scans at the configured interval."""
         import schedule
 
-        # Parse scan time
-        schedule.every().day.at(self.scan_time).do(
-            lambda: self.run_scan(triggered_by="scheduled")
-        )
-
-        logger.info(f"Scan scheduled daily at {self.scan_time}")
+        if self.scan_interval_hours > 0:
+            # Interval mode: scan every N hours
+            interval_min = int(self.scan_interval_hours * 60)
+            schedule.every(interval_min).minutes.do(
+                lambda: self.run_scan(triggered_by="scheduled")
+            )
+            logger.info(f"Scan scheduled every {self.scan_interval_hours}h ({interval_min} min)")
+        else:
+            # Legacy mode: once daily at a fixed time
+            schedule.every().day.at(self.scan_time).do(
+                lambda: self.run_scan(triggered_by="scheduled")
+            )
+            logger.info(f"Scan scheduled daily at {self.scan_time}")
 
         while not self._stop_event.is_set():
             schedule.run_pending()
@@ -551,6 +568,7 @@ class ScanLoop:
         """Get scan loop status."""
         return {
             "scan_time": self.scan_time,
+            "scan_interval_hours": self.scan_interval_hours,
             "scan_running": self.scan_running,
             "scheduler_running": (
                 self._scheduler_thread is not None
@@ -565,8 +583,16 @@ class ScanLoop:
             "last_scan": (
                 self._last_scan_time.isoformat() if self._last_scan_time else None
             ),
+            "next_scan": self._estimate_next_scan(),
             "cooldown_hours": self.cooldown_hours,
         }
+
+    def _estimate_next_scan(self) -> Optional[str]:
+        """Estimate when the next scan will fire."""
+        from datetime import timedelta
+        if self.scan_interval_hours > 0 and self._last_scan_time:
+            return (self._last_scan_time + timedelta(hours=self.scan_interval_hours)).isoformat()
+        return None
 
     def get_recent_logs(self, days: int = 7) -> List[Dict]:
         """Get recent scan logs."""

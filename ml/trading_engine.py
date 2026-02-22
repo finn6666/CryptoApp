@@ -109,6 +109,13 @@ class TradingEngine:
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
 
+        # Buy-side auto-approve: skip email approval for buy trades within budget
+        self.buy_auto_approve = os.getenv(
+            "BUY_AUTO_APPROVE", "true"
+        ).lower() in ("1", "true", "yes")
+        if self.buy_auto_approve:
+            logger.info("🤖 Buy-side: auto-approve ENABLED — buys within budget will execute immediately")
+
         # Sell-side control: require manual approval for sells (cannot be bypassed)
         self.sell_require_approval = os.getenv(
             "SELL_REQUIRE_APPROVAL", "true"
@@ -294,6 +301,54 @@ class TradingEngine:
             "price": current_price,
             "email_sent": email_sent,
         }
+
+    # ─── Auto-Approve (for scheduled scans) ────────────────────
+
+    def propose_and_auto_execute(
+        self,
+        symbol: str,
+        side: str,
+        amount_gbp: float,
+        current_price: float,
+        reason: str,
+        confidence: int,
+        recommendation: str,
+    ) -> Dict[str, Any]:
+        """
+        Propose a trade and, if auto-approve is enabled for that side,
+        immediately approve and execute it.  Falls back to the normal
+        email-approval flow when auto-approve is off.
+
+        Sells ALWAYS require manual approval regardless of this setting.
+        """
+        result = self.propose_trade(
+            symbol=symbol,
+            side=side,
+            amount_gbp=amount_gbp,
+            current_price=current_price,
+            reason=reason,
+            confidence=confidence,
+            recommendation=recommendation,
+        )
+
+        if not result.get("success"):
+            return result
+
+        proposal_id = result["proposal_id"]
+        is_sell = side.lower() == "sell"
+
+        # Only auto-approve buys when the flag is on; sells always need manual approval
+        if is_sell or not self.buy_auto_approve:
+            return result  # normal email-approval flow
+
+        # Auto-approve: execute immediately
+        logger.info(
+            f"🤖 Auto-approving BUY {symbol} £{amount_gbp:.4f} "
+            f"(confidence {confidence}%)"
+        )
+        exec_result = self.approve_trade(proposal_id)
+        exec_result["auto_approved"] = True
+        return exec_result
 
     # ─── Approval / Rejection ─────────────────────────────────
 
