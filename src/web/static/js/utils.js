@@ -43,9 +43,11 @@ function startInitialRetry() {
     const maxRetries = 12; // 12 × 10s = 2 minutes
     const timer = setInterval(async () => {
         _initialRetryCount++;
-        // Check if market data is loaded by inspecting the opportunity text
-        const oppText = document.getElementById('opportunityText');
-        const hasData = oppText && !oppText.textContent.includes('Waiting') && !oppText.textContent.includes('Connecting');
+        // Check if portfolio card has loaded real data (no longer shows default text)
+        const valEl = document.getElementById('portfolioValue');
+        const tradingEl = document.getElementById('tradingBudget');
+        const hasData = (valEl && valEl.textContent !== '$0.00' && valEl.textContent !== '—') ||
+                        (tradingEl && tradingEl.textContent !== '—' && tradingEl.textContent !== 'Connecting...');
         if (hasData || _initialRetryCount >= maxRetries) {
             clearInterval(timer);
             if (hasData) console.log('Initial data loaded after', _initialRetryCount * 10, 'seconds');

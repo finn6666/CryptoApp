@@ -43,42 +43,16 @@ async function loadMarketConditions() {
             return;
         }
 
-        // Update opportunity bar
-        const oppFill = document.getElementById('opportunityFill');
-        const oppText = document.getElementById('opportunityText');
-        
-        if (oppFill && oppText) {
-            oppFill.style.width = `${data.opportunity_percentage}%`;
-            oppText.textContent = data.message;
-            
-            // If data isn't loaded yet, show muted style and auto-refresh
-            if (data.opportunity_level === 'UNKNOWN') {
-                oppFill.style.background = 'linear-gradient(90deg, #4a5568, #2d3748)';
-                // Auto-trigger a data refresh if market data isn't loaded
-                try {
-                    const refreshRes = await fetch('/api/refresh', { method: 'POST' });
-                    const refreshData = await refreshRes.json();
-                    if (refreshData.success) {
-                        // Reload the entire dashboard after successful refresh
-                        setTimeout(() => refreshData_afterAutoLoad(), 2000);
-                    }
-                } catch (e) {
-                    console.warn('Auto-refresh failed:', e);
+        // If data isn't loaded yet, auto-trigger a refresh
+        if (data.opportunity_level === 'UNKNOWN') {
+            try {
+                const refreshRes = await fetch('/api/refresh', { method: 'POST' });
+                const refreshData = await refreshRes.json();
+                if (refreshData.success) {
+                    setTimeout(() => refreshData_afterAutoLoad(), 2000);
                 }
-                return;
-            }
-            
-            // Color: high opportunity = green/gold, low = muted
-            if (data.opportunity_score >= 75) {
-                oppFill.style.background = 'linear-gradient(90deg, #48bb78, #38a169)';
-            } else if (data.opportunity_score >= 60) {
-                oppFill.style.background = 'linear-gradient(90deg, #68d391, #48bb78)';
-            } else if (data.opportunity_score >= 40) {
-                oppFill.style.background = 'linear-gradient(90deg, #ecc94b, #d69e2e)';
-            } else if (data.opportunity_score >= 25) {
-                oppFill.style.background = 'linear-gradient(90deg, #a0aec0, #718096)';
-            } else {
-                oppFill.style.background = 'linear-gradient(90deg, #4a5568, #2d3748)';
+            } catch (e) {
+                console.warn('Auto-refresh failed:', e);
             }
         }
         
