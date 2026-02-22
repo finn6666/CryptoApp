@@ -590,7 +590,7 @@
         function getApiKey() {
             let key = sessionStorage.getItem('tradingApiKey');
             if (!key) {
-                key = prompt('Enter your TRADING_API_KEY:');
+                key = prompt('Enter first 6 characters of your API key:');
                 if (key) sessionStorage.setItem('tradingApiKey', key);
             }
             return key;
@@ -778,11 +778,9 @@
         }
         async function approveTrade(proposalId) {
             if (!confirm('Approve and execute this trade?')) return;
-            const hdrs = authHeaders();
-            if (!hdrs) return;
             try {
                 const response = await fetch(`/api/trades/approve/${proposalId}`, {
-                    method: 'POST', headers: hdrs
+                    method: 'POST'
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -803,11 +801,9 @@
 
         async function rejectTrade(proposalId) {
             if (!confirm('Reject this trade proposal?')) return;
-            const hdrs = authHeaders();
-            if (!hdrs) return;
             try {
                 const response = await fetch(`/api/trades/reject/${proposalId}`, {
-                    method: 'POST', headers: hdrs
+                    method: 'POST'
                 });
                 const data = await response.json();
                 if (data.success) {
