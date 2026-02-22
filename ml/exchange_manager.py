@@ -312,14 +312,29 @@ class ExchangeManager:
 
             # Enforce exchange-specific minimum order sizes
             min_qty = self._get_min_order_quantity(exchange, pair)
-            if quantity < min_qty:
-                return {
-                    "success": False,
-                    "error": (
-                        f"Order quantity {quantity:.8f} below minimum {min_qty:.8f} "
-                        f"for {pair} on {exchange_id}"
-                    ),
-                }
+            min_cost = self._get_min_order_cost(exchange, pair)
+
+            # Bump quantity up to minimum if needed (and recalculate amount_gbp)
+            if min_qty and quantity < min_qty:
+                old_qty = quantity
+                quantity = min_qty * 1.02  # 2% buffer above minimum
+                new_amount_in_quote = quantity * current_price
+                new_amount_gbp = new_amount_in_quote / fx_rate
+                logger.info(
+                    f"Bumped order from {old_qty:.8f} to {quantity:.8f} "
+                    f"(min={min_qty:.8f}) — £{amount_gbp:.4f} → £{new_amount_gbp:.4f}"
+                )
+                amount_gbp = new_amount_gbp
+
+            # Also check cost minimum (in quote currency)
+            if min_cost and (quantity * current_price) < min_cost:
+                quantity = (min_cost * 1.02) / current_price  # 2% buffer
+                new_amount_gbp = (quantity * current_price) / fx_rate
+                logger.info(
+                    f"Bumped order to meet cost minimum {min_cost:.4f} {quote_currency} "
+                    f"— £{amount_gbp:.4f} → £{new_amount_gbp:.4f}"
+                )
+                amount_gbp = new_amount_gbp
 
             # Verify exchange balance before placing order
             balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
@@ -560,6 +575,62 @@ class ExchangeManager:
             limits = market.get("limits", {}).get("amount", {})
             return limits.get("min", 0) or 0
         except Exception:
+            return 0
+
+    @staticmethod
+    def _get_min_order_cost(exchange, pair: str) -> float:
+        """Get minimum order cost (in quote currency) for a pair on an exchange."""
+        try:
+            market = exchange.market(pair)
+            cost_min = market.get("limits", {}).get("cost", {}).get("min", 0) or 0
+            return float(cost_min)
+        except Exception:
+            return 0
+
+    def get_min_order_gbp(self, symbol: str) -> float:
+        """
+        Get the minimum order size in GBP for a symbol.
+        Checks both quantity-based and cost-based minimums.
+        Returns the minimum GBP needed to place an order, or 0 if unknown.
+        """
+        result = self.find_best_pair(symbol)
+        if not result:
+            return 0
+
+        exchange_id, pair = result
+        exchange = self.get_exchange(exchange_id)
+        if not exchange:
+            return 0
+
+        try:
+            ticker = exchange.fetch_ticker(pair)
+            current_price = ticker.get("last", 0)
+            if not current_price:
+                return 0
+
+            quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
+            fx_rate = 1.0
+            if quote_currency != "GBP":
+                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange)
+                if fx_rate is None:
+                    fx_rate = 1.27  # fallback approx GBP→USD
+
+            # Minimum from quantity limit
+            min_qty = self._get_min_order_quantity(exchange, pair)
+            min_gbp_from_qty = (min_qty * current_price) / fx_rate if min_qty else 0
+
+            # Minimum from cost limit (already in quote currency)
+            min_cost = self._get_min_order_cost(exchange, pair)
+            min_gbp_from_cost = min_cost / fx_rate if min_cost else 0
+
+            # Take the larger of the two minimums, add 5% buffer for price movement
+            min_gbp = max(min_gbp_from_qty, min_gbp_from_cost)
+            if min_gbp > 0:
+                min_gbp *= 1.05  # 5% buffer
+
+            return round(min_gbp, 4)
+        except Exception as e:
+            logger.warning(f"Could not determine min order for {symbol}: {e}")
             return 0
 
     def get_status(self) -> Dict[str, Any]:

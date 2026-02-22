@@ -257,6 +257,23 @@ class TradingEngine:
                 amount_gbp = max_single
                 logger.info(f"Capped trade to max single trade: £{amount_gbp:.4f}")
 
+            # Enforce exchange minimum order size — bump up if needed
+            min_order_gbp = self._get_min_order_gbp(symbol)
+            if min_order_gbp > 0 and amount_gbp < min_order_gbp:
+                if min_order_gbp <= remaining:
+                    logger.info(
+                        f"Bumping trade from £{amount_gbp:.4f} to exchange minimum £{min_order_gbp:.4f}"
+                    )
+                    amount_gbp = min_order_gbp
+                else:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Trade amount £{amount_gbp:.4f} below exchange minimum £{min_order_gbp:.4f} "
+                            f"and remaining budget £{remaining:.4f} cannot cover it"
+                        ),
+                    }
+
         # Per-side cooldown check (buys and sells have independent cooldowns)
         last_time = self._last_sell_proposal_time if is_sell else self._last_buy_proposal_time
         if last_time:
@@ -425,7 +442,32 @@ class TradingEngine:
 
                 ticker = exchange.fetch_ticker(symbol_pair)
                 current_price = ticker["last"]
-                quantity = proposal.amount_gbp / current_price
+
+                # FX conversion: if pair isn't GBP-quoted, convert amount
+                quote_currency = symbol_pair.split("/")[1] if "/" in symbol_pair else "GBP"
+                amount_in_quote = proposal.amount_gbp
+                if quote_currency != "GBP":
+                    # Approximate GBP → quote conversion
+                    approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
+                    fx_rate = approx_fx.get(quote_currency, 1.27)
+                    amount_in_quote = proposal.amount_gbp * fx_rate
+                    logger.info(f"Legacy FX: £{proposal.amount_gbp:.4f} → {amount_in_quote:.4f} {quote_currency} (rate {fx_rate})")
+
+                quantity = amount_in_quote / current_price
+
+                # Enforce exchange minimum order quantity
+                try:
+                    market = exchange.market(symbol_pair)
+                    min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+                    min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                    if min_qty and quantity < min_qty:
+                        quantity = min_qty * 1.02  # 2% buffer
+                        logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
+                    if min_cost and (quantity * current_price) < min_cost:
+                        quantity = (min_cost * 1.02) / current_price
+                        logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
+                except Exception as e:
+                    logger.debug(f"Could not check min order for {symbol_pair}: {e}")
 
                 if proposal.side == "buy":
                     order = exchange.create_market_buy_order(symbol_pair, quantity)
@@ -547,6 +589,50 @@ class TradingEngine:
             if pair in exchange.markets:
                 return pair
         return None
+
+    def _get_min_order_gbp(self, symbol: str) -> float:
+        """
+        Get the minimum order size in GBP for a symbol.
+        Tries ExchangeManager first (live data), falls back to exchange direct query.
+        Returns 0 if unknown.
+        """
+        try:
+            from ml.exchange_manager import get_exchange_manager
+            mgr = get_exchange_manager()
+            return mgr.get_min_order_gbp(symbol)
+        except Exception:
+            pass
+
+        # Fallback: query the exchange directly
+        try:
+            exchange = self._get_exchange()
+            pair = self._find_market_pair(symbol)
+            if not pair:
+                return 0
+
+            market = exchange.market(pair)
+            ticker = exchange.fetch_ticker(pair)
+            price = ticker.get("last", 0)
+            if not price:
+                return 0
+
+            quote = pair.split("/")[1] if "/" in pair else "GBP"
+            approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
+            fx_rate = approx_fx.get(quote, 1.0) if quote != "GBP" else 1.0
+
+            min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+            min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+
+            min_gbp_qty = (min_qty * price / fx_rate) if min_qty else 0
+            min_gbp_cost = (min_cost / fx_rate) if min_cost else 0
+
+            min_gbp = max(min_gbp_qty, min_gbp_cost)
+            if min_gbp > 0:
+                min_gbp *= 1.05  # 5% safety buffer
+            return round(min_gbp, 4)
+        except Exception as e:
+            logger.debug(f"Could not determine min order GBP for {symbol}: {e}")
+            return 0
 
     # ─── Token Signing ─────────────────────────────────────────
 

@@ -68,7 +68,9 @@ class TestTradingEngine:
 
     def test_can_afford_trade(self, engine):
         assert engine.can_afford_trade(0.02) is True
-        assert engine.can_afford_trade(0.10) is False
+        # Budget defaults to DAILY_TRADE_BUDGET_GBP (£3.00) — anything over should fail
+        over_budget = engine.daily_budget_gbp + 0.01
+        assert engine.can_afford_trade(over_budget) is False
 
     def test_kill_switch_blocks_trades(self, engine):
         engine.kill_switch = True
