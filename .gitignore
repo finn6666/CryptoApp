@@ -82,6 +82,11 @@ wheels/
 *.tar
 *.tar.bz2
 
+## ML Models & Training Data (regenerated at runtime)
+models/*.onnx
+models/*.csv
+data/training_data_*.csv
+
 ## Data Files (runtime data — regenerated on startup)
 data/favorites.json
 data/live_api.json
