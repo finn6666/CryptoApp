@@ -199,9 +199,12 @@ def get_favorites():
         favorite_coins = []
         missing_coins = []
 
+        # Guard: if analyzer hasn't loaded yet, still try to fetch coin data
+        analyzer_coins = state.analyzer.coins if state.analyzer else []
+
         for symbol in favorites:
             found = False
-            for coin in state.analyzer.coins:
+            for coin in analyzer_coins:
                 if coin.symbol.upper() == symbol.upper():
                     found = True
                     cd = {
@@ -253,7 +256,7 @@ def get_favorites():
         run_agents = request.args.get('agents', 'false').lower() == 'true'
         if run_agents and state.GEM_DETECTOR_AVAILABLE and state.gem_detector and state.gem_detector.multi_agent_enabled:
             for cd in favorite_coins:
-                matching = next((c for c in state.analyzer.coins if c.symbol.upper() == cd['symbol'].upper()), None)
+                matching = next((c for c in analyzer_coins if c.symbol.upper() == cd['symbol'].upper()), None)
                 if matching:
                     _run_agent_analysis(matching, cd)
 

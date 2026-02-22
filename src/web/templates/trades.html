@@ -372,10 +372,13 @@
                 <div id="pendingProposals"></div>
             </div>
 
-            <!-- Recent Executed Trades -->
+            <!-- Trade Log (merged: executed trades + full history) -->
             <div id="executedSection" style="margin-top: 16px;">
-                <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px;">Executed Trades</h3>
-                <div id="executedTrades">
+                <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px; display: flex; justify-content: space-between; align-items: center;">
+                    Trade Log
+                    <button onclick="loadTradeLog(); loadExecutedTrades();" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer;">🔄 Refresh</button>
+                </h3>
+                <div id="tradeLogUnified" style="max-height: 500px; overflow-y: auto;">
                     <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
                         No trades yet. Agents will propose trades when they find high-conviction opportunities.
                     </p>
@@ -505,19 +508,6 @@
             </div>
         </div>
 
-        <!-- Trade Log Section -->
-        <div class="section-card">
-            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                📜 Trade Log
-                <button onclick="loadTradeLog()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
-                    🔄 Refresh
-                </button>
-            </h2>
-            <div id="tradeLog" style="max-height: 400px; overflow-y: auto;">
-                <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trades recorded yet.</p>
-            </div>
-        </div>
-
         <!-- Activity Log Section -->
         <div class="section-card">
             <h2 class="section-header">📜 Activity Log</h2>
@@ -527,9 +517,13 @@
         </div>
 
         <div class="info-box">
-            <strong>📝 How it works:</strong> AI agents analyse coins and propose trades when conviction is high. 
-            You'll get an email with Approve/Reject links. Max spend: £0.05/day. 
-            You can also report manual trades below to teach the RL system.
+            <strong>📝 How it works:</strong><br>
+            <strong>1. Automated Scanning</strong> — The scanner runs daily at the scheduled time, refreshing coin data and filtering to tradeable pairs on your configured exchanges.<br>
+            <strong>2. Multi-Agent Analysis</strong> — A team of AI agents (Research, Technical, Risk, Sentiment) analyses the top candidates and produces a consensus recommendation with a conviction score.<br>
+            <strong>3. Trade Proposals</strong> — When conviction is high enough (≥65%), a buy proposal is created. You receive an email with Approve/Reject links (proposals expire after 1 hour).<br>
+            <strong>4. Portfolio Tracking</strong> — Approved trades are executed on your exchange, tracked in the portfolio, and monitored for exit signals (profit targets, stop-losses, trailing stops).<br>
+            <strong>5. Hold-First Strategy</strong> — The system is biased toward accumulating positions and holding. Sells require manual approval and are only proposed when exit conditions are met or the outlook turns negative.<br>
+            Max daily spend: £0.05. You can also report manual trades below to teach the RL system.
         </div>
 
         <div class="alert" id="alert">
@@ -684,24 +678,87 @@
 
         async function loadExecutedTrades() {
             try {
-                const response = await fetch('/api/trades/history');
-                const data = await response.json();
-                const container = document.getElementById('executedTrades');
+                // Fetch both executed trades and portfolio history, merge into unified log
+                const [execRes, histRes] = await Promise.all([
+                    fetch('/api/trades/history'),
+                    fetch('/api/portfolio/history?limit=100')
+                ]);
+                const execData = await execRes.json();
+                const histData = await histRes.json();
+                const container = document.getElementById('tradeLogUnified');
 
-                if (data.trades && data.trades.length > 0) {
-                    container.innerHTML = data.trades.map(t => {
-                        const sideIcon = t.side === 'buy' ? '🟢' : '🔴';
+                // Build unified trade list from both sources
+                const allTrades = [];
+
+                // Add executed trades (from trading engine)
+                if (execData.trades) {
+                    execData.trades.forEach(t => {
+                        allTrades.push({
+                            symbol: t.symbol,
+                            side: t.side,
+                            quantity: t.quantity,
+                            price: t.price,
+                            amount_gbp: t.amount_gbp,
+                            fee_gbp: t.fee_gbp || 0,
+                            exchange: t.exchange || '—',
+                            timestamp: t.timestamp,
+                            reasoning: t.reason || t.reasoning || '',
+                            realised_pnl_gbp: t.realised_pnl_gbp,
+                            source: 'engine',
+                        });
+                    });
+                }
+
+                // Add portfolio history trades (may include more detail)
+                if (histData.trades) {
+                    histData.trades.forEach(t => {
+                        // De-duplicate: skip if same symbol+timestamp already present
+                        const isDupe = allTrades.some(
+                            e => e.symbol === t.symbol && e.timestamp === t.timestamp && e.side === t.side
+                        );
+                        if (!isDupe) {
+                            allTrades.push({
+                                symbol: t.symbol,
+                                side: t.side,
+                                quantity: t.quantity || 0,
+                                price: t.price || 0,
+                                amount_gbp: t.amount_gbp || 0,
+                                fee_gbp: t.fee_gbp || 0,
+                                exchange: t.exchange || '—',
+                                timestamp: t.timestamp,
+                                reasoning: t.reasoning || '',
+                                realised_pnl_gbp: t.realised_pnl_gbp,
+                                source: 'portfolio',
+                            });
+                        }
+                    });
+                }
+
+                // Sort by timestamp, newest first
+                allTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                if (allTrades.length > 0) {
+                    container.innerHTML = allTrades.map(t => {
+                        const isBuy = t.side === 'buy';
+                        const sideColor = isBuy ? '#48bb78' : '#fc8181';
+                        const sideIcon = isBuy ? '🟢' : '🔴';
                         const time = new Date(t.timestamp).toLocaleString();
+                        const pnlStr = t.realised_pnl_gbp !== undefined && t.realised_pnl_gbp !== null
+                            ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(4)}`
+                            : '';
                         return `
-                            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                                <div>
-                                    <span style="font-weight: 700;">${sideIcon} ${t.side.toUpperCase()} ${t.symbol}</span>
-                                    <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${t.quantity.toFixed(6)} @ £${t.price.toFixed(6)}</span>
+                            <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
+                                <span>${sideIcon}</span>
+                                <div style="flex: 1;">
+                                    <span style="font-weight: 700;">${t.symbol}</span>
+                                    <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${t.side.toUpperCase()}</span>
+                                    <span style="color: var(--text-secondary);"> ${(t.quantity || 0).toFixed(6)} @ £${(t.price || 0).toFixed(6)}</span>
+                                    <div style="color: var(--text-secondary); font-size: 11px; margin-top: 3px;">
+                                        £${(t.amount_gbp || 0).toFixed(4)} • ${t.exchange} • Fee: £${(t.fee_gbp || 0).toFixed(4)}${pnlStr}
+                                    </div>
+                                    ${t.reasoning ? `<div style="color: var(--text-secondary); font-size: 11px; margin-top: 2px; font-style: italic;">"${t.reasoning.substring(0, 120)}${t.reasoning.length > 120 ? '…' : ''}"</div>` : ''}
                                 </div>
-                                <div style="text-align: right;">
-                                    <div style="font-weight: 600; font-size: 13px;">£${t.amount_gbp.toFixed(4)}</div>
-                                    <div style="font-size: 11px; color: var(--text-secondary);">${time}</div>
-                                </div>
+                                <span style="color: var(--text-secondary); font-size: 11px; white-space: nowrap;">${time}</span>
                             </div>
                         `;
                     }).join('');
@@ -709,10 +766,9 @@
                     container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trades yet. Agents will propose trades when they find high-conviction opportunities.</p>';
                 }
             } catch (e) {
-                console.error('Error loading executed trades:', e);
+                console.error('Error loading trade log:', e);
             }
         }
-
         async function approveTrade(proposalId) {
             try {
                 const response = await fetch(`/api/trades/approve/${proposalId}`);
@@ -971,46 +1027,11 @@
             }
         }
 
-        // ─── Trade Log ───────────────────────────────────────
+        // ─── Trade Log (now unified in loadExecutedTrades) ─────
 
         async function loadTradeLog() {
-            try {
-                const response = await fetch('/api/portfolio/history?limit=100');
-                const data = await response.json();
-                const trades = data.trades || [];
-                const container = document.getElementById('tradeLog');
-
-                if (trades.length > 0) {
-                    container.innerHTML = trades.map(t => {
-                        const isBuy = t.side === 'buy';
-                        const sideColor = isBuy ? '#48bb78' : '#fc8181';
-                        const sideIcon = isBuy ? '🟢' : '🔴';
-                        const time = new Date(t.timestamp).toLocaleString();
-                        const pnlStr = t.realised_pnl_gbp !== undefined
-                            ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(4)}`
-                            : '';
-                        return `
-                            <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
-                                <span>${sideIcon}</span>
-                                <div style="flex: 1;">
-                                    <span style="font-weight: 700;">${t.symbol}</span>
-                                    <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${t.side.toUpperCase()}</span>
-                                    <span style="color: var(--text-secondary);"> ${(t.quantity || 0).toFixed(6)} @ £${(t.price || 0).toFixed(6)}</span>
-                                    <div style="color: var(--text-secondary); font-size: 11px; margin-top: 3px;">
-                                        £${(t.amount_gbp || 0).toFixed(4)} • ${t.exchange || '—'} • Fee: £${(t.fee_gbp || 0).toFixed(4)}${pnlStr}
-                                    </div>
-                                    ${t.reasoning ? `<div style="color: var(--text-secondary); font-size: 11px; margin-top: 2px; font-style: italic;">"${t.reasoning.substring(0, 100)}${t.reasoning.length > 100 ? '…' : ''}"</div>` : ''}
-                                </div>
-                                <span style="color: var(--text-secondary); font-size: 11px; white-space: nowrap;">${time}</span>
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trades recorded yet.</p>';
-                }
-            } catch (e) {
-                console.error('Error loading trade log:', e);
-            }
+            // Merged into loadExecutedTrades — this is a no-op stub for backward compat
+            await loadExecutedTrades();
         }
 
         // ─── Activity Log ────────────────────────────────────

@@ -435,13 +435,13 @@ class ScanLoop:
             if not should_trade and analysis_source == "gem_detector":
                 rec = analysis.get("recommendation", "HOLD").upper()
                 conf = analysis.get("confidence", 0)
-                if rec == "BUY" and conf >= 65:
+                if rec == "BUY" and conf >= 55:
                     should_trade = True
                     conviction = conf
-                    allocation_pct = min(50, conf - 25)
+                    allocation_pct = min(60, conf - 20)
                     trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
 
-            if should_trade and conviction >= 65:
+            if should_trade and conviction >= 60:
                 amount = remaining * (allocation_pct / 100)
                 amount = min(amount, remaining)
 
@@ -552,6 +552,10 @@ class ScanLoop:
         return {
             "scan_time": self.scan_time,
             "scan_running": self.scan_running,
+            "scheduler_running": (
+                self._scheduler_thread is not None
+                and self._scheduler_thread.is_alive()
+            ),
             "scheduler_active": (
                 self._scheduler_thread is not None
                 and self._scheduler_thread.is_alive()

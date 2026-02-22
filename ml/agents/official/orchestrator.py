@@ -70,6 +70,15 @@ crypto_orchestrator = Agent(
 5. Delegate to trading_specialist with your synthesized analysis — let it decide if this is worth REAL money
 6. Include the trading specialist's decision in your output (should_trade, trade_conviction, trade_reasoning, etc.)
 
+**Opportunity-Seeking Mindset:**
+- Be BIASED TOWARD FINDING OPPORTUNITIES. The user wants to accumulate promising positions.
+- A coin doesn't need to be perfect to be a BUY — strong fundamentals + reasonable risk = worth a punt
+- Dips in fundamentally strong coins are BUYING opportunities, not reasons to avoid
+- Look for asymmetric risk/reward: small downside, large potential upside
+- Coins with upcoming catalysts (mainnet, partnerships, exchange listings) deserve extra attention
+- Early-stage projects with strong dev activity and growing communities are exactly what we're looking for
+- Don't be overly conservative — think like a venture investor, not a banker
+
 **Key rules:**
 - Every summary must mention the coin's actual name and use case — never say "this project" or "the token"
 - Reference real price levels and % changes from the data provided

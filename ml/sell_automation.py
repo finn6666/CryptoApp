@@ -3,10 +3,11 @@ Sell-Side Automation
 Monitors holdings for exit triggers and automatically proposes sell trades.
 
 Exit triggers:
-- Profit target hit (configurable, default 20%)
-- Stop-loss triggered (configurable, default -15%)
-- Trailing stop (locks in gains, default 10% from peak)
+- Profit target hit (configurable, default 50%) — only after min hold period
+- Stop-loss triggered (configurable, default -20%) — always fires for capital protection
+- Trailing stop (locks in gains, default 20% from peak) — only after min hold period
 - Agent re-analysis recommends SELL/AVOID
+- Minimum hold period (configurable, default 48h) before profit/trailing triggers fire
 """
 
 import os
@@ -30,12 +31,15 @@ class SellAutomation:
     """
 
     def __init__(self):
-        # Exit thresholds (from env or defaults)
-        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "20.0"))
-        self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-15.0"))
-        self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "10.0"))
+        # Exit thresholds (from env or defaults) — wider defaults to favour holding
+        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "50.0"))
+        self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-20.0"))
+        self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "20.0"))
         self.enable_agent_recheck = os.getenv("SELL_AGENT_RECHECK", "true").lower() in ("1", "true", "yes")
         self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "24"))
+
+        # Minimum hold period in hours before ANY sell trigger (except stop-loss) fires
+        self.min_hold_hours = float(os.getenv("SELL_MIN_HOLD_HOURS", "48.0"))
 
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
@@ -45,7 +49,8 @@ class SellAutomation:
 
         logger.info(
             f"Sell automation: profit_target={self.profit_target_pct}%, "
-            f"stop_loss={self.stop_loss_pct}%, trailing_stop={self.trailing_stop_pct}%"
+            f"stop_loss={self.stop_loss_pct}%, trailing_stop={self.trailing_stop_pct}%, "
+            f"min_hold={self.min_hold_hours}h"
         )
 
     # ─── Main Check ───────────────────────────────────────────
@@ -89,11 +94,21 @@ class SellAutomation:
 
             pnl_pct = ((current_price - entry_price) / entry_price) * 100
 
+            # Calculate hold duration
+            first_buy = holding.get("first_buy_at")
+            hold_hours = 0.0
+            if first_buy:
+                try:
+                    buy_time = datetime.fromisoformat(first_buy.replace("Z", "+00:00"))
+                    hold_hours = (datetime.now(buy_time.tzinfo or None) - buy_time).total_seconds() / 3600
+                except Exception:
+                    pass
+
             # Update peak price for trailing stop
             if symbol not in self._peak_prices or current_price > self._peak_prices[symbol]:
                 self._peak_prices[symbol] = current_price
 
-            trigger = self._evaluate_exit(symbol, current_price, entry_price, pnl_pct)
+            trigger = self._evaluate_exit(symbol, current_price, entry_price, pnl_pct, hold_hours)
 
             if trigger:
                 amount_gbp = current_price * quantity
@@ -133,22 +148,14 @@ class SellAutomation:
         current_price: float,
         entry_price: float,
         pnl_pct: float,
+        hold_hours: float = 0.0,
     ) -> Optional[Dict[str, Any]]:
-        """Evaluate a single holding against exit triggers."""
+        """Evaluate a single holding against exit triggers.
+        Respects minimum hold period for all triggers except stop-loss."""
 
-        # 1. Profit target
-        if pnl_pct >= self.profit_target_pct:
-            return {
-                "type": "profit_target",
-                "reason": (
-                    f"Profit target reached: {pnl_pct:.1f}% gain "
-                    f"(target: {self.profit_target_pct}%). "
-                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
-                ),
-                "confidence": 85,
-            }
+        within_hold_period = hold_hours < self.min_hold_hours
 
-        # 2. Stop loss
+        # 1. Stop-loss — always fires regardless of hold period (capital protection)
         if pnl_pct <= self.stop_loss_pct:
             return {
                 "type": "stop_loss",
@@ -158,6 +165,22 @@ class SellAutomation:
                     f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
                 ),
                 "confidence": 90,
+            }
+
+        # Skip profit-taking triggers during minimum hold period
+        if within_hold_period:
+            return None
+
+        # 2. Profit target
+        if pnl_pct >= self.profit_target_pct:
+            return {
+                "type": "profit_target",
+                "reason": (
+                    f"Profit target reached: {pnl_pct:.1f}% gain "
+                    f"(target: {self.profit_target_pct}%). "
+                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
+                ),
+                "confidence": 85,
             }
 
         # 3. Trailing stop
@@ -248,6 +271,7 @@ class SellAutomation:
             "profit_target_pct": self.profit_target_pct,
             "stop_loss_pct": self.stop_loss_pct,
             "trailing_stop_pct": self.trailing_stop_pct,
+            "min_hold_hours": self.min_hold_hours,
             "agent_recheck_enabled": self.enable_agent_recheck,
             "recheck_interval_hours": self.recheck_interval_hours,
             "tracked_peaks": {k: round(v, 8) for k, v in self._peak_prices.items()},

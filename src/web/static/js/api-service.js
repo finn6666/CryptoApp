@@ -10,7 +10,7 @@ async function loadFavorites(withAgents = false) {
             throw new Error(data.error);
         }
 
-        const favorites = data.favorites;
+        const favorites = data.favorites || [];
         userFavorites = favorites.map(fav => fav.symbol);
         
         if (favorites.length > 0) {
@@ -18,7 +18,9 @@ async function loadFavorites(withAgents = false) {
             document.getElementById('favoritesContent').innerHTML = favoritesHtml;
             document.getElementById('favoritesContainer').style.display = 'block';
         } else {
-            document.getElementById('favoritesContainer').style.display = 'none';
+            document.getElementById('favoritesContent').innerHTML = 
+                '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No favorites yet — click "Add Favorite" to track coins here.</div>';
+            document.getElementById('favoritesContainer').style.display = 'block';
         }
         
         updateFavoriteButtons();
@@ -27,6 +29,7 @@ async function loadFavorites(withAgents = false) {
         console.error('Error loading favorites:', error);
         document.getElementById('favoritesContent').innerHTML = 
             `<div class="error">❌ Error loading favorites: ${error.message}</div>`;
+        document.getElementById('favoritesContainer').style.display = 'block';
     }
 }
 

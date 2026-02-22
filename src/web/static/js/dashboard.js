@@ -106,9 +106,18 @@ async function loadScanCard() {
         const valEl = document.getElementById('scanStatus');
         const subEl = document.getElementById('scanSub');
 
-        const running = status.running ?? status.is_running ?? false;
-        valEl.textContent = running ? '● Running' : '○ Idle';
-        valEl.style.color = running ? 'var(--success)' : 'var(--text-secondary)';
+        const running = status.scan_running ?? status.running ?? status.is_running ?? false;
+        const scheduled = status.scheduler_running ?? status.scheduler_active ?? false;
+        if (running) {
+            valEl.textContent = '● Scanning';
+            valEl.style.color = 'var(--warning)';
+        } else if (scheduled) {
+            valEl.textContent = '● Scheduled';
+            valEl.style.color = 'var(--success)';
+        } else {
+            valEl.textContent = '○ Idle';
+            valEl.style.color = 'var(--text-secondary)';
+        }
 
         let subParts = [];
         if (status.last_scan) {

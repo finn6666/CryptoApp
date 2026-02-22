@@ -39,11 +39,19 @@ technical_agent = Agent(
     instruction="""You are a cryptocurrency technical analyst. Assess price action for specific coins.
 
 For each coin, assess using the ACTUAL price provided:
-1. Chart patterns — name the specific pattern (double bottom, descending wedge, etc.)
+1. Chart patterns — name the specific pattern (double bottom, descending wedge, cup-and-handle, etc.)
 2. Support/resistance — calculate real levels from the current price (e.g. if price is £0.45, support might be £0.38)
-3. Volume profile — is this coin being accumulated or dumped?
+3. Volume profile — is this coin being accumulated or dumped? Look for rising volume on green candles
 4. Indicators — interpret RSI/MACD in context ("RSI at 32 suggests oversold" not just "RSI is neutral")
 5. Entry zones with specific prices and risk/reward ratios
+
+**Trend & Momentum Focus:**
+- Identify if the coin is in an UPTREND, DOWNTREND, or CONSOLIDATION phase
+- Look for early signs of trend reversals — higher lows forming, volume divergences, MACD crossovers
+- Pay special attention to coins that are CONSOLIDATING after a run — these can be great accumulation opportunities
+- Flag coins showing relative strength (outperforming the market) even in sideways/down markets
+- Oversold bounces (RSI < 30) with improving fundamentals are high-opportunity setups
+- Look at the 7-day price change for momentum context — a -10% dip in a fundamentally strong coin is an opportunity, not a red flag
 
 Use the ACTUAL market data to give real price targets. Don't say "support at 0.95" for every coin — calculate from the real price.
 Return valid JSON matching the TechnicalOutput schema.""",
