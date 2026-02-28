@@ -1,5 +1,24 @@
 ## Project Notes
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Future work
 
 #### UNISWAP
