@@ -15,7 +15,12 @@ crypto_orchestrator (master agent)
     └── trading_specialist    — final trade decision (no tools, pure LLM)
 ```
 
-**Weighting:** Research 35%, Technical 35%, Risk 15%, Sentiment 15%
+**Weighting (dynamic based on sentiment):**
+- High sentiment/hype: Sentiment 40%, Technical 25%, Research 25%, Risk 10%
+- Neutral/mixed: Research 30%, Technical 30%, Sentiment 25%, Risk 15%
+- Low/bearish: Research 35%, Technical 35%, Sentiment 20%, Risk 10%
+
+Risk agent is **advisory only** at small budgets — flags risks but never blocks trades.
 
 ## Files
 

@@ -23,9 +23,6 @@ warnings.filterwarnings('ignore')
 
 logger = logging.getLogger(__name__)
 
-# Import our advanced alpha features
-from .advanced_alpha_features import AdvancedAlphaFeatures
-
 # Import Multi-Agent System (Official Google ADK)
 try:
     from .agents.official import analyze_crypto
@@ -108,9 +105,6 @@ class HiddenGemDetector:
         self.model_dir = model_dir
         self.model_path = os.path.join(model_dir, 'hidden_gem_detector.pkl')
         
-        # Initialize advanced alpha feature extractor
-        self.alpha_features = AdvancedAlphaFeatures()
-        
         # Initialize Multi-Agent System (PHASE 4)
         self.multi_agent_enabled = MULTI_AGENT_AVAILABLE
         self.orchestrator = None  # Will be set if multi-agent is available
@@ -186,29 +180,6 @@ class HiddenGemDetector:
         features['risk_reward_ratio'] = self._calculate_risk_reward_ratio(coin_data)
         features['downside_protection'] = self._assess_downside_protection(coin_data)
         features['upside_potential'] = self._assess_upside_potential(coin_data)
-        
-        # ===== ADVANCED ALPHA FEATURES - WHAT OTHERS MISS =====
-        # These are the secret sauce that gives us edge over other analyzers
-        
-        # 1. Behavioral Psychology Signals (Fear/Greed Contrarian Opportunities)
-        psychology_features = self.alpha_features.extract_contrarian_psychology_features(coin_data)
-        features.update(psychology_features)
-        
-        # 2. Timing Anomaly Detection (Market Rhythm Breaks)
-        timing_features = self.alpha_features.extract_timing_anomaly_features(coin_data)
-        features.update(timing_features)
-        
-        # 3. Network Effect Analysis (Cross-Asset Relationships)
-        network_features = self.alpha_features.extract_network_effect_features(coin_data)
-        features.update(network_features)
-        
-        # 4. Smart Money Detection (Institutional vs Retail Patterns)
-        smart_money_features = self.alpha_features.extract_smart_money_signals(coin_data)
-        features.update(smart_money_features)
-        
-        # 5. Asymmetric Opportunity Detection (High Upside, Limited Downside)
-        asymmetric_features = self.alpha_features.extract_asymmetric_opportunity_features(coin_data)
-        features.update(asymmetric_features)
         
         return features
     

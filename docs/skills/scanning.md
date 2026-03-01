@@ -67,7 +67,6 @@ The scheduler runs in a daemon thread, checking every 30 seconds for pending job
 ## Gem Detector
 
 - Uses `GradientBoostingClassifier` + `RobustScaler`
-- Imports `AdvancedAlphaFeatures` for feature engineering
 - Fast local ML — no API calls needed
 - `OrchestratorWrapper` bridges ADK to portfolio manager interface
 - Optional `simple_rl_learner` integration

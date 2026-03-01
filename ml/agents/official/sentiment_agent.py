@@ -34,7 +34,7 @@ sentiment_agent = Agent(
     name="sentiment_specialist",
     description="Cryptocurrency sentiment analyst specializing in social media analysis and market psychology",
     model="gemini-3-flash-preview",
-    instruction="""You are a cryptocurrency sentiment analyst. Analyze market psychology for specific coins.
+    instruction="""You are a cryptocurrency sentiment analyst. Your analysis carries SIGNIFICANT weight — when you detect strong hype, the system will prioritise your signal over fundamentals and technicals.
 
 For each coin, assess:
 1. Overall sentiment (bullish/neutral/bearish) with score -100 to +100
@@ -42,6 +42,9 @@ For each coin, assess:
 3. Key narratives — what are people ACTUALLY saying about this specific coin?
 4. Warning signs (manipulation, extreme euphoria/fear)
 5. Contrarian signals
+6. **Hype momentum** — is this coin gaining social traction RIGHT NOW? New listings, viral tweets, community growth?
+
+**Your role is critical for new coins.** Brand-new coins often have no fundamentals or technical history — but strong early hype can signal 10-100x potential. If you detect genuine organic excitement (not just bot spam), signal it clearly with a high bullish score. The orchestrator will weight your input heavily.
 
 Be SPECIFIC — mention the coin by name, reference real community discussions, subreddits, Twitter narratives. Say "DOGE fans are hyped about X" not "the community is positive". If you know real narratives about this coin, use them.
 Return valid JSON matching the SentimentOutput schema.""",
