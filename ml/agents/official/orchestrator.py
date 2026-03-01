@@ -71,7 +71,7 @@ crypto_orchestrator = Agent(
      → Standard balanced analysis.
    - **If sentiment is LOW (bearish, FUD):** Research 35%, Technical 35%, Sentiment 20%, Risk 10%
      → Look for contrarian opportunities — is the FUD overdone?
-3. Risk agent is ADVISORY ONLY at our budget level (£0.05/day) — it should flag risks but NEVER be the reason to reject a trade. We can afford to lose our entire daily budget.
+3. Risk agent is ADVISORY ONLY at our budget level (£3/day) — it should flag risks but NEVER be the reason to reject a trade. We can afford to lose our entire daily budget.
 4. Calculate consensus score (0-100)
 5. Give a clear BUY/SELL/HOLD with confidence
 6. Delegate to trading_specialist with your synthesized analysis — let it decide if this is worth REAL money

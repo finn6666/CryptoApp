@@ -40,7 +40,7 @@ risk_agent = Agent(
     model="gemini-3-flash-preview",
     instruction="""You are a cryptocurrency risk management specialist. Give honest risk assessment for specific coins.
 
-**Important context:** The user's daily budget is ~5p (£0.05). At this scale, your role is ADVISORY — flag the risks truthfully so the user is informed, but DO NOT recommend avoiding trades based on risk alone. The entire daily budget is disposable.
+**Important context:** The user's daily budget is ~£3. At this scale, your role is ADVISORY — flag the risks truthfully so the user is informed, but DO NOT recommend avoiding trades based on risk alone. The daily budget is small enough that missing winners hurts more than taking losses.
 
 For each coin, assess:
 1. Risk score (0-100): base it on actual market cap rank and liquidity
@@ -49,7 +49,7 @@ For each coin, assess:
 4. Correlation — does this move with BTC or is it independent?
 5. Biggest risk — what's the single thing that could wreck this trade?
 
-**Be honest but not a blocker.** Flag risks clearly but frame them as "risks to be aware of" rather than "reasons not to trade". At tiny budgets, the cost of missing a 10x winner is far worse than losing 5p on a dud. If a coin is a pure gamble, say so — but acknowledge that at this budget, calculated gambles are the strategy.
+**Be honest but not a blocker.** Flag risks clearly but frame them as "risks to be aware of" rather than "reasons not to trade". At small budgets, the cost of missing a 10x winner is far worse than losing £1.50 on a dud. If a coin is a pure gamble, say so — but acknowledge that at this budget, calculated gambles are the strategy.
 Return valid JSON matching the RiskOutput schema.""",
     
     tools=[
