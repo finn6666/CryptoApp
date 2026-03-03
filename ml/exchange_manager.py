@@ -529,6 +529,8 @@ class ExchangeManager:
     ) -> Dict[str, Any]:
         """
         Verify the exchange account has sufficient balance for the order.
+        If buying and the quote currency balance is too low but GBP is available,
+        automatically converts GBP → quote currency on the exchange first.
         Returns {"ok": True} or {"ok": False, "error": "..."}.
         """
         try:
@@ -540,6 +542,15 @@ class ExchangeManager:
                 # Need enough quote currency to cover the order
                 available = balance.get(quote, {}).get("free", 0) or 0
                 if available < amount_in_quote:
+                    # Try auto-converting GBP → quote currency if possible
+                    if quote != "GBP":
+                        converted = self._auto_convert_gbp(
+                            exchange, exchange_id, quote,
+                            amount_in_quote - available, balance,
+                        )
+                        if converted:
+                            return {"ok": True}
+
                     msg = (
                         f"Insufficient {quote} balance on {exchange_id}: "
                         f"have {available:.4f}, need {amount_in_quote:.4f}"
@@ -563,6 +574,78 @@ class ExchangeManager:
             # (the exchange will reject if funds are truly insufficient)
             logger.warning(f"Balance check failed on {exchange_id} (proceeding anyway): {e}")
             return {"ok": True}
+
+    def _auto_convert_gbp(
+        self, exchange, exchange_id: str, target_currency: str,
+        amount_needed: float, balance: Dict,
+    ) -> bool:
+        """
+        Auto-convert GBP → target_currency on the exchange when the target
+        balance is insufficient but GBP is available.
+        Returns True if conversion succeeded, False otherwise.
+        """
+        gbp_free = balance.get("GBP", {}).get("free", 0) or 0
+        if gbp_free < 0.50:  # Need at least £0.50 to bother
+            logger.info(f"Auto-convert skipped: only £{gbp_free:.2f} GBP available")
+            return False
+
+        # Check if GBP/<target> pair exists (e.g. GBP/USD)
+        convert_pair = f"GBP/{target_currency}"
+        if convert_pair not in getattr(exchange, "markets", {}):
+            logger.info(f"Auto-convert skipped: {convert_pair} not available on {exchange_id}")
+            return False
+
+        try:
+            ticker = exchange.fetch_ticker(convert_pair)
+            rate = ticker["last"]
+            if not rate or rate <= 0:
+                return False
+
+            # How much GBP do we need to sell to get amount_needed in target?
+            # GBP/USD means selling GBP gives USD: gbp_amount * rate = usd_amount
+            gbp_to_sell = (amount_needed / rate) * 1.03  # 3% buffer for slippage + fees
+
+            # Don't convert more than we have (leave £1 cushion)
+            max_gbp = gbp_free - 1.0
+            if gbp_to_sell > max_gbp:
+                gbp_to_sell = max_gbp
+            if gbp_to_sell < 0.50:
+                logger.info(f"Auto-convert: not enough GBP to convert (need £{gbp_to_sell:.2f})")
+                return False
+
+            # Check exchange minimum for this pair
+            market = exchange.market(convert_pair)
+            min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+            min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+            if min_qty and gbp_to_sell < min_qty:
+                gbp_to_sell = min_qty * 1.02
+            if min_cost and (gbp_to_sell * rate) < min_cost:
+                gbp_to_sell = (min_cost * 1.02) / rate
+
+            # Final check we can still afford it
+            if gbp_to_sell > gbp_free:
+                logger.info(f"Auto-convert: GBP needed (£{gbp_to_sell:.2f}) exceeds available (£{gbp_free:.2f})")
+                return False
+
+            logger.info(
+                f"💱 Auto-converting £{gbp_to_sell:.2f} GBP → {target_currency} "
+                f"on {exchange_id} (rate {rate:.4f}, need {amount_needed:.4f} {target_currency})"
+            )
+
+            order = exchange.create_market_sell_order(convert_pair, gbp_to_sell)
+            filled = order.get("filled", gbp_to_sell)
+            avg_price = order.get("average", rate)
+            received = filled * avg_price
+
+            logger.info(
+                f"💱 Converted £{filled:.2f} → {received:.4f} {target_currency} "
+                f"(avg rate {avg_price:.4f}, order {order.get('id', 'unknown')})"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Auto-convert GBP → {target_currency} failed: {e}")
+            return False
 
     # ─── Fee Extraction ───────────────────────────────────────
 
