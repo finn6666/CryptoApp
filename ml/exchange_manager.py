@@ -336,6 +336,10 @@ class ExchangeManager:
                 )
                 amount_gbp = new_amount_gbp
 
+            # Recalculate amount_in_quote after any quantity bumps so the
+            # balance check uses the *actual* order cost, not the original.
+            amount_in_quote = quantity * current_price
+
             # Verify exchange balance before placing order
             balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
             if not balance_check["ok"]:
@@ -423,6 +427,19 @@ class ExchangeManager:
 
                 amount_in_quote = amount_gbp * fx_rate
                 quantity = amount_in_quote / current_price
+
+                # Enforce exchange minimums on fallback too
+                min_qty = self._get_min_order_quantity(exchange, pair)
+                min_cost = self._get_min_order_cost(exchange, pair)
+                if min_qty and quantity < min_qty:
+                    quantity = min_qty * 1.02
+                    amount_gbp = (quantity * current_price) / fx_rate
+                if min_cost and (quantity * current_price) < min_cost:
+                    quantity = (min_cost * 1.02) / current_price
+                    amount_gbp = (quantity * current_price) / fx_rate
+
+                # Recalculate after any bumps
+                amount_in_quote = quantity * current_price
 
                 # Balance check
                 balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
