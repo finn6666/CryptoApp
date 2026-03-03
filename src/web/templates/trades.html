@@ -1090,11 +1090,16 @@
                         else if (e.event === 'skip') { icon = '⏭️'; color = 'var(--text-secondary)'; }
                         else if (e.event === 'scan_start') { icon = '🔍'; color = '#ed8936'; }
                         else if (e.event === 'scan_complete') { icon = '✅'; color = '#48bb78'; }
+                        else if (e.event === 'trade_executed') { icon = '💰'; color = '#48bb78'; }
+                        else if (e.event === 'trade_failed') { icon = '⚠️'; color = '#fc8181'; }
                         else if (e.event === 'error') { icon = '❌'; color = '#fc8181'; }
                         else if (e.event === 'scan_no_coins') { icon = '⚠️'; color = '#ecc94b'; }
 
                         let detail = '';
                         if (e.symbol) detail += `<strong>${e.symbol}</strong> `;
+                        if (e.side) detail += `${e.side.toUpperCase()} `;
+                        if (e.amount_gbp) detail += `£${e.amount_gbp.toFixed(2)} `;
+                        if (e.exchange) detail += `on ${e.exchange} `;
                         if (e.reason) detail += `— ${e.reason} `;
                         if (e.confidence) detail += `(${e.confidence}% conf) `;
                         if (e.proposals !== undefined) detail += `${e.proposals} proposals `;

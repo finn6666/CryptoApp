@@ -480,11 +480,25 @@ class MarketMonitor:
                     f"[Monitor] ✅ Auto-buy proposed for {symbol}: "
                     f"outcome={outcome}, confidence={result.get('confidence', 0)}"
                 )
+                # Write to shared audit log so the Activity Log UI shows it
+                scanner._audit("proposal", {
+                    "scan_id": f"monitor_{trigger}",
+                    "symbol": symbol,
+                    "confidence": result.get("confidence", 0),
+                    "trigger": trigger,
+                })
             else:
                 logger.info(
                     f"[Monitor] Auto-buy skipped for {symbol}: "
                     f"{result.get('reason', 'agent decided not to trade')}"
                 )
+                # Write to shared audit log so the Activity Log UI shows it
+                scanner._audit("skip", {
+                    "scan_id": f"monitor_{trigger}",
+                    "symbol": symbol,
+                    "reason": result.get("reason", "Agent decided not to trade"),
+                    "trigger": trigger,
+                })
 
             self._log_alert("auto_buy_trigger", {
                 "symbol": symbol,

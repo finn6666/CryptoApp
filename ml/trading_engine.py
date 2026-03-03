@@ -306,8 +306,12 @@ class TradingEngine:
         budget = self._get_today_budget()
         budget.trades_proposed += 1
 
-        # Send approval email
-        email_sent = self._send_approval_email(proposal)
+        # Send approval email only when manual approval is needed
+        # (Skip for buys that will be auto-approved — execution email covers it)
+        is_buy_auto = not is_sell and self.buy_auto_approve
+        email_sent = False
+        if not is_buy_auto:
+            email_sent = self._send_approval_email(proposal)
 
         self._save_state()
 
@@ -524,6 +528,16 @@ class TradingEngine:
                 f"(£{proposal.amount_gbp:.4f}) on {exchange_used}"
             )
 
+            # Write to shared audit log for Activity Log UI
+            self._write_audit("trade_executed", {
+                "symbol": proposal.symbol,
+                "side": proposal.side,
+                "amount_gbp": round(proposal.amount_gbp, 4),
+                "price": proposal.execution_price,
+                "exchange": exchange_used,
+                "confidence": proposal.confidence,
+            })
+
             return {
                 "success": True,
                 "proposal_id": proposal.id,
@@ -540,7 +554,37 @@ class TradingEngine:
             proposal.status = "rejected"
             proposal.error = str(e)
             logger.error(f"Trade execution failed: {e}")
+
+            # Write to shared audit log for Activity Log UI
+            self._write_audit("trade_failed", {
+                "symbol": proposal.symbol,
+                "side": proposal.side,
+                "amount_gbp": round(proposal.amount_gbp, 4),
+                "error": str(e),
+                "confidence": proposal.confidence,
+            })
+
+            # Notify by email so the user knows about the failure
+            self._send_failure_email(proposal, str(e))
+
             return {"success": False, "error": str(e)}
+
+    def _write_audit(self, event: str, data: Dict[str, Any]):
+        """Append an event to the shared audit log (JSONL) for the Activity Log UI."""
+        from pathlib import Path
+        import json as _json
+        audit_file = Path("data/trades/audit_log.jsonl")
+        entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "event": event,
+            **data,
+        }
+        try:
+            audit_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(audit_file, "a") as f:
+                f.write(_json.dumps(entry, default=str) + "\n")
+        except Exception as e:
+            logger.error(f"Failed to write audit log: {e}")
 
     def _execute_via_exchange_manager(self, proposal: TradeProposal) -> Optional[Dict[str, Any]]:
         """Try executing via the multi-exchange manager."""
@@ -747,6 +791,43 @@ class TradingEngine:
                 </table>
                 <div style="margin-top: 16px; font-size: 12px; color: #a0aec0;">
                     Remaining daily budget: &#163;{self.get_remaining_budget():.4f}
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        return self._send_email(subject, body)
+
+    def _send_failure_email(self, proposal: TradeProposal, error: str) -> bool:
+        """Send trade failure notification email."""
+        if not self.smtp_user or not self.smtp_password:
+            return False
+
+        subject = f"[FAILED] {proposal.side.upper()} {proposal.symbol} - GBP {proposal.amount_gbp:.4f}"
+
+        body = f"""
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+            <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
+                <div style="background: linear-gradient(90deg, #e53e3e, #c53030); padding: 16px 20px;">
+                    <h2 style="margin: 0; color: white; font-size: 18px;">&#x274C; Trade Failed</h2>
+                </div>
+                <div style="padding: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{proposal.symbol}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #a0aec0;">Confidence</td><td style="text-align: right;">{proposal.confidence}%</td></tr>
+                    </table>
+                    <div style="background: rgba(229,62,62,0.15); border: 1px solid rgba(229,62,62,0.4); border-radius: 8px; padding: 12px; margin: 16px 0;">
+                        <div style="font-size: 11px; color: #fc8181; text-transform: uppercase; margin-bottom: 4px;">Error</div>
+                        <div style="font-size: 13px; color: #fc8181;">{error}</div>
+                    </div>
+                    <div style="font-size: 12px; color: #a0aec0;">
+                        Remaining daily budget: &#163;{self.get_remaining_budget():.4f}
+                    </div>
                 </div>
             </div>
         </body>
