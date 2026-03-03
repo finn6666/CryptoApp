@@ -431,10 +431,10 @@ class TradingEngine:
             if order_result:
                 proposal.status = "executed"
                 proposal.executed_at = datetime.utcnow().isoformat()
-                proposal.execution_price = order_result.get("price", proposal.price_at_proposal)
-                proposal.quantity = order_result.get("quantity", 0)
-                proposal.order_id = order_result.get("order_id", "unknown")
-                exchange_used = order_result.get("exchange", self.exchange_id)
+                proposal.execution_price = order_result.get("price") or proposal.price_at_proposal
+                proposal.quantity = order_result.get("quantity") or 0
+                proposal.order_id = order_result.get("order_id") or "unknown"
+                exchange_used = order_result.get("exchange") or self.exchange_id
             else:
                 # Fallback to legacy single-exchange
                 exchange = self._get_exchange()
@@ -480,8 +480,8 @@ class TradingEngine:
 
                 proposal.status = "executed"
                 proposal.executed_at = datetime.utcnow().isoformat()
-                proposal.execution_price = order.get("average", current_price)
-                proposal.quantity = order.get("filled", quantity)
+                proposal.execution_price = order.get("average") or current_price
+                proposal.quantity = order.get("filled") or quantity
                 proposal.order_id = order.get("id", "unknown")
 
             # Extract fee info from order result
@@ -523,8 +523,8 @@ class TradingEngine:
             self._send_execution_email(proposal)
 
             logger.info(
-                f"TRADE EXECUTED: {proposal.side.upper()} {proposal.quantity:.6f} "
-                f"{proposal.symbol} @ £{proposal.execution_price:.6f} "
+                f"TRADE EXECUTED: {proposal.side.upper()} {(proposal.quantity or 0):.6f} "
+                f"{proposal.symbol} @ £{(proposal.execution_price or 0):.6f} "
                 f"(£{proposal.amount_gbp:.4f}) on {exchange_used}"
             )
 
@@ -785,8 +785,8 @@ class TradingEngine:
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{proposal.symbol}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{proposal.quantity:.8f}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{proposal.execution_price:.6f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{(proposal.quantity or 0):.8f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{(proposal.execution_price or 0):.6f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Order ID</td><td style="text-align: right; font-size: 11px;">{proposal.order_id}</td></tr>
                 </table>
                 <div style="margin-top: 16px; font-size: 12px; color: #a0aec0;">

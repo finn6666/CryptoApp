@@ -633,8 +633,8 @@ class ExchangeManager:
             )
 
             order = exchange.create_market_sell_order(convert_pair, gbp_to_sell)
-            filled = order.get("filled", gbp_to_sell)
-            avg_price = order.get("average", rate)
+            filled = order.get("filled") or gbp_to_sell
+            avg_price = order.get("average") or rate
             received = filled * avg_price
 
             logger.info(
