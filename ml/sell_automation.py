@@ -3,11 +3,14 @@ Sell-Side Automation
 Monitors holdings for exit triggers and automatically proposes sell trades.
 
 Exit triggers:
-- Profit target hit (configurable, default 50%) — only after min hold period
-- Stop-loss triggered (configurable, default -20%) — always fires for capital protection
-- Trailing stop (locks in gains, default 20% from peak) — only after min hold period
+- Profit target hit (configurable, default 75%) — only after min hold period
+- Stop-loss triggered (configurable, default -35%) — always fires for capital protection
+- Trailing stop (locks in gains, default 35% from peak) — only after min hold period
 - Agent re-analysis recommends SELL/AVOID
-- Minimum hold period (configurable, default 48h) before profit/trailing triggers fire
+- Minimum hold period (configurable, default 72h) before profit/trailing triggers fire
+
+Thresholds are intentionally wide — crypto, especially low-cap coins, routinely
+swings 20-30% in a day. Tight stops cause premature sells on normal volatility.
 """
 
 import os
@@ -31,15 +34,17 @@ class SellAutomation:
     """
 
     def __init__(self):
-        # Exit thresholds (from env or defaults) — wider defaults to favour holding
-        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "50.0"))
-        self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-20.0"))
-        self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "20.0"))
+        # Exit thresholds — intentionally wide for crypto volatility.
+        # Small-cap coins routinely swing 20-30%/day; tight stops cause premature exits.
+        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "75.0"))
+        self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-35.0"))
+        self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "35.0"))
         self.enable_agent_recheck = os.getenv("SELL_AGENT_RECHECK", "true").lower() in ("1", "true", "yes")
-        self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "24"))
+        self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "48"))
 
-        # Minimum hold period in hours before ANY sell trigger (except stop-loss) fires
-        self.min_hold_hours = float(os.getenv("SELL_MIN_HOLD_HOURS", "48.0"))
+        # Minimum hold period in hours before ANY sell trigger (except stop-loss) fires.
+        # 72h lets positions ride out short-term volatility before evaluating exits.
+        self.min_hold_hours = float(os.getenv("SELL_MIN_HOLD_HOURS", "72.0"))
 
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
