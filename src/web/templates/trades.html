@@ -420,12 +420,12 @@
 
         <!-- Portfolio Holdings Section -->
         <div class="section-card">
-            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                💼 Portfolio Holdings
-                <button onclick="loadPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
+                <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0;">💼 Portfolio Holdings</h2>
+                <button id="portfolioRefreshBtn" onclick="refreshPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
                     🔄 Refresh
                 </button>
-            </h2>
+            </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
                     <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="portfolioValue">£0.00</div>
@@ -903,6 +903,21 @@
         }
 
         // ─── Portfolio Functions ──────────────────────────────
+
+        async function refreshPortfolio() {
+            const btn = document.getElementById('portfolioRefreshBtn');
+            const origText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Refreshing...';
+            try {
+                await loadPortfolio();
+                btn.textContent = '✅ Updated';
+                setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+            } catch (e) {
+                btn.textContent = '❌ Error';
+                setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+            }
+        }
 
         async function loadPortfolio() {
             try {

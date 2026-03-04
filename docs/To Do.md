@@ -1,8 +1,5 @@
 ## Current work
 
-- Get Kraken trading fully operational end-to-end (scan → agent analysis → trade execution)
-- Verify live order placement, fills, and portfolio tracking on Kraken
-- Confirm email approval flow works in production
 
 ## Future work
 
