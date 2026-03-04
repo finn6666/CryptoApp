@@ -523,44 +523,11 @@
             <strong>3. Trade Proposals</strong> — When conviction is high enough (≥65%), a buy proposal is created. You receive an email with Approve/Reject links (proposals expire after 1 hour).<br>
             <strong>4. Portfolio Tracking</strong> — Approved trades are executed on your exchange, tracked in the portfolio, and monitored for exit signals (profit targets, stop-losses, trailing stops).<br>
             <strong>5. Hold-First Strategy</strong> — The system is biased toward accumulating positions and holding. Sells require manual approval and are only proposed when exit conditions are met or the outlook turns negative.<br>
-            Max daily spend: £0.05. You can also report manual trades below to help the RL system learn from your own observations.
+            The RL system learns automatically from the outcomes of executed trades.
         </div>
 
         <div class="alert" id="alert">
             <span id="alertMessage"></span>
-        </div>
-
-        <div class="section-card">
-            <h2 class="section-header">📈 Report a Manual Trade</h2>
-            
-            <form id="tradeForm">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label for="symbol">Symbol (e.g., BTC, ETH)</label>
-                        <input type="text" id="symbol" name="symbol" required placeholder="BTC">
-                    </div>
-                    <div class="form-group">
-                        <label for="daysHeld">Days Held</label>
-                        <input type="number" id="daysHeld" name="daysHeld" required min="1" placeholder="7">
-                    </div>
-                    <div class="form-group">
-                        <label for="entryPrice">Entry Price (£)</label>
-                        <input type="number" id="entryPrice" name="entryPrice" required step="0.00000001" min="0" placeholder="50000">
-                    </div>
-                    <div class="form-group">
-                        <label for="exitPrice">Exit Price (£)</label>
-                        <input type="number" id="exitPrice" name="exitPrice" required step="0.00000001" min="0" placeholder="55000">
-                    </div>
-                    <div class="form-group full-width">
-                        <label for="notes">Notes (optional)</label>
-                        <textarea id="notes" name="notes" placeholder="Why did you make this trade? What signals did you see?"></textarea>
-                    </div>
-                </div>
-                
-                <button type="submit" class="submit-btn" id="submitBtn">
-                    🚀 Report Trade & Teach RL
-                </button>
-            </form>
         </div>
 
 
@@ -1154,53 +1121,8 @@
             }, 5000);
         }
 
-        // Handle form submission
-        document.getElementById('tradeForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = '⏳ Reporting...';
-            
-            const formData = {
-                symbol: document.getElementById('symbol').value.toUpperCase(),
-                entry_price: parseFloat(document.getElementById('entryPrice').value),
-                exit_price: parseFloat(document.getElementById('exitPrice').value),
-                days_held: parseInt(document.getElementById('daysHeld').value),
-                notes: document.getElementById('notes').value
-            };
-            
-            try {
-                const response = await fetch('/api/rl/report-trade', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(formData)
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showAlert(`✅ Trade reported! Profit: ${result.profit_pct > 0 ? '+' : ''}${result.profit_pct}% | New success rate: ${result.new_success_rate}%`, 'success');
-                    
-                    // Reset form
-                    e.target.reset();
-                    
-                    // Reload stats and trade log
-                    loadStats();
-                    loadExecutedTrades();
-                } else {
-                    showAlert('❌ Error: ' + (result.error || 'Failed to report trade'), 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showAlert('❌ Network error. Please try again.', 'error');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = '🚀 Report Trade & Teach RL';
-            }
-        });
+        // Handle RL outcome checking for automated trades
+        // (Manual trade reporting has been removed — RL learns from automated trade outcomes)
     </script>
 </body>
 </html>

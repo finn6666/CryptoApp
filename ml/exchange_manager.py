@@ -353,8 +353,19 @@ class ExchangeManager:
                 exchange, pair, side, quantity
             )
 
+            # Log raw order response for debugging
+            logger.info(
+                f"Order response from {exchange_id}: id={order.get('id')}, "
+                f"filled={order.get('filled')}, amount={order.get('amount')}, "
+                f"average={order.get('average')}, cost={order.get('cost')}, "
+                f"status={order.get('status')}"
+            )
+
             # Extract fee from order response
             fee_gbp = self._extract_fee_gbp(order, fx_rate)
+
+            # Use filled quantity from exchange, fall back to our calculated qty
+            filled_qty = order.get("filled") or order.get("amount") or quantity
 
             return {
                 "success": True,
@@ -362,8 +373,8 @@ class ExchangeManager:
                 "pair": pair,
                 "order_id": order.get("id", "unknown"),
                 "side": side,
-                "quantity": order.get("filled", quantity),
-                "price": order.get("average", current_price),
+                "quantity": filled_qty,
+                "price": order.get("average") or current_price,
                 "amount_gbp": amount_gbp,
                 "fee_gbp": fee_gbp,
                 "fx_rate": fx_rate,
@@ -452,14 +463,16 @@ class ExchangeManager:
 
                 fee_gbp = self._extract_fee_gbp(order, fx_rate)
 
+                filled_qty = order.get("filled") or order.get("amount") or quantity
+
                 return {
                     "success": True,
                     "exchange": exchange_id,
                     "pair": pair,
                     "order_id": order.get("id", "unknown"),
                     "side": side,
-                    "quantity": order.get("filled", quantity),
-                    "price": order.get("average", current_price),
+                    "quantity": filled_qty,
+                    "price": order.get("average") or current_price,
                     "amount_gbp": amount_gbp,
                     "fee_gbp": fee_gbp,
                     "fx_rate": fx_rate,

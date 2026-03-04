@@ -435,6 +435,14 @@ class TradingEngine:
                 proposal.quantity = order_result.get("quantity") or 0
                 proposal.order_id = order_result.get("order_id") or "unknown"
                 exchange_used = order_result.get("exchange") or self.exchange_id
+
+                # Fallback: if quantity still 0, calculate from amount/price
+                if not proposal.quantity and proposal.execution_price > 0:
+                    proposal.quantity = proposal.amount_gbp / proposal.execution_price
+                    logger.warning(
+                        f"Quantity was 0 from exchange — calculated fallback: "
+                        f"{proposal.quantity:.8f} from £{proposal.amount_gbp:.4f} / £{proposal.execution_price:.6f}"
+                    )
             else:
                 # Fallback to legacy single-exchange
                 exchange = self._get_exchange()
