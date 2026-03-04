@@ -603,10 +603,12 @@ class TradingEngine:
         try:
             from ml.exchange_manager import get_exchange_manager
             mgr = get_exchange_manager()
+            remaining = self.get_remaining_budget() if proposal.side == "buy" else None
             result = mgr.execute_order(
                 symbol=proposal.symbol,
                 side=proposal.side,
                 amount_gbp=proposal.amount_gbp,
+                max_amount_gbp=remaining,
             )
             if result.get("success"):
                 return result

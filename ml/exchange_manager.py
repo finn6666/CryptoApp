@@ -268,12 +268,18 @@ class ExchangeManager:
         symbol: str,
         side: str,
         amount_gbp: float,
+        max_amount_gbp: float = None,
     ) -> Dict[str, Any]:
         """
         Execute an order on the best available exchange.
         Converts GBP to the pair's quote currency when needed.
         Verifies exchange balance before placing orders.
         Tries exchanges in priority order until one succeeds.
+
+        Args:
+            max_amount_gbp: Hard ceiling (e.g. remaining daily budget).
+                            If meeting the exchange minimum would exceed
+                            this, the order is rejected instead of placed.
         """
         result = self.find_best_pair(symbol)
         if not result:
@@ -345,6 +351,16 @@ class ExchangeManager:
             # balance check uses the *actual* order cost, not the original.
             amount_in_quote = quantity * current_price
 
+            # Reject if bumped amount exceeds the daily-budget ceiling
+            if max_amount_gbp is not None and amount_gbp > max_amount_gbp:
+                return {
+                    "success": False,
+                    "error": (
+                        f"Exchange minimum order for {pair} is £{amount_gbp:.4f} "
+                        f"but only £{max_amount_gbp:.4f} budget remaining"
+                    ),
+                }
+
             # Verify exchange balance before placing order
             balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
             if not balance_check["ok"]:
@@ -394,7 +410,8 @@ class ExchangeManager:
             for fallback_id in remaining:
                 try:
                     fb_result = self._try_order_on_exchange(
-                        fallback_id, symbol, side, amount_gbp
+                        fallback_id, symbol, side, amount_gbp,
+                        max_amount_gbp=max_amount_gbp,
                     )
                     if fb_result.get("success"):
                         return fb_result
@@ -420,7 +437,8 @@ class ExchangeManager:
             return exchange.create_market_sell_order(pair, quantity)
 
     def _try_order_on_exchange(
-        self, exchange_id: str, symbol: str, side: str, amount_gbp: float
+        self, exchange_id: str, symbol: str, side: str, amount_gbp: float,
+        max_amount_gbp: float = None,
     ) -> Dict[str, Any]:
         """Try to execute an order on a specific exchange (with FX conversion)."""
         exchange = self.get_exchange(exchange_id)
@@ -459,6 +477,14 @@ class ExchangeManager:
 
                 # Recalculate after any bumps
                 amount_in_quote = quantity * current_price
+
+                # Reject if bumped amount exceeds daily-budget ceiling
+                if max_amount_gbp is not None and amount_gbp > max_amount_gbp:
+                    logger.info(
+                        f"Skipping {pair} on {exchange_id}: min order £{amount_gbp:.4f} "
+                        f"exceeds budget remaining £{max_amount_gbp:.4f}"
+                    )
+                    continue
 
                 # Balance check
                 balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
