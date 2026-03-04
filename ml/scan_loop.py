@@ -130,6 +130,20 @@ class ScanLoop:
                     logger.info(f"[Scan {scan_id}] Hit max proposals ({self.max_proposals_per_scan})")
                     break
 
+                # Check budget before each coin to avoid wasting API calls
+                try:
+                    from ml.trading_engine import get_trading_engine
+                    _engine = get_trading_engine()
+                    if _engine.get_remaining_budget() <= 0:
+                        logger.info(f"[Scan {scan_id}] Daily budget exhausted — stopping scan")
+                        self._audit("budget_exhausted", {"scan_id": scan_id})
+                        break
+                    if _engine.kill_switch:
+                        logger.info(f"[Scan {scan_id}] Kill switch active — stopping scan")
+                        break
+                except Exception:
+                    pass
+
                 symbol = coin_data["symbol"]
                 try:
                     result = self._analyse_and_evaluate(coin_data)
@@ -147,6 +161,21 @@ class ScanLoop:
                             "symbol": symbol,
                             "confidence": result.get("confidence", 0),
                         })
+
+                        # Re-check budget after a successful trade/proposal
+                        try:
+                            if _engine.get_remaining_budget() <= 0:
+                                logger.info(
+                                    f"[Scan {scan_id}] Daily budget now exhausted after "
+                                    f"{symbol} trade — stopping scan"
+                                )
+                                self._audit("budget_exhausted", {
+                                    "scan_id": scan_id,
+                                    "after_symbol": symbol,
+                                })
+                                break
+                        except Exception:
+                            pass
                     else:
                         scan_result["proposals_skipped"] += 1
                         self._audit("skip", {
@@ -455,7 +484,7 @@ class ScanLoop:
                     symbol=symbol,
                     side=trade_side,
                     amount_gbp=round(amount, 4),
-                    current_price=coin_data.get("price", 0),
+                    current_price=coin_data.get("price") or 0,
                     reason=trade_reasoning[:500] if trade_reasoning else "Multi-agent orchestrator recommended trade",
                     confidence=conviction,
                     recommendation=analysis.get("recommendation", "BUY"),

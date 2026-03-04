@@ -118,12 +118,15 @@ class TradingEngine:
         if self.buy_auto_approve:
             logger.info("🤖 Buy-side: auto-approve ENABLED — buys within budget execute immediately")
 
-        # Sell-side control: require manual approval for sells (cannot be bypassed)
+        # Sell-side control: auto-approve sells below a GBP threshold
+        self.sell_auto_approve_max_gbp = float(os.getenv("SELL_AUTO_APPROVE_MAX_GBP", "25.0"))
         self.sell_require_approval = os.getenv(
-            "SELL_REQUIRE_APPROVAL", "true"
+            "SELL_REQUIRE_APPROVAL", "false"
         ).lower() in ("1", "true", "yes")
         if self.sell_require_approval:
-            logger.info("🔒 Sell-side: manual approval REQUIRED — sells will never auto-execute")
+            logger.info("🔒 Sell-side: manual approval REQUIRED for ALL sells")
+        else:
+            logger.info(f"🤖 Sell-side: auto-approve for sells up to £{self.sell_auto_approve_max_gbp:.2f}")
 
         # Exchange (lazy init — prefers ExchangeManager for multi-exchange)
         self._exchange = None
@@ -285,6 +288,10 @@ class TradingEngine:
                     "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
                 }
 
+        # Ensure current_price is never None (can happen if coin data has price=None)
+        if current_price is None:
+            current_price = 0
+
         proposal = TradeProposal(
             id=uuid.uuid4().hex[:12],
             symbol=symbol.upper(),
@@ -306,11 +313,19 @@ class TradingEngine:
         budget = self._get_today_budget()
         budget.trades_proposed += 1
 
-        # Send approval email only when manual approval is needed
-        # (Skip for buys that will be auto-approved — execution email covers it)
-        is_buy_auto = not is_sell and self.buy_auto_approve
+        # Send approval email only when manual approval is needed.
+        # Auto-approved trades skip this — the execution email covers it.
+        will_auto_approve = False
+        if is_sell:
+            will_auto_approve = (
+                not self.sell_require_approval
+                and proposal.amount_gbp < self.sell_auto_approve_max_gbp
+            )
+        else:
+            will_auto_approve = self.buy_auto_approve
+
         email_sent = False
-        if not is_buy_auto:
+        if not will_auto_approve:
             email_sent = self._send_approval_email(proposal)
 
         self._save_state()
@@ -342,7 +357,8 @@ class TradingEngine:
         immediately approve and execute it.  Falls back to the normal
         email-approval flow when auto-approve is off.
 
-        Sells ALWAYS require manual approval regardless of this setting.
+        Sells under SELL_AUTO_APPROVE_MAX_GBP auto-execute; larger sells
+        still require manual email approval.
         """
         result = self.propose_trade(
             symbol=symbol,
@@ -360,13 +376,24 @@ class TradingEngine:
         proposal_id = result["proposal_id"]
         is_sell = side.lower() == "sell"
 
-        # Only auto-approve buys; sells always need manual approval
-        if is_sell or not self.buy_auto_approve:
+        # Determine whether to auto-approve this trade
+        should_auto = False
+        if is_sell:
+            # Sells: auto-approve if under threshold AND manual-approval not forced
+            if (not self.sell_require_approval
+                    and amount_gbp < self.sell_auto_approve_max_gbp):
+                should_auto = True
+        else:
+            # Buys: honour existing buy_auto_approve flag
+            should_auto = self.buy_auto_approve
+
+        if not should_auto:
             return result  # normal email-approval flow
 
         # Auto-approve: execute immediately
+        side_label = "SELL" if is_sell else "BUY"
         logger.info(
-            f"🤖 Auto-approving BUY {symbol} £{amount_gbp:.4f} "
+            f"🤖 Auto-approving {side_label} {symbol} £{amount_gbp:.4f} "
             f"(confidence {confidence}%)"
         )
         exec_result = self.approve_trade(proposal_id)
@@ -431,7 +458,7 @@ class TradingEngine:
             if order_result:
                 proposal.status = "executed"
                 proposal.executed_at = datetime.utcnow().isoformat()
-                proposal.execution_price = order_result.get("price") or proposal.price_at_proposal
+                proposal.execution_price = order_result.get("price") or proposal.price_at_proposal or 0
                 proposal.quantity = order_result.get("quantity") or 0
                 proposal.order_id = order_result.get("order_id") or "unknown"
                 exchange_used = order_result.get("exchange") or self.exchange_id
@@ -453,7 +480,7 @@ class TradingEngine:
                     return {"success": False, "error": proposal.error}
 
                 ticker = exchange.fetch_ticker(symbol_pair)
-                current_price = ticker.get("last") or ticker.get("close")
+                current_price = ticker.get("last") or ticker.get("close") or 0
                 if not current_price:
                     proposal.status = "rejected"
                     proposal.error = f"No current price for {symbol_pair} (ticker returned None)"
@@ -492,8 +519,8 @@ class TradingEngine:
 
                 proposal.status = "executed"
                 proposal.executed_at = datetime.utcnow().isoformat()
-                proposal.execution_price = order.get("average") or current_price
-                proposal.quantity = order.get("filled") or quantity
+                proposal.execution_price = order.get("average") or current_price or 0
+                proposal.quantity = order.get("filled") or quantity or 0
                 proposal.order_id = order.get("id", "unknown")
 
             # Extract fee info from order result
@@ -670,7 +697,7 @@ class TradingEngine:
 
             market = exchange.market(pair)
             ticker = exchange.fetch_ticker(pair)
-            price = ticker.get("last", 0)
+            price = ticker.get("last") or ticker.get("close") or 0
             if not price:
                 return 0
 

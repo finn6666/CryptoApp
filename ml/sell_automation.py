@@ -117,7 +117,7 @@ class SellAutomation:
 
             if trigger:
                 amount_gbp = current_price * quantity
-                result = engine.propose_trade(
+                result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side="sell",
                     amount_gbp=amount_gbp,
@@ -126,6 +126,7 @@ class SellAutomation:
                     confidence=trigger["confidence"],
                     recommendation="SELL",
                 )
+                outcome = "auto-executed" if result.get("auto_approved") else "proposed"
                 proposals.append({
                     "symbol": symbol,
                     "trigger": trigger["type"],
@@ -133,8 +134,8 @@ class SellAutomation:
                     "proposal": result,
                 })
                 logger.info(
-                    f"SELL proposed: {symbol} — {trigger['type']} "
-                    f"(PnL: {pnl_pct:.1f}%)"
+                    f"SELL {outcome}: {symbol} — {trigger['type']} "
+                    f"(PnL: {pnl_pct:.1f}%, £{amount_gbp:.4f})"
                 )
 
         # Optionally re-analyse with agents
@@ -249,7 +250,7 @@ class SellAutomation:
                     current_price = live_prices.get(symbol, 0)
                     quantity = holding.get("quantity", 0)
 
-                    prop = engine.propose_trade(
+                    prop = engine.propose_and_auto_execute(
                         symbol=symbol,
                         side="sell",
                         amount_gbp=current_price * quantity,

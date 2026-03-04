@@ -299,7 +299,7 @@ class ExchangeManager:
         try:
             # Get current price (with retry)
             ticker = self._fetch_ticker_with_retry(exchange, pair)
-            current_price = ticker.get("last") or ticker.get("close")
+            current_price = ticker.get("last") or ticker.get("close") or 0
             if not current_price:
                 return {
                     "success": False,
@@ -311,7 +311,7 @@ class ExchangeManager:
             fx_rate = 1.0
             if quote_currency != "GBP":
                 fx_rate = self._get_fx_rate("GBP", quote_currency, exchange)
-                if fx_rate is None:
+                if not fx_rate:  # None or 0
                     return {
                         "success": False,
                         "error": f"Cannot convert GBP to {quote_currency} — no FX rate available",
@@ -450,7 +450,7 @@ class ExchangeManager:
             pair = f"{symbol.upper()}/{quote}"
             if pair in pairs:
                 ticker = self._fetch_ticker_with_retry(exchange, pair)
-                current_price = ticker.get("last") or ticker.get("close")
+                current_price = ticker.get("last") or ticker.get("close") or 0
                 if not current_price:
                     logger.warning(f"No price for {pair} on {exchange_id}, trying next quote")
                     continue
@@ -459,7 +459,7 @@ class ExchangeManager:
                 fx_rate = 1.0
                 if quote != "GBP":
                     fx_rate = self._get_fx_rate("GBP", quote, exchange)
-                    if fx_rate is None:
+                    if not fx_rate:  # None or 0
                         continue  # Skip this quote, try next
 
                 amount_in_quote = amount_gbp * fx_rate
@@ -751,16 +751,14 @@ class ExchangeManager:
 
         try:
             ticker = exchange.fetch_ticker(pair)
-            current_price = ticker.get("last", 0)
+            current_price = ticker.get("last") or ticker.get("close") or 0
             if not current_price:
                 return 0
 
             quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
             fx_rate = 1.0
             if quote_currency != "GBP":
-                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange)
-                if fx_rate is None:
-                    fx_rate = 1.27  # fallback approx GBP→USD
+                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange) or 1.27
 
             # Minimum from quantity limit
             min_qty = self._get_min_order_quantity(exchange, pair)
