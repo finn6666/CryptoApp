@@ -425,8 +425,8 @@ class MarketMonitor:
             engine = get_trading_engine()
             if engine.kill_switch:
                 return
-            if engine.get_remaining_budget() <= 0:
-                logger.debug(f"[Monitor] No budget remaining, skipping auto-buy for {symbol}")
+            if engine.is_budget_exhausted():
+                logger.debug(f"[Monitor] Budget exhausted, skipping auto-buy for {symbol}")
                 return
 
             # Don't re-buy coins we already hold

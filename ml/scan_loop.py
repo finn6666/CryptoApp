@@ -134,7 +134,7 @@ class ScanLoop:
                 try:
                     from ml.trading_engine import get_trading_engine
                     _engine = get_trading_engine()
-                    if _engine.get_remaining_budget() <= 0:
+                    if _engine.is_budget_exhausted():
                         logger.info(f"[Scan {scan_id}] Daily budget exhausted — stopping scan")
                         self._audit("budget_exhausted", {"scan_id": scan_id})
                         break
@@ -164,7 +164,7 @@ class ScanLoop:
 
                         # Re-check budget after a successful trade/proposal
                         try:
-                            if _engine.get_remaining_budget() <= 0:
+                            if _engine.is_budget_exhausted():
                                 logger.info(
                                     f"[Scan {scan_id}] Daily budget now exhausted after "
                                     f"{symbol} trade — stopping scan"
@@ -355,8 +355,7 @@ class ScanLoop:
         engine = get_trading_engine()
 
         # Check budget before spending API credits
-        remaining = engine.get_remaining_budget()
-        if remaining <= 0:
+        if engine.is_budget_exhausted():
             return {"outcome": "skipped", "reason": "Daily budget exhausted", "proposed": False}
 
         if engine.kill_switch:
@@ -475,6 +474,7 @@ class ScanLoop:
                     trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
 
             if should_trade and conviction >= 45:
+                remaining = engine.get_remaining_budget()
                 amount = remaining * (allocation_pct / 100)
                 amount = min(amount, remaining)
 

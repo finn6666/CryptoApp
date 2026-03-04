@@ -405,8 +405,8 @@ def auto_evaluate_trade():
             return jsonify({"error": f"{symbol} is not available on Kraken"}), 400
 
         remaining = engine.get_remaining_budget()
-        if remaining <= 0:
-            return jsonify({"error": "Daily budget exhausted", "remaining": 0}), 400
+        if engine.is_budget_exhausted():
+            return jsonify({"error": "Daily budget exhausted", "remaining": round(remaining, 4)}), 400
 
         # Run the full multi-agent orchestrator (includes trading_specialist)
         if not state.official_adk_available or not state.analyze_crypto_adk:

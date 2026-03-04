@@ -97,6 +97,11 @@ class TradingEngine:
 
         # Safety: max single trade = 50% of daily budget
         self.max_trade_pct = float(os.getenv("MAX_TRADE_PCT", "50")) / 100
+        # Minimum useful budget: if remaining is below this, treat as exhausted.
+        # Most exchanges have a minimum order of ~£0.50, so anything below that
+        # will always fail.  Default 0.50 — override via env if your exchange
+        # has a different floor.
+        self.min_useful_budget_gbp = float(os.getenv("MIN_USEFUL_BUDGET_GBP", "0.50"))
         # Cooldown: minimum minutes between proposals (per-side)
         self.trade_cooldown_min = int(os.getenv("TRADE_COOLDOWN_MIN", "60"))
         self._last_buy_proposal_time: Optional[datetime] = None
@@ -208,13 +213,20 @@ class TradingEngine:
         budget = self._get_today_budget()
         return max(0, self.daily_budget_gbp - budget.spent_gbp)
 
+    def is_budget_exhausted(self) -> bool:
+        """True when remaining budget is too small for any practical trade."""
+        return self.get_remaining_budget() < self.min_useful_budget_gbp
+
     def can_afford_trade(self, amount_gbp: float, side: str = "buy") -> bool:
         """Check if a trade fits within today's budget. Sells are always affordable."""
         if self.kill_switch:
             return False
         if side == "sell":
             return True  # Sells don't consume buy budget
-        return amount_gbp <= self.get_remaining_budget()
+        remaining = self.get_remaining_budget()
+        if remaining < self.min_useful_budget_gbp:
+            return False
+        return amount_gbp <= remaining
 
     # ─── Trade Proposal ───────────────────────────────────────
 
@@ -241,10 +253,13 @@ class TradingEngine:
         # Budget checks only apply to buys — sells don't consume buy budget
         if not is_sell:
             remaining = self.get_remaining_budget()
-            if remaining <= 0:
+            if remaining < self.min_useful_budget_gbp:
                 return {
                     "success": False,
-                    "error": f"Daily budget exhausted (£{self.daily_budget_gbp} spent today)",
+                    "error": (
+                        f"Daily budget effectively exhausted "
+                        f"(£{remaining:.4f} remaining, minimum useful £{self.min_useful_budget_gbp:.2f})"
+                    ),
                 }
 
             if amount_gbp > remaining:
