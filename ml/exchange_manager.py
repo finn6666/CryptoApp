@@ -293,7 +293,12 @@ class ExchangeManager:
         try:
             # Get current price (with retry)
             ticker = self._fetch_ticker_with_retry(exchange, pair)
-            current_price = ticker["last"]
+            current_price = ticker.get("last") or ticker.get("close")
+            if not current_price:
+                return {
+                    "success": False,
+                    "error": f"No current price available for {pair} on {exchange_id} (ticker returned None)",
+                }
 
             # Convert GBP amount to quote currency if pair isn't GBP-quoted
             quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
@@ -427,7 +432,10 @@ class ExchangeManager:
             pair = f"{symbol.upper()}/{quote}"
             if pair in pairs:
                 ticker = self._fetch_ticker_with_retry(exchange, pair)
-                current_price = ticker["last"]
+                current_price = ticker.get("last") or ticker.get("close")
+                if not current_price:
+                    logger.warning(f"No price for {pair} on {exchange_id}, trying next quote")
+                    continue
 
                 # FX conversion
                 fx_rate = 1.0

@@ -437,11 +437,11 @@ class TradingEngine:
                 exchange_used = order_result.get("exchange") or self.exchange_id
 
                 # Fallback: if quantity still 0, calculate from amount/price
-                if not proposal.quantity and proposal.execution_price > 0:
+                if not proposal.quantity and proposal.execution_price and proposal.execution_price > 0:
                     proposal.quantity = proposal.amount_gbp / proposal.execution_price
                     logger.warning(
                         f"Quantity was 0 from exchange — calculated fallback: "
-                        f"{proposal.quantity:.8f} from £{proposal.amount_gbp:.4f} / £{proposal.execution_price:.6f}"
+                        f"{(proposal.quantity or 0):.8f} from £{proposal.amount_gbp:.4f} / £{(proposal.execution_price or 0):.6f}"
                     )
             else:
                 # Fallback to legacy single-exchange
@@ -453,7 +453,11 @@ class TradingEngine:
                     return {"success": False, "error": proposal.error}
 
                 ticker = exchange.fetch_ticker(symbol_pair)
-                current_price = ticker["last"]
+                current_price = ticker.get("last") or ticker.get("close")
+                if not current_price:
+                    proposal.status = "rejected"
+                    proposal.error = f"No current price for {symbol_pair} (ticker returned None)"
+                    return {"success": False, "error": proposal.error}
 
                 # FX conversion: if pair isn't GBP-quoted, convert amount
                 quote_currency = symbol_pair.split("/")[1] if "/" in symbol_pair else "GBP"
