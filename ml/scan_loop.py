@@ -36,7 +36,8 @@ class ScanLoop:
     def __init__(self):
         self.scan_time = os.getenv("SCAN_TIME", "12:00")
         # Interval-based scanning: run every N hours (0 = once-daily at scan_time only)
-        self.scan_interval_hours = float(os.getenv("SCAN_INTERVAL_HOURS", "6"))
+        # 12h balances Gemini API cost (~$0.84/day) with discovery frequency
+        self.scan_interval_hours = float(os.getenv("SCAN_INTERVAL_HOURS", "12"))
         self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "10"))
         self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "5.0"))
         self.scan_running = False
