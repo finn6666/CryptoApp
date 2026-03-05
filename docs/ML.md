@@ -45,18 +45,11 @@ Short-term: 6h in-memory. Long-term: 30d on disk.
 
 Gem threshold: `gem_probability > 0.40`. Recommendations: >0.70 STRONG BUY, >0.55 BUY, >0.40 HOLD.
 
-## Reinforcement Learning
+## Learning from Trade History
 
-`ml/simple_rl.py` — Q-learning (no PyTorch). Learns from trades reported via `/api/rl/report-trade`.
-
-| Profit | Reward |
-|--------|--------|
-| > 10% | +1.0 |
-| > 0% | +0.5 |
-| > -5% | -0.5 |
-| ≤ -5% | -1.0 |
-
-RL contributes up to +10 to gem score. State saved to `models/rl_simple_learner.json`.
+Instead of a separate RL module, past trade outcomes are injected directly into
+the ADK orchestrator prompt. Agents see open positions, recent wins/losses and
+overall win rate so they can calibrate conviction without extra API calls.
 
 ## ML Pipeline
 

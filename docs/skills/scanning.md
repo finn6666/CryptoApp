@@ -69,7 +69,7 @@ The scheduler runs in a daemon thread, checking every 30 seconds for pending job
 - Uses `GradientBoostingClassifier` + `RobustScaler`
 - Fast local ML — no API calls needed
 - `OrchestratorWrapper` bridges ADK to portfolio manager interface
-- Optional `simple_rl_learner` integration
+- Trade history injected into orchestrator prompt for agent learning
 
 ## Environment Variables
 
@@ -77,7 +77,7 @@ The scheduler runs in a daemon thread, checking every 30 seconds for pending job
 |-----|---------|---------|
 | `SCAN_ENABLED` | `true` | Enable/disable scan loop |
 | `SCAN_TIME` | `12:00` | Daily scan time (legacy mode) |
-| `SCAN_INTERVAL_HOURS` | `6` | Hours between scans (0 = daily) |
+| `SCAN_INTERVAL_HOURS` | `12` | Hours between scans (0 = daily) |
 | `SCAN_MAX_COINS` | `10` | Max coins per scan |
 | `SCAN_MIN_GEM_SCORE` | `5.0` | Min gem score for inclusion |
 | `SCAN_MAX_PROPOSALS` | `3` | Max trade proposals per scan |

@@ -34,7 +34,6 @@ ml/
   portfolio_manager.py      # Batch analysis, allocation
   enhanced_gem_detector.py  # GradientBoosting gem detection
   training_pipeline.py      # RandomForest training, ONNX export
-  simple_rl.py              # Q-learning
   agent_memory.py           # Short/long-term context
   scheduler.py              # Weekly retrain + reports
 routes/                     # Flask blueprints (coins, health, ml, symbols, trading)

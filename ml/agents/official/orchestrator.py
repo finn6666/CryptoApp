@@ -18,6 +18,8 @@ from .risk_agent import risk_agent
 from .sentiment_agent import sentiment_agent
 from .trading_agent import trading_agent
 
+from ml.portfolio_tracker import get_portfolio_tracker
+
 logger = logging.getLogger(__name__)
 
 # Late-import helper to avoid circular imports
@@ -122,6 +124,54 @@ memory_service = InMemoryMemoryService()
 session_service = InMemorySessionService()
 
 
+def _build_trade_history_context() -> str:
+    """
+    Build a concise summary of past trading performance for agent context.
+    Lets agents learn from real outcomes without any extra API calls.
+    """
+    try:
+        tracker = get_portfolio_tracker()
+        perf = tracker.get_performance_summary()
+        holdings = tracker.get_holdings()
+        closed = tracker.get_closed_positions()
+
+        if perf["total_trades"] == 0:
+            return ""
+
+        lines = ["PAST TRADING PERFORMANCE (learn from this):"]
+
+        # Overall stats
+        lines.append(
+            f"  Trades: {perf['total_trades']} ({perf['total_buys']} buys, {perf['total_sells']} sells) | "
+            f"Win rate: {perf['win_rate_pct']}% | Realised P&L: £{perf['realised_pnl_gbp']:.2f}"
+        )
+
+        # Current open positions
+        if holdings:
+            lines.append("  Open positions:")
+            for h in holdings:
+                sym = h["symbol"]
+                entry = h.get("avg_entry_price", 0)
+                qty = h.get("quantity", 0)
+                cost = h.get("total_cost_gbp", 0)
+                lines.append(f"    {sym}: qty {qty:.6g} @ £{entry:.6g} (cost £{cost:.4f})")
+
+        # Recent closed trades (last 5)
+        if closed:
+            lines.append("  Recent closed positions:")
+            for c in closed[:5]:
+                outcome = "WIN" if c["won"] else "LOSS"
+                lines.append(
+                    f"    {c['symbol']}: {outcome} £{c['realised_pnl_gbp']:+.4f}"
+                )
+
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.debug(f"Could not build trade history context: {e}")
+        return ""
+
+
 async def analyze_crypto(
     symbol: str,
     coin_data: Optional[Dict[str, Any]] = None,
@@ -170,9 +220,14 @@ async def analyze_crypto(
     
     market_data_str = " | ".join(market_lines) if market_lines else "No data available."
 
-    prompt = f"""Analyze {symbol}: {market_data_str}
+    # Inject past trade performance so agents can learn from real outcomes
+    trade_history_ctx = _build_trade_history_context()
+    history_block = f"\n\n{trade_history_ctx}" if trade_history_ctx else ""
+
+    prompt = f"""Analyze {symbol}: {market_data_str}{history_block}
 
 Give me the real story on {symbol} — what does this project actually do, why should anyone care, and is it worth a punt at this price? Coordinate your team (all 5 specialists) and be brutally honest. No generic filler.
+Use the past trading performance above (if present) to calibrate your confidence — avoid repeating losing patterns and double down on what has worked.
 After getting analysis from your 4 analysts, delegate to trading_specialist to decide if this is worth real money.
 Return JSON matching CryptoAnalysisOutput schema with ALL fields including should_trade, trade_side, trade_conviction, trade_reasoning, trade_risk_note and trade_allocation_pct."""
     

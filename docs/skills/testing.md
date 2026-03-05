@@ -14,7 +14,6 @@ pytest with shared fixtures in `conftest.py`. All exchange/API calls are mocked 
 | `tests/test_backtesting.py` | ~118 | Backtesting engine tests |
 | `tests/test_exchange_manager.py` | ~122 | Exchange manager tests |
 | `tests/test_portfolio_tracker.py` | ~218 | Portfolio tracker tests |
-| `tests/test_rl_learner.py` | ~107 | RL learner tests |
 | `tests/test_training_pipeline.py` | ~147 | ML training pipeline tests |
 | `tests/test_agent_memory.py` | ~51 | Agent memory tests |
 | `tests/test_frontend.js` | ~295 | Frontend JS tests (manually run) |

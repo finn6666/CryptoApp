@@ -47,7 +47,6 @@ ml/                 — All ML, trading, and agent logic
   enhanced_gem_detector.py — GradientBoosting gem scoring (local ML)
   training_pipeline.py — RandomForest → ONNX export
   onnx_inference.py    — ONNX Runtime inference
-  simple_rl.py         — Q-learning RL (lightweight)
   agent_memory.py      — Short/long-term agent context
   scheduler.py         — Weekly retrain + performance reports
   agents/official/     — 5 ADK agents + orchestrator

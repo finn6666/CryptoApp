@@ -665,96 +665,6 @@ def portfolio_closed():
 
 
 # ========================================
-# RL Outcome Feedback for Live Trades
-# ========================================
-
-@trading_bp.route('/api/trades/check-outcomes', methods=['POST'])
-@limiter.limit('10 per hour')
-@require_trading_auth
-def check_trade_outcomes():
-    """
-    Review all open positions and feed results back to RL.
-    Checks each holding's P&L and reports outcomes for learning.
-    """
-    try:
-        from ml.portfolio_tracker import get_portfolio_tracker
-        tracker = get_portfolio_tracker()
-
-        live_prices = {}
-        if state.analyzer:
-            for coin in state.analyzer.coins:
-                if coin.price:
-                    live_prices[coin.symbol.upper()] = coin.price
-
-        holdings = tracker.get_holdings(live_prices)
-        outcomes_reported = 0
-        results = []
-
-        for holding in holdings:
-            symbol = holding["symbol"]
-            if symbol not in live_prices:
-                continue
-
-            current_price = live_prices[symbol]
-            entry_price = holding.get("avg_entry_price", 0)
-            if entry_price <= 0:
-                continue
-
-            # Calculate days held
-            first_buy = holding.get("first_buy_at", "")
-            if first_buy:
-                from datetime import datetime as dt
-                try:
-                    buy_dt = dt.fromisoformat(first_buy)
-                    days_held = (dt.utcnow() - buy_dt).days
-                except Exception:
-                    days_held = 1
-            else:
-                days_held = 1
-
-            pnl_pct = ((current_price - entry_price) / entry_price) * 100
-
-            # Report to RL
-            if state.GEM_DETECTOR_AVAILABLE and state.gem_detector:
-                try:
-                    features = {
-                        'profit_indicator': 1.0 if pnl_pct > 0 else -1.0,
-                        'days_held': days_held / 100.0,
-                        'entry_price': entry_price / 10000.0,
-                    }
-                    rl_result = state.gem_detector.learn_from_outcome(
-                        symbol=symbol,
-                        entry_price=entry_price,
-                        current_price=current_price,
-                        days_held=days_held,
-                        features=features,
-                        notes=f"Auto-checked by outcome scanner",
-                    )
-                    if rl_result:
-                        outcomes_reported += 1
-                        results.append({
-                            "symbol": symbol,
-                            "entry_price": entry_price,
-                            "current_price": current_price,
-                            "pnl_pct": round(pnl_pct, 2),
-                            "days_held": days_held,
-                            "rl_updated": True,
-                        })
-                except Exception as e:
-                    logger.warning(f"RL update failed for {symbol}: {e}")
-
-        return jsonify({
-            "success": True,
-            "outcomes_reported": outcomes_reported,
-            "results": results,
-        }), 200
-
-    except Exception as e:
-        logger.error(f"Check outcomes error: {e}")
-        return jsonify({"error": "Failed to check trade outcomes"}), 500
-
-
-# ========================================
 # Exchange Info Routes
 # ========================================
 
@@ -796,108 +706,13 @@ def check_symbol_tradeable(symbol):
 
 
 # ========================================
-# Trade Journal & RL Learning Routes
+# Trade Journal Routes
 # ========================================
 
 @trading_bp.route('/trades')
 def trades_page():
-    """Trade journal page for reporting trades and RL learning"""
+    """Trade journal page"""
     return render_template('trades.html')
-
-
-@trading_bp.route('/api/rl/report-trade', methods=['POST'])
-def report_trade():
-    """Report a trade outcome to teach the RL system"""
-    try:
-        data = request.json
-
-        required_fields = ['symbol', 'entry_price', 'exit_price', 'days_held']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
-
-        symbol = data['symbol'].upper()
-        entry_price = float(data['entry_price'])
-        exit_price = float(data['exit_price'])
-        days_held = int(data['days_held'])
-        notes = data.get('notes', '')
-
-        profit_pct = ((exit_price - entry_price) / entry_price) * 100
-
-        if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-            return jsonify({'error': 'RL not available. Gem detector not initialized.'}), 503
-
-        features = {
-            'profit_indicator': 1.0 if profit_pct > 0 else -1.0,
-            'days_held': days_held / 100.0,
-            'entry_price': entry_price / 10000.0,
-        }
-
-        result = state.gem_detector.learn_from_outcome(
-            symbol=symbol,
-            entry_price=entry_price,
-            current_price=exit_price,
-            days_held=days_held,
-            features=features,
-            notes=notes
-        )
-
-        if not result:
-            return jsonify({'error': 'RL learning not available'}), 503
-
-        result['symbol'] = symbol
-        result['entry_price'] = entry_price
-        result['exit_price'] = exit_price
-        result['profit_pct'] = round(profit_pct, 2)
-        result['days_held'] = days_held
-        result['notes'] = notes
-        result['new_success_rate'] = round(result['new_success_rate'] * 100, 2)
-
-        logger.info(f"Trade reported: {symbol} {profit_pct:+.1f}% over {days_held} days")
-        return jsonify(result), 200
-
-    except ValueError as e:
-        return jsonify({'error': 'Invalid number format in trade data'}), 400
-    except Exception as e:
-        logger.error(f"Error reporting trade: {e}")
-        return jsonify({'error': 'Failed to report trade'}), 500
-
-
-@trading_bp.route('/api/rl/stats')
-def rl_stats():
-    """Get RL learning statistics"""
-    try:
-        if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-            return jsonify({'success': False, 'error': 'RL not available'}), 503
-
-        from ml.simple_rl import simple_rl_learner
-        stats = simple_rl_learner.get_stats()
-        stats['success'] = True
-        return jsonify(stats), 200
-
-    except Exception as e:
-        logger.error(f"Error getting RL stats: {e}")
-        return jsonify({'success': False, 'error': 'Failed to get RL stats'}), 500
-
-
-@trading_bp.route('/api/rl/trades')
-def rl_trades():
-    """Get recent trades from RL history"""
-    try:
-        from ml.simple_rl import simple_rl_learner
-
-        recent_trades = simple_rl_learner.trade_history[-20:]
-        enhanced_trades = []
-        for trade in reversed(recent_trades):
-            enhanced_trade = trade.copy()
-            enhanced_trade['symbol'] = enhanced_trade.get('symbol', 'N/A')
-            enhanced_trades.append(enhanced_trade)
-
-        return jsonify({'success': True, 'trades': enhanced_trades}), 200
-
-    except Exception as e:
-        logger.error(f"Error getting trades: {e}")
-        return jsonify({'success': False, 'error': 'Failed to get trades', 'trades': []}), 500
 
 
 # ─── Sell Automation ──────────────────────────────────────────
