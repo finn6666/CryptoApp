@@ -790,9 +790,13 @@ class ExchangeManager:
             has_keys = self._get_exchange_config(eid) is not None
             connected = eid in self._exchanges
             pair_count = len(self._pairs.get(eid, set()))
+            # Consider the exchange "connected" if keys are configured and
+            # we have successfully loaded its trading pairs, even if we
+            # haven't opened a live ccxt session yet (lazy-init).
+            effectively_connected = connected or (has_keys and pair_count > 0)
             status["exchanges"][eid] = {
                 "configured": has_keys,
-                "connected": connected,
+                "connected": effectively_connected,
                 "pairs": pair_count,
             }
         return status

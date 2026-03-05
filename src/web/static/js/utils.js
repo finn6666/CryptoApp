@@ -46,7 +46,7 @@ function startInitialRetry() {
         // Check if portfolio card has loaded real data (no longer shows default text)
         const valEl = document.getElementById('portfolioValue');
         const tradingEl = document.getElementById('tradingBudget');
-        const hasData = (valEl && valEl.textContent !== '$0.00' && valEl.textContent !== '—') ||
+        const hasData = (valEl && valEl.textContent !== '£0.00' && valEl.textContent !== '$0.00' && valEl.textContent !== '—') ||
                         (tradingEl && tradingEl.textContent !== '—' && tradingEl.textContent !== 'Connecting...');
         if (hasData || _initialRetryCount >= maxRetries) {
             clearInterval(timer);

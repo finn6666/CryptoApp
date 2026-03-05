@@ -589,10 +589,20 @@ def portfolio_holdings():
         # Get live prices for held coins
         live_prices = {}
         holdings_raw = tracker.get_holdings()
-        if holdings_raw and state.analyzer:
-            for coin in state.analyzer.coins:
-                if coin.price and coin.symbol.upper() in {h["symbol"] for h in holdings_raw}:
-                    live_prices[coin.symbol.upper()] = coin.price
+        if holdings_raw:
+            held_symbols = {h["symbol"] for h in holdings_raw}
+
+            # 1) Try the analyzer's coin list (fast, no API calls)
+            if state.analyzer:
+                for coin in state.analyzer.coins:
+                    if coin.price and coin.symbol.upper() in held_symbols:
+                        live_prices[coin.symbol.upper()] = coin.price
+
+            # 2) Fallback: use last_buy_price for any coins not in the analyzer
+            for h in holdings_raw:
+                sym = h["symbol"]
+                if sym not in live_prices and h.get("last_buy_price"):
+                    live_prices[sym] = h["last_buy_price"]
 
         holdings = tracker.get_holdings(live_prices)
         summary = tracker.get_total_value(live_prices)

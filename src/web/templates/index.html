@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Low Cap Crypto Analyzer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260208b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260305a">
 </head>
 <body>
     <div class="container">
@@ -47,7 +50,7 @@
                     <div class="overview-card-icon">💰</div>
                     <div class="overview-card-body">
                         <div class="overview-card-title">Portfolio</div>
-                        <div class="overview-card-value" id="portfolioValue">$0.00</div>
+                        <div class="overview-card-value" id="portfolioValue">£0.00</div>
                         <div class="overview-card-sub" id="portfolioPnL">No open positions</div>
                     </div>
                 </div>
@@ -136,14 +139,14 @@
     </div>
 
     <!-- Modular JavaScript -->
-    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260204c"></script>
-    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260204c"></script>
-    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260222a"></script>
-    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260222a"></script>
-    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260204c"></script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260204c"></script>
-    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260204c"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260222a"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260204c"></script>
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260305a"></script>
 </body>
 </html>
