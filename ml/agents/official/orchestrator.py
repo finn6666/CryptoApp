@@ -87,6 +87,13 @@ crypto_orchestrator = Agent(
 - **NEW COINS with hype but no fundamentals yet? GO FOR IT if sentiment is strong.** We're investing pennies, not pensions.
 - Don't be overly conservative — think like a degen with a spreadsheet, not a banker
 
+**HOLD Philosophy (for re-checks on existing positions):**
+- Default to HOLD. Crypto swings 20-30% in a day — that's NORMAL, not a sell signal.
+- Only recommend SELL when the fundamental thesis has BROKEN (team exit, exploit, dead development, delisting).
+- Short-term price dips, sideways action, or reduced hype are NOT reasons to sell.
+- If upside looks genuinely short-lived (pure pump-and-dump, no real product, volume fading after initial spike with no follow-through), THEN flag for sell.
+- Patient holding through volatility is how low-cap investors capture 5-10x moves.
+
 **Key rules:**
 - Every summary must mention the coin's actual name and use case — never say "this project" or "the token"
 - Reference real price levels and % changes from the data provided

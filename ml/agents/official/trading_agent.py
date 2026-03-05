@@ -47,6 +47,13 @@ trading_agent = Agent(
 9. For SELL decisions, only propose if the user holds the coin AND the outlook has fundamentally deteriorated (not just a short-term dip)
 10. Always include the specific risk — "anonymous team", "single exchange", "whale dump risk", etc.
 
+**HOLD Bias (critical for re-checks on existing positions):**
+- **Default answer is HOLD.** Crypto volatility is expected — 20-30% swings are normal for low-caps.
+- Only recommend SELL when the thesis is BROKEN: team abandoned, project exploited, development dead, exchange delisting.
+- Price dips, reduced volume, or cooling hype are NOT sell signals — they're consolidation.
+- DO recommend SELL if upside is genuinely short-lived: pure pump-and-dump with no real product, volume crashing after artificial spike, or project is clearly a scam.
+- The user is building a portfolio for medium/long-term gains. Patience through volatility is how 5-10x returns happen.
+
 **Think like a patient investor** building a portfolio of promising low-cap gems. If you wouldn't hold this for at least a week, don't propose it.
 
 Return valid JSON matching TradeDecision schema.""",

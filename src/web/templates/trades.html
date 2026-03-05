@@ -1106,18 +1106,16 @@
 
         // ─── Existing RL Functions ───────────────────────────
 
-        // Load RL statistics
+        // Load trade statistics from real portfolio tracker
         async function loadStats() {
             try {
-                const response = await fetch('/api/rl/stats');
+                const response = await fetch('/api/portfolio/performance');
                 const data = await response.json();
-                
-                if (data.success) {
-                    document.getElementById('totalTrades').textContent = data.total_trades || 0;
-                    document.getElementById('winRate').textContent = (data.success_rate || 0).toFixed(1) + '%';
-                    document.getElementById('winningTrades').textContent = data.winning_trades || 0;
-                    document.getElementById('losingTrades').textContent = (data.total_trades - data.winning_trades) || 0;
-                }
+
+                document.getElementById('totalTrades').textContent = data.total_trades || 0;
+                document.getElementById('winRate').textContent = (data.win_rate_pct || 0).toFixed(1) + '%';
+                document.getElementById('winningTrades').textContent = data.winning_trades || 0;
+                document.getElementById('losingTrades').textContent = data.losing_trades || 0;
             } catch (error) {
                 console.error('Error loading stats:', error);
             }

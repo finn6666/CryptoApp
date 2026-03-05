@@ -20,24 +20,25 @@ async function loadPortfolioCard() {
         const summary = data.summary || {};
         const holdings = data.holdings || [];
 
-        const totalValue = summary.total_current_value ?? summary.total_value ?? 0;
-        const totalPnL = summary.total_pnl ?? summary.unrealised_pnl ?? 0;
-        const pnlPct = summary.total_pnl_pct ?? summary.pnl_percentage ?? null;
+        const totalValue = summary.total_value_gbp ?? 0;
+        const totalPnL = summary.unrealised_pnl_gbp ?? 0;
+        const totalCost = summary.total_cost_gbp ?? 0;
+        const pnlPct = totalCost > 0 ? ((totalPnL / totalCost) * 100) : null;
 
         const valEl = document.getElementById('portfolioValue');
         const subEl = document.getElementById('portfolioPnL');
 
         if (holdings.length === 0) {
-            valEl.textContent = '$0.00';
+            valEl.textContent = '£0.00';
             subEl.textContent = 'No open positions';
             subEl.className = 'overview-card-sub neutral';
             return;
         }
 
-        valEl.textContent = `$${Number(totalValue).toFixed(2)}`;
+        valEl.textContent = `£${Number(totalValue).toFixed(2)}`;
 
         const sign = totalPnL >= 0 ? '+' : '';
-        let subText = `${sign}$${Number(totalPnL).toFixed(2)}`;
+        let subText = `${sign}£${Number(totalPnL).toFixed(2)}`;
         if (pnlPct !== null) {
             subText += ` (${sign}${Number(pnlPct).toFixed(1)}%)`;
         }
