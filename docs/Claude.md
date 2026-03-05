@@ -7,7 +7,6 @@
 - **Git workflow:** Single `dev` branch for work, merge to `main` for releases. Descriptive commit messages with bullet-point body
 - **Commit convention:** Commit + push after every completed change. Verify syntax first with `uv run python -c "import py_compile; ..."`
 - **Deployment:** Raspberry Pi 4 — restart with `ssh pi "sudo systemctl restart cryptoapp"`
-- **Testing:** `uv run pytest` — use existing conftest fixtures
 
 ## Project Overview
 
@@ -57,7 +56,6 @@ src/core/           — Config, CryptoAnalyzer model, CoinMarketCap fetcher
 src/web/            — Jinja2 templates + static JS/CSS
 data/               — Runtime JSON state (gitignored)
 deploy/             — systemd unit, nginx config, SSL script
-tests/              — pytest suite with conftest fixtures
 docs/               — Markdown documentation
 ```
 
@@ -108,4 +106,3 @@ See `docs/skills/` for detailed guides on specific subsystems:
 - `scanning.md` — Scan loop, gem detection, scheduling
 - `deployment.md` — Pi setup, systemd, nginx, SSL, monitoring
 - `frontend.md` — Templates, JS modules, API endpoints, dashboard
-- `testing.md` — pytest setup, fixtures, test patterns

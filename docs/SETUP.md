@@ -81,9 +81,4 @@ curl http://localhost:5001/health
 curl http://localhost:5001/api/exchanges/status
 ```
 
-## Tests
 
-```bash
-uv run python -m pytest tests/ -v    # 92 Python tests
-node tests/test_frontend.js            # 29 JS tests
-```
