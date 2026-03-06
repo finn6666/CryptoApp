@@ -1,104 +1,90 @@
 # Architecture
 
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Language | Python 3.13+, uv |
-| Web | Flask + Gunicorn (1 worker, 2 threads) |
-| AI | Google ADK + Gemini |
-| Exchange | ccxt (Kraken only) |
-| ML | scikit-learn, ONNX Runtime |
-| RL | Q-learning (no PyTorch) |
-| Data | CoinMarketCap API |
-| Frontend | Vanilla HTML/CSS/JS |
-| Deploy | systemd, nginx |
-
-Monthly cost: ~£2.50 (Gemini ~£2, Pi power ~£0.50).
-
-## Project Structure
-
 ```
-app.py                      # Flask app factory, blueprint registration
-main.py                     # CLI entry point
-wsgi.py                     # WSGI entrypoint
-gunicorn.conf.py            # Gunicorn config (Pi-optimised)
-ml/
-  agents/official/          # 5 ADK agents + orchestrator
-  tools/adk_tools.py        # 16 agent tools
-  trading_engine.py         # Trade proposals, approval, execution
-  exchange_manager.py       # Kraken routing, FX, balance checks
-  scan_loop.py              # Daily scan pipeline
-  sell_automation.py         # Exit triggers
-  q_learning.py             # Q-learning RL (reward shaping, ε-greedy)
-  portfolio_tracker.py      # Holdings, cost basis, P&L
-  portfolio_manager.py      # Batch analysis, allocation
-  enhanced_gem_detector.py  # GradientBoosting gem detection
-  training_pipeline.py      # RandomForest training, ONNX export
-  agent_memory.py           # Short/long-term context
-  scheduler.py              # Weekly retrain + reports
-routes/                     # Flask blueprints (coins, health, ml, symbols, trading)
-services/app_state.py       # Global state, caching
-src/core/                   # CoinMarketCap data fetching
-src/web/                    # Templates + static assets
-```
-
-## Buy Flow
-
-```
-ScanLoop.run_scan()
-  → Refresh data (CoinMarketCap)
-  → Filter tradeable coins (Kraken pairs)
-  → Select candidates (favourites → gem score → attractiveness)
-  → Analyse (5-agent orchestrator or gem detector)
-  → Q-learning adjusts conviction (−20 to +15 based on state pattern history)
-  → Conviction ≥ 45?
-    → TradingEngine.propose_trade() — budget check, cooldown
-    → Email with HMAC-signed APPROVE/REJECT links
-    → User clicks APPROVE
-    → Re-check budget + expiry
-    → ExchangeManager.execute_order() — FX conversion, balance check, market order
-    → PortfolioTracker.record_trade() — holdings + fees
+                        ┌─────────────────┐
+                        │  CoinMarketCap  │
+                        │    (prices)     │
+                        └────────┬────────┘
+                                 │
+                 ┌───────────────┼───────────────┐
+                 ▼                               ▼
+        ┌────────────────┐              ┌────────────────┐
+        │   ScanLoop     │◄─────────────│ MarketMonitor  │
+        │  (every 12h)   │  high gems / │ (5/15/30 min)  │
+        │                │  momentum    │                │
+        └───────┬────────┘              └───────┬────────┘
+                │                               │
+                ▼                               │
+        ┌────────────────┐                      │
+        │   Analysis     │                      │
+        │ Gemini Agents  │                      │
+        │ + Gem Detector │                      │
+        └───────┬────────┘                      │
+                │                               │
+                ▼                               │
+        ┌────────────────┐                      │
+        │  Q-Learning    │◄─── outcomes ───┐    │
+        │ adjust -20/+15 │                 │    │
+        └───────┬────────┘                 │    │
+                │                          │    │
+                ▼                          │    │
+        ┌────────────────┐          ┌──────┴────────┐
+        │ Trading Engine │          │     Sell      │
+        │  proposals +   │────────► │  Automation   │◄──┘
+        │  budget check  │  sells   │ -35% / +75%   │
+        └───────┬────────┘          └───────────────┘
+                │                          ▲
+                ▼                          │
+        ┌────────────────┐          ┌──────┴────────┐
+        │    Kraken      │          │   Portfolio   │
+        │  (via ccxt)    │────────► │   Tracker     │
+        │                │  record  │ holdings+P&L  │
+        └────────────────┘          └───────────────┘
 ```
 
-## Sell Flow
+## How it works
+
+**Scanning:** ScanLoop runs every 12h — pulls CoinMarketCap data, filters to Kraken-tradeable coins, picks top 10 candidates. MarketMonitor runs between scans — checks prices every 5min, momentum every 15min, quick ML scan every 30min. High-scoring finds get fed into the full pipeline.
+
+**Analysis:** Candidates go through 5 Gemini agents (Sentiment, Research, Technical, Risk, Trading) which produce a conviction score 0–100. Falls back to the local GradientBoosting gem detector if Gemini's down. Q-learning then adjusts conviction -20 to +15 based on past experience with similar patterns.
+
+**Trading:** Conviction 45+ creates a proposal. Buys auto-approve, large sells need email confirmation (HMAC-signed, 1h expiry). Exchange Manager handles pair routing, FX, balance checks, executes on Kraken via ccxt.
+
+**Portfolio:** Tracks holdings, cost basis, P&L. Sell automation checks stop-loss (-35%), profit target (+75%), trailing stop (35% from peak), plus 12h agent re-checks. All outcomes feed back into Q-learning.
+
+**Learning:** Q-learning maps market patterns (gem score / volume / trend / cap size) to buy/skip actions. Losses hurt 1.5x more than equivalent wins. Repeat losers get progressive penalties. Exploration decays from 30% to 5% as it gains experience.
+
+**Weekly:** Model retrains Sunday 2am, report emails Monday 9am.
+
+## Key numbers
+
+| | |
+|---|---|
+| Daily budget | £3 (configurable) |
+| Conviction threshold | 45+ to buy |
+| Stop-loss | -35% |
+| Profit target | +75% (after 72h) |
+| Trailing stop | 35% from peak |
+| Max auto-buys/day | 3 (from MarketMonitor) |
+| Coin re-analysis cooldown | 6h |
+| Monthly cost | ~£2.50 |
+
+## Files
 
 ```
-ScanLoop step 5 → SellAutomation.check_and_propose_sells()
-  → Profit target ≥ 20% → confidence 85
-  → Stop loss ≤ -15%   → confidence 90
-  → Trailing stop -10%  → confidence 80
-  → Same email approval flow
-  → Sells don't consume buy budget
+ml/scan_loop.py             # Full scan pipeline
+ml/market_monitor.py        # Between-scan monitoring
+ml/agents/official/         # 5 Gemini agents + orchestrator
+ml/trading_engine.py        # Proposals, approval, execution
+ml/exchange_manager.py      # Kraken routing + FX
+ml/sell_automation.py       # Exit triggers + RL feedback
+ml/q_learning.py            # RL agent
+ml/portfolio_tracker.py     # Holdings + P&L
+ml/enhanced_gem_detector.py # Local ML scoring
+ml/training_pipeline.py     # Model training + ONNX export
+ml/scheduler.py             # Weekly retrain + reports
+routes/trading.py           # API + web UI
+services/app_state.py       # Singleton init
+src/core/                   # CoinMarketCap fetching
+src/web/                    # Frontend
 ```
-
-## Singletons
-
-| Class | Accessor |
-|-------|----------|
-| TradingEngine | `get_trading_engine()` |
-| ExchangeManager | `get_exchange_manager()` |
-| ScanLoop | `get_scan_loop()` |
-| PortfolioTracker | `get_portfolio_tracker()` |
-| ONNXInferenceEngine | `get_onnx_engine()` |
-| QLearningTrader | `get_q_learner()` |
-| MLScheduler | `get_ml_scheduler()` |
-
-## Persistence
-
-| File | Purpose |
-|------|---------|
-| `data/trades/trading_state.json` | Proposals, history, budgets |
-| `data/portfolio.json` | Holdings, trade log |
-| `data/exchange_pairs_cache.json` | Kraken pair cache (6h TTL) |
-| `data/favorites.json` | User favourites |
-| `models/crypto_model.onnx` | Trained ONNX model |
-| `models/crypto_model.pkl` | sklearn model |
-| `models/rl_simple_learner.json` | Q-table + stats |
-
-## Budget
-
-- Daily cap: `DAILY_TRADE_BUDGET_GBP` (software-side, funds must exist on Kraken)
-- Buy/sell budgets tracked separately
-- Budget resets at midnight (date-keyed)
-- Balance verified on Kraken before every order

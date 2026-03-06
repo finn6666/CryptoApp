@@ -716,6 +716,93 @@ def check_symbol_tradeable(symbol):
 
 
 # ========================================
+# RL Insights
+# ========================================
+
+@trading_bp.route('/api/rl/insights')
+def rl_insights():
+    """Human-readable Q-learning insights."""
+    try:
+        from ml.q_learning import get_q_learner
+        ql = get_q_learner()
+        stats = ql.get_stats()
+        history = ql.get_outcome_history(limit=10)
+        insights = []
+
+        episodes = stats.get('episodes', 0)
+        if episodes == 0:
+            insights.append("Still early days — no trades have fully closed yet so there's nothing concrete to learn from. The system will start picking up patterns once positions get sold.")
+        else:
+            insights.append(f"Learnt from {episodes} completed trade{'s' if episodes != 1 else ''} so far.")
+
+        # Exploration rate
+        eps = stats.get('epsilon', 0.3)
+        if eps > 0.2:
+            insights.append(f"Currently in exploration mode ({eps*100:.0f}% random). Still trying different things to figure out what works rather than sticking to what it knows.")
+        elif eps > 0.1:
+            insights.append(f"Starting to settle down ({eps*100:.0f}% exploration). Getting more confident about which patterns are worth buying into.")
+        else:
+            insights.append(f"Mostly running on learnt experience now ({eps*100:.0f}% exploration). Sticking with patterns that have worked before.")
+
+        # Loss memory — which coins keep underperforming
+        losses = stats.get('loss_memory', {})
+        loss_coins = [sym for sym, count in sorted(losses.items(), key=lambda x: -x[1]) if count > 0]
+        if loss_coins:
+            if len(loss_coins) == 1:
+                insights.append(f"{loss_coins[0]} keeps sitting in the red. The system's getting more cautious about buying similar setups.")
+            else:
+                coin_list = ', '.join(loss_coins[:-1]) + ' and ' + loss_coins[-1]
+                insights.append(f"{coin_list} have all been underperforming. The system's penalising these and will need stronger signals before buying similar coins again.")
+
+        # Best/worst known patterns
+        best = stats.get('best_state')
+        worst = stats.get('worst_state')
+        state_labels = {
+            'high': 'high gem score', 'medium': 'medium gem score', 'low': 'low gem score',
+            'bullish': 'bullish weekly trend', 'bearish': 'bearish weekly trend', 'neutral': 'flat weekly trend',
+            'micro': 'micro cap', 'small': 'small cap', 'mid': 'mid cap', 'large': 'large cap',
+        }
+        def describe_state(s):
+            parts = s.split('|')
+            if len(parts) == 4:
+                desc = [state_labels.get(parts[0], parts[0]),
+                        state_labels.get(parts[2], parts[2]),
+                        state_labels.get(parts[3], parts[3])]
+                return ', '.join(desc)
+            return s
+
+        if best and best.get('q_buy', 0) > 0:
+            insights.append(f"Most promising pattern so far: {describe_state(best['state'])}. The system will lean towards buying these.")
+        if worst and worst.get('q_buy', 0) < -0.1:
+            insights.append(f"Least promising pattern: {describe_state(worst['state'])}. These get a confidence penalty now.")
+
+        # Recent outcomes
+        if history:
+            wins = [o for o in history if o.get('pnl_pct', 0) >= 0]
+            losses_list = [o for o in history if o.get('pnl_pct', 0) < 0]
+            if wins and not losses_list:
+                insights.append(f"Last {len(history)} outcomes have all been winners — nice.")
+            elif losses_list and not wins:
+                insights.append(f"Last {len(history)} outcomes were all losses. The system is adjusting its strategy to avoid repeating the same mistakes.")
+            else:
+                insights.append(f"Recent record: {len(wins)}W / {len(losses_list)}L from the last {len(history)} trades.")
+
+            # Call out notable recent trades
+            for o in history[:3]:
+                pnl = o.get('pnl_pct', 0)
+                sym = o.get('symbol', '?')
+                if pnl >= 10:
+                    insights.append(f"{sym} was a solid win at +{pnl:.1f}%. Reinforcing that pattern.")
+                elif pnl <= -10:
+                    insights.append(f"{sym} took a {pnl:.1f}% hit. The system's learnt to be more careful with that type of setup.")
+
+        return jsonify({"insights": insights}), 200
+    except Exception as e:
+        logger.error(f"RL insights error: {e}")
+        return jsonify({"insights": ["Couldn't load insights right now."]}), 200
+
+
+# ========================================
 # Trade Journal Routes
 # ========================================
 
