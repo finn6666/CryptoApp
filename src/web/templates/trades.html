@@ -902,33 +902,29 @@
                 // Holdings list
                 const container = document.getElementById('holdingsList');
                 if (holdings.length > 0) {
-                    container.innerHTML = holdings.map((h, i) => {
+                    container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">` + holdings.map(h => {
                         const pnlPct = h.unrealised_pnl_pct || 0;
                         const pnlGbp = h.unrealised_pnl_gbp || 0;
                         const isUp = pnlGbp >= 0;
                         const pnlColor = isUp ? '#48bb78' : '#fc8181';
                         const pnlBg = isUp ? 'rgba(72,187,120,0.1)' : 'rgba(252,129,129,0.1)';
+                        const borderAccent = isUp ? 'rgba(72,187,120,0.3)' : 'rgba(252,129,129,0.3)';
                         const arrow = isUp ? '▲' : '▼';
-                        const rowBg = i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent';
                         return `
-                        <div style="display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 16px 20px; background: ${rowBg}; border-bottom: 1px solid rgba(255,255,255,0.05);">
-                            <div>
-                                <div style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">${h.symbol}</div>
-                                <div style="font-size: 13px; color: var(--text-secondary);">
-                                    ${h.quantity?.toFixed(4) || 0} units · ${h.exchange || '—'}
-                                </div>
+                        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-top: 3px solid ${borderAccent}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${h.symbol}</span>
+                                <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
                             </div>
-                            <div style="text-align: right;">
-                                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 4px;">
-                                    <span style="font-size: 15px; font-weight: 600; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(4)}</span>
-                                    <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 2px 8px; border-radius: 4px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
-                                </div>
-                                <div style="font-size: 13px; color: var(--text-secondary);">
-                                    Cost £${(h.total_cost_gbp || 0).toFixed(4)} · P&L <span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(4)}</span>
-                                </div>
+                            <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(4)}</div>
+                            <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary);">
+                                <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>£${(h.total_cost_gbp || 0).toFixed(4)}</span></div>
+                                <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(4)}</span></div>
+                                <div style="display: flex; justify-content: space-between;"><span>Qty</span><span>${h.quantity?.toFixed(4) || 0}</span></div>
+                                <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${h.exchange || '—'}</span></div>
                             </div>
                         </div>`;
-                    }).join('');
+                    }).join('') + `</div>`;
                 } else {
                     container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No holdings yet. The portfolio tracker records every executed trade automatically.</p>';
                 }

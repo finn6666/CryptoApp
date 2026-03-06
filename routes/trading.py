@@ -598,7 +598,18 @@ def portfolio_holdings():
                     if coin.price and coin.symbol.upper() in held_symbols:
                         live_prices[coin.symbol.upper()] = coin.price
 
-            # 2) Fallback: use last_buy_price for any coins not in the analyzer
+            # 2) Fallback: fetch from exchange for coins not in the analyzer
+            missing = [h["symbol"] for h in holdings_raw if h["symbol"] not in live_prices]
+            if missing:
+                try:
+                    from ml.exchange_manager import get_exchange_manager
+                    mgr = get_exchange_manager()
+                    exchange_prices = mgr.get_live_prices_gbp(missing)
+                    live_prices.update(exchange_prices)
+                except Exception as e:
+                    logger.warning(f"Exchange price fetch failed: {e}")
+
+            # 3) Last resort: use last_buy_price (will show 0% P&L)
             for h in holdings_raw:
                 sym = h["symbol"]
                 if sym not in live_prices and h.get("last_buy_price"):

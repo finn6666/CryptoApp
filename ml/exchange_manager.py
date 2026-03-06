@@ -778,6 +778,33 @@ class ExchangeManager:
             logger.warning(f"Could not determine min order for {symbol}: {e}")
             return 0
 
+    def get_live_prices_gbp(self, symbols: List[str]) -> Dict[str, float]:
+        """Fetch current GBP prices for a list of symbols from exchanges."""
+        prices = {}
+        for sym in symbols:
+            try:
+                result = self.find_best_pair(sym)
+                if not result:
+                    continue
+                exchange_id, pair = result
+                exchange = self.get_exchange(exchange_id)
+                if not exchange:
+                    continue
+                ticker = self._fetch_ticker_with_retry(exchange, pair)
+                price = ticker.get("last") or ticker.get("close")
+                if not price:
+                    continue
+                quote = pair.split("/")[1] if "/" in pair else "GBP"
+                if quote == "GBP":
+                    prices[sym.upper()] = price
+                else:
+                    fx_rate = self._get_fx_rate("GBP", quote, exchange)
+                    if fx_rate:
+                        prices[sym.upper()] = price / fx_rate
+            except Exception as e:
+                logger.debug(f"Could not fetch price for {sym}: {e}")
+        return prices
+
     def get_status(self) -> Dict[str, Any]:
         """Get connectivity and configuration status for all exchanges."""
         status = {
