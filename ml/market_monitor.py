@@ -78,6 +78,9 @@ class MarketMonitor:
         self.auto_buy_min_confidence = int(os.getenv("MONITOR_AUTO_BUY_MIN_CONFIDENCE", "55"))
         self.auto_buy_momentum_pct = float(os.getenv("MONITOR_AUTO_BUY_MOMENTUM_PCT", "15"))  # % move to trigger
         self.auto_buy_max_per_day = int(os.getenv("MONITOR_AUTO_BUY_MAX_PER_DAY", "3"))
+        # Cooldown before re-analysing a coin that was already evaluated and skipped.
+        # 6h default — no point burning Gemini calls on the same coin with identical data.
+        self.buy_analysis_cooldown_min = int(os.getenv("MONITOR_BUY_COOLDOWN_MIN", "360"))
         self._auto_buys_today = 0
         self._auto_buy_date = datetime.utcnow().date()
 
@@ -409,6 +412,12 @@ class MarketMonitor:
         symbol = coin_info.get("symbol", "?")
 
         try:
+            # Cooldown: don't re-analyse a coin that was recently evaluated
+            cooldown_key = f"buy_analysis:{symbol}"
+            if not self._can_alert(cooldown_key):
+                logger.debug(f"[Monitor] {symbol} analysed recently, skipping (cooldown)")
+                return
+
             # Reset daily counter if date changed
             today = datetime.utcnow().date()
             if today != self._auto_buy_date:
@@ -469,6 +478,9 @@ class MarketMonitor:
             from ml.scan_loop import get_scan_loop
             scanner = get_scan_loop()
             result = scanner._analyse_and_evaluate(coin_data)
+
+            # Mark cooldown so we don't re-analyse this coin next cycle
+            self._mark_alerted(cooldown_key)
 
             proposed = result.get("proposed", False)
             outcome = result.get("outcome", "skipped")
@@ -637,7 +649,9 @@ class MarketMonitor:
         if not last:
             return True
         elapsed = (datetime.utcnow() - last).total_seconds() / 60
-        return elapsed >= self.alert_cooldown_min
+        # Buy analysis uses a longer cooldown to avoid wasting API calls
+        cooldown = self.buy_analysis_cooldown_min if key.startswith("buy_analysis:") else self.alert_cooldown_min
+        return elapsed >= cooldown
 
     def _mark_alerted(self, key: str):
         """Mark an alert key as having just fired."""
