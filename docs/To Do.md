@@ -1,5 +1,7 @@
 ## Current work
 
+- Look at ways to help the q-learning system eg reward shaping, e greedy exploration with decay?
+
 
 ## Future work
 
@@ -15,13 +17,6 @@ Build a `DexManager` class using Jupiter's REST API + `solders` for signing. Gas
 
 Seamless routing: check CEXes first for best price/availability, fall back to Jupiter DEX for tokens not listed on any CEX.
 
-### Phase 4 (optional) — 1inch on BSC (effort: ~1 day)
-
-REST API + `web3.py` for BSC-specific tokens. Gas ~£0.03–0.05/swap. Only worth it if there are BSC-exclusive tokens not available on Solana.
-
-### ❌ Ruled out — Uniswap on Ethereum mainnet
-
-Gas fees (£3–15 per swap) exceed the entire £3 daily budget. Not viable unless moved to L2s (Arbitrum/Base) where micro-cap selection is limited anyway.
 
 ### Weekly Report
 
