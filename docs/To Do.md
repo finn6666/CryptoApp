@@ -1,7 +1,5 @@
 ## Current work
 
-- Look at ways to help the q-learning system eg reward shaping, e greedy exploration with decay?
-
 
 ## Future work
 
@@ -19,4 +17,3 @@ Seamless routing: check CEXes first for best price/availability, fall back to Ju
 
 
 ### Weekly Report
-

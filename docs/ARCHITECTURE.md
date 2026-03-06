@@ -29,7 +29,8 @@ ml/
   trading_engine.py         # Trade proposals, approval, execution
   exchange_manager.py       # Kraken routing, FX, balance checks
   scan_loop.py              # Daily scan pipeline
-  sell_automation.py        # Exit triggers
+  sell_automation.py         # Exit triggers
+  q_learning.py             # Q-learning RL (reward shaping, ε-greedy)
   portfolio_tracker.py      # Holdings, cost basis, P&L
   portfolio_manager.py      # Batch analysis, allocation
   enhanced_gem_detector.py  # GradientBoosting gem detection
@@ -50,7 +51,8 @@ ScanLoop.run_scan()
   → Filter tradeable coins (Kraken pairs)
   → Select candidates (favourites → gem score → attractiveness)
   → Analyse (5-agent orchestrator or gem detector)
-  → Conviction ≥ 75?
+  → Q-learning adjusts conviction (−20 to +15 based on state pattern history)
+  → Conviction ≥ 45?
     → TradingEngine.propose_trade() — budget check, cooldown
     → Email with HMAC-signed APPROVE/REJECT links
     → User clicks APPROVE
@@ -79,6 +81,7 @@ ScanLoop step 5 → SellAutomation.check_and_propose_sells()
 | ScanLoop | `get_scan_loop()` |
 | PortfolioTracker | `get_portfolio_tracker()` |
 | ONNXInferenceEngine | `get_onnx_engine()` |
+| QLearningTrader | `get_q_learner()` |
 | MLScheduler | `get_ml_scheduler()` |
 
 ## Persistence

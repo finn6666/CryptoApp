@@ -42,6 +42,7 @@ ml/                 — All ML, trading, and agent logic
   trading_engine.py — Proposals, budget, approval, execution, kill switch
   exchange_manager.py — Kraken via ccxt, pair cache, FX, orders
   sell_automation.py  — Exit triggers (profit/stop-loss/trailing/agent)
+  q_learning.py        — Q-learning RL (buy/skip, reward shaping, ε-greedy)
   portfolio_tracker.py — Holdings, cost basis, unrealised P&L
   enhanced_gem_detector.py — GradientBoosting gem scoring (local ML)
   training_pipeline.py — RandomForest → ONNX export

@@ -1,0 +1,466 @@
+"""
+Q-Learning Trade Selector
+
+Learns from trade outcomes to adjust future buy/skip decisions.
+Uses a discretised state space with epsilon-greedy exploration.
+
+State features (discretised):
+- gem_score_tier: low / medium / high
+- volume_mcap_ratio: low / medium / high
+- weekly_change: bearish / neutral / bullish
+- market_cap_tier: micro / small / mid / large
+
+Actions: BUY, SKIP
+
+Reward: actual P&L % from closed positions, with shaping for:
+- Repeat losers (extra penalty for buying same pattern that lost before)
+- Opportunity cost (small negative for long holds with no movement)
+- Win streaks (small bonus for consecutive profitable trades)
+
+Integration: provides a confidence_adjustment that modifies the agent's
+raw confidence score before the scan loop's trade decision threshold.
+"""
+
+import json
+import logging
+import math
+import random
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+Q_TABLE_FILE = Path("data/q_table.json")
+OUTCOME_LOG_FILE = Path("data/trade_outcomes.jsonl")
+
+# ─── State Discretisation ─────────────────────────────────────
+
+def _gem_tier(score: float) -> str:
+    if score >= 60:
+        return "high"
+    if score >= 30:
+        return "medium"
+    return "low"
+
+
+def _volume_mcap_tier(ratio: float) -> str:
+    """ratio = 24h_volume / market_cap"""
+    if ratio >= 0.3:
+        return "high"
+    if ratio >= 0.05:
+        return "medium"
+    return "low"
+
+
+def _weekly_change_tier(pct: float) -> str:
+    if pct > 10:
+        return "bullish"
+    if pct < -10:
+        return "bearish"
+    return "neutral"
+
+
+def _mcap_tier(mcap_gbp: float) -> str:
+    if mcap_gbp >= 500_000_000:
+        return "large"
+    if mcap_gbp >= 50_000_000:
+        return "mid"
+    if mcap_gbp >= 5_000_000:
+        return "small"
+    return "micro"
+
+
+def discretise_state(coin_data: Dict[str, Any]) -> str:
+    """
+    Convert raw coin data into a hashable state string.
+    Returns e.g. 'high|medium|bearish|micro'
+    """
+    gem = _gem_tier(coin_data.get("gem_score", 0))
+    vol = _volume_mcap_tier(
+        coin_data.get("volume_24h", 0) / max(coin_data.get("market_cap", 1), 1)
+    )
+    wk = _weekly_change_tier(coin_data.get("percent_change_7d", 0))
+    mc = _mcap_tier(coin_data.get("market_cap", 0))
+    return f"{gem}|{vol}|{wk}|{mc}"
+
+
+# ─── Q-Learning Engine ────────────────────────────────────────
+
+ACTIONS = ("buy", "skip")
+
+
+class QLearningTrader:
+    """
+    Tabular Q-learning agent for buy/skip decisions.
+
+    - Persists Q-table to disk so learning survives restarts
+    - Logs every outcome for auditing
+    - Provides confidence_adjustment() for the scan loop
+    """
+
+    def __init__(
+        self,
+        alpha: float = None,
+        gamma: float = None,
+        epsilon: float = None,
+        epsilon_min: float = None,
+        epsilon_decay: float = None,
+    ):
+        # Learning rate — how much new info overrides old
+        self.alpha = alpha if alpha is not None else float(
+            os.environ.get("QL_ALPHA", "0.15")
+        )
+        # Discount factor — importance of future rewards
+        self.gamma = gamma if gamma is not None else float(
+            os.environ.get("QL_GAMMA", "0.9")
+        )
+        # Exploration rate — probability of random action
+        self.epsilon = epsilon if epsilon is not None else float(
+            os.environ.get("QL_EPSILON", "0.3")
+        )
+        self.epsilon_min = epsilon_min if epsilon_min is not None else float(
+            os.environ.get("QL_EPSILON_MIN", "0.05")
+        )
+        # Decay per episode (each completed trade outcome)
+        self.epsilon_decay = epsilon_decay if epsilon_decay is not None else float(
+            os.environ.get("QL_EPSILON_DECAY", "0.995")
+        )
+
+        # Q-table: state → {action → value}
+        self.q_table: Dict[str, Dict[str, float]] = defaultdict(
+            lambda: {a: 0.0 for a in ACTIONS}
+        )
+        # Visit counts for diagnostics
+        self.visit_counts: Dict[str, Dict[str, int]] = defaultdict(
+            lambda: {a: 0 for a in ACTIONS}
+        )
+        # Track symbols that have lost money and how many times
+        self.loss_memory: Dict[str, int] = {}
+        # Total episodes processed
+        self.episodes = 0
+
+        self._load()
+
+    # ─── Core Q-Learning ──────────────────────────────────────
+
+    def get_action(self, state: str) -> str:
+        """Epsilon-greedy action selection."""
+        if random.random() < self.epsilon:
+            return random.choice(ACTIONS)
+        q_values = self.q_table[state]
+        return max(q_values, key=q_values.get)
+
+    def update(
+        self,
+        state: str,
+        action: str,
+        reward: float,
+        next_state: Optional[str] = None,
+    ):
+        """
+        Q-value update using Bellman equation.
+        next_state is None for terminal states (position closed).
+        """
+        current_q = self.q_table[state][action]
+
+        if next_state is not None:
+            max_next_q = max(self.q_table[next_state].values())
+            target = reward + self.gamma * max_next_q
+        else:
+            target = reward
+
+        # Q-learning update rule
+        self.q_table[state][action] = current_q + self.alpha * (target - current_q)
+        self.visit_counts[state][action] += 1
+
+        # Decay epsilon after each learning step
+        self.episodes += 1
+        self.epsilon = max(self.epsilon_min, self.epsilon * self.epsilon_decay)
+
+        self._save()
+
+    # ─── Reward Shaping ───────────────────────────────────────
+
+    def calculate_reward(
+        self,
+        pnl_pct: float,
+        symbol: str,
+        hold_hours: float = 0,
+    ) -> float:
+        """
+        Shaped reward signal from trade outcome.
+
+        Components:
+        1. Base reward: scaled P&L percentage
+        2. Repeat-loser penalty: extra cost for buying patterns that keep losing
+        3. Opportunity cost: small drag for very long holds with minimal movement
+        4. Asymmetric scaling: losses hurt more than equivalent gains help
+           (reflects real psychology + the math of recovering from losses)
+        """
+        # 1. Base reward — scale P&L into [-1, 1] range using tanh
+        #    tanh(pnl/30) maps ±30% P&L to roughly ±0.8
+        base = math.tanh(pnl_pct / 30.0)
+
+        # 2. Asymmetric loss penalty — losses are 1.5× as impactful
+        if base < 0:
+            base *= 1.5
+
+        # 3. Repeat-loser penalty
+        if pnl_pct < -5:
+            times_lost = self.loss_memory.get(symbol, 0)
+            self.loss_memory[symbol] = times_lost + 1
+            # Progressive penalty: -0.1 first loss, -0.2 second, etc.
+            repeat_penalty = -0.1 * (times_lost + 1)
+            base += max(repeat_penalty, -0.5)  # Cap at -0.5
+        elif pnl_pct > 5:
+            # Winning resets the loss counter
+            self.loss_memory.pop(symbol, None)
+
+        # 4. Opportunity cost for long stagnant holds (>168h = 1 week)
+        if hold_hours > 168 and abs(pnl_pct) < 5:
+            base -= 0.05  # Small penalty for capital tied up with no movement
+
+        return round(base, 4)
+
+    # ─── Integration: Confidence Adjustment ───────────────────
+
+    def confidence_adjustment(self, coin_data: Dict[str, Any]) -> int:
+        """
+        Returns an adjustment (-20 to +15) to apply to the agent's
+        raw confidence score before the buy threshold check.
+
+        Positive = Q-learning thinks this state pattern tends to win.
+        Negative = Q-learning thinks this state pattern tends to lose.
+        """
+        state = discretise_state(coin_data)
+        q_buy = self.q_table[state]["buy"]
+        q_skip = self.q_table[state]["skip"]
+        visits = self.visit_counts[state]["buy"]
+
+        # No opinion yet — don't adjust
+        if visits == 0:
+            return 0
+
+        # Difference between buy and skip Q-values
+        advantage = q_buy - q_skip
+
+        # Scale to [-20, +15] range (asymmetric: easier to penalise than boost)
+        # Clamp advantage to [-1, 1] first
+        clamped = max(-1.0, min(1.0, advantage))
+        if clamped >= 0:
+            adjustment = int(clamped * 15)
+        else:
+            adjustment = int(clamped * 20)
+
+        return adjustment
+
+    def should_skip(self, coin_data: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Consult Q-table for a direct BUY/SKIP recommendation.
+        Returns (should_skip, reason).
+        """
+        state = discretise_state(coin_data)
+        action = self.get_action(state)
+
+        if action == "skip":
+            q_vals = self.q_table[state]
+            visits = sum(self.visit_counts[state].values())
+            reason = (
+                f"Q-learning recommends SKIP for state {state} "
+                f"(Q_buy={q_vals['buy']:.3f}, Q_skip={q_vals['skip']:.3f}, "
+                f"visits={visits}, ε={self.epsilon:.3f})"
+            )
+            return True, reason
+
+        return False, ""
+
+    # ─── Outcome Recording ────────────────────────────────────
+
+    def record_outcome(
+        self,
+        symbol: str,
+        coin_data: Dict[str, Any],
+        action: str,
+        pnl_pct: float,
+        hold_hours: float = 0,
+        exit_trigger: str = "",
+    ):
+        """
+        Record a trade outcome and update Q-values.
+        Called by sell automation when a position closes, or periodically
+        for unrealised P&L checkpoints.
+        """
+        state = discretise_state(coin_data)
+        reward = self.calculate_reward(pnl_pct, symbol, hold_hours)
+
+        # Terminal update (position closed)
+        self.update(state, action, reward, next_state=None)
+
+        # Also update the skip action inversely — if buying lost money,
+        # skipping would have been correct (and vice versa)
+        skip_reward = -reward * 0.3  # Weaker inverse signal
+        self.update(state, "skip", skip_reward, next_state=None)
+
+        # Log outcome
+        outcome = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "symbol": symbol,
+            "state": state,
+            "action": action,
+            "pnl_pct": round(pnl_pct, 2),
+            "hold_hours": round(hold_hours, 1),
+            "reward": reward,
+            "exit_trigger": exit_trigger,
+            "epsilon": round(self.epsilon, 4),
+            "q_buy": round(self.q_table[state]["buy"], 4),
+            "q_skip": round(self.q_table[state]["skip"], 4),
+        }
+        self._log_outcome(outcome)
+
+        logger.info(
+            f"Q-learning outcome: {symbol} {action} → "
+            f"P&L {pnl_pct:+.1f}%, reward={reward:+.3f}, "
+            f"Q_buy={self.q_table[state]['buy']:.3f}, "
+            f"Q_skip={self.q_table[state]['skip']:.3f}, "
+            f"ε={self.epsilon:.3f}"
+        )
+
+    def record_unrealised_checkpoint(
+        self,
+        symbol: str,
+        coin_data: Dict[str, Any],
+        pnl_pct: float,
+        hold_hours: float,
+    ):
+        """
+        Periodic checkpoint for open positions.
+        Uses a much smaller learning rate to avoid overreacting to
+        unrealised swings, but still nudges Q-values in the right direction.
+        """
+        state = discretise_state(coin_data)
+        # Damped reward — only 20% weight compared to realised outcomes
+        reward = self.calculate_reward(pnl_pct, symbol, hold_hours) * 0.2
+        current_q = self.q_table[state]["buy"]
+        self.q_table[state]["buy"] = current_q + self.alpha * 0.3 * (reward - current_q)
+        self._save()
+
+    # ─── Diagnostics ──────────────────────────────────────────
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return Q-learning diagnostics for the dashboard."""
+        total_states = len(self.q_table)
+        visited_states = sum(
+            1 for s in self.visit_counts
+            if sum(self.visit_counts[s].values()) > 0
+        )
+        total_visits = sum(
+            sum(v.values()) for v in self.visit_counts.values()
+        )
+
+        # Best and worst states
+        best_state = max(
+            self.q_table, key=lambda s: self.q_table[s]["buy"], default=None
+        )
+        worst_state = max(
+            self.q_table, key=lambda s: -self.q_table[s]["buy"], default=None
+        )
+
+        return {
+            "epsilon": round(self.epsilon, 4),
+            "alpha": self.alpha,
+            "gamma": self.gamma,
+            "episodes": self.episodes,
+            "total_states": total_states,
+            "visited_states": visited_states,
+            "total_visits": total_visits,
+            "loss_memory": dict(self.loss_memory),
+            "best_state": {
+                "state": best_state,
+                "q_buy": round(self.q_table[best_state]["buy"], 4) if best_state else 0,
+            } if best_state else None,
+            "worst_state": {
+                "state": worst_state,
+                "q_buy": round(self.q_table[worst_state]["buy"], 4) if worst_state else 0,
+            } if worst_state else None,
+        }
+
+    def get_outcome_history(self, limit: int = 50) -> List[Dict]:
+        """Read recent outcomes from the log."""
+        if not OUTCOME_LOG_FILE.exists():
+            return []
+        entries = []
+        try:
+            with open(OUTCOME_LOG_FILE) as f:
+                for line in f:
+                    try:
+                        entries.append(json.loads(line.strip()))
+                    except (json.JSONDecodeError, ValueError):
+                        pass
+            return list(reversed(entries[-limit:]))
+        except Exception as e:
+            logger.warning(f"Failed to read outcome history: {e}")
+            return []
+
+    # ─── Persistence ──────────────────────────────────────────
+
+    def _save(self):
+        try:
+            Q_TABLE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            data = {
+                "q_table": dict(self.q_table),
+                "visit_counts": dict(self.visit_counts),
+                "loss_memory": self.loss_memory,
+                "epsilon": self.epsilon,
+                "episodes": self.episodes,
+            }
+            with open(Q_TABLE_FILE, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save Q-table: {e}")
+
+    def _load(self):
+        if not Q_TABLE_FILE.exists():
+            logger.info("No existing Q-table — starting fresh")
+            return
+        try:
+            with open(Q_TABLE_FILE) as f:
+                data = json.load(f)
+
+            for state, actions in data.get("q_table", {}).items():
+                self.q_table[state] = actions
+            for state, counts in data.get("visit_counts", {}).items():
+                self.visit_counts[state] = counts
+            self.loss_memory = data.get("loss_memory", {})
+            self.epsilon = data.get("epsilon", self.epsilon)
+            self.episodes = data.get("episodes", 0)
+
+            logger.info(
+                f"Loaded Q-table: {len(self.q_table)} states, "
+                f"{self.episodes} episodes, ε={self.epsilon:.3f}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to load Q-table: {e}")
+
+    def _log_outcome(self, outcome: Dict):
+        try:
+            OUTCOME_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(OUTCOME_LOG_FILE, "a") as f:
+                f.write(json.dumps(outcome) + "\n")
+        except Exception as e:
+            logger.warning(f"Failed to log outcome: {e}")
+
+
+# ─── Singleton ────────────────────────────────────────────────
+
+import os
+
+_instance: Optional[QLearningTrader] = None
+
+
+def get_q_learner() -> QLearningTrader:
+    global _instance
+    if _instance is None:
+        _instance = QLearningTrader()
+    return _instance

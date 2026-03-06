@@ -474,6 +474,34 @@ class ScanLoop:
                     allocation_pct = min(80, conf - 10)
                     trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
 
+            # ── Q-learning adjustment ──
+            # Let the RL agent nudge conviction based on past outcomes
+            # for this coin's state pattern (gem tier, vol, weekly change, mcap)
+            try:
+                from ml.q_learning import get_q_learner
+                ql = get_q_learner()
+                ql_adjust = ql.confidence_adjustment(coin_data)
+                if ql_adjust != 0:
+                    original_conviction = conviction
+                    conviction = max(0, min(100, conviction + ql_adjust))
+                    logger.info(
+                        f"[QL] {symbol}: conviction {original_conviction} → "
+                        f"{conviction} (adjustment {ql_adjust:+d})"
+                    )
+
+                # Also check if Q-learning outright recommends skipping
+                should_ql_skip, skip_reason = ql.should_skip(coin_data)
+                if should_ql_skip and conviction < 80:
+                    # High-conviction agent calls can override Q-learning skip
+                    logger.info(f"[QL] {symbol}: {skip_reason}")
+                    return {
+                        "outcome": "skipped",
+                        "proposed": False,
+                        "reason": skip_reason,
+                    }
+            except Exception as e:
+                logger.debug(f"Q-learning adjustment skipped: {e}")
+
             if should_trade and conviction >= 45:
                 remaining = engine.get_remaining_budget()
                 amount = remaining * (allocation_pct / 100)

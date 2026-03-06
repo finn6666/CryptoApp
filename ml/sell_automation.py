@@ -118,7 +118,36 @@ class SellAutomation:
 
             trigger = self._evaluate_exit(symbol, current_price, entry_price, pnl_pct, hold_hours)
 
+            # ── Q-learning: checkpoint unrealised P&L for open positions ──
+            if not trigger:
+                try:
+                    from ml.q_learning import get_q_learner
+                    ql = get_q_learner()
+                    ql.record_unrealised_checkpoint(
+                        symbol=symbol,
+                        coin_data=holding,
+                        pnl_pct=pnl_pct,
+                        hold_hours=hold_hours,
+                    )
+                except Exception:
+                    pass
+
             if trigger:
+                # ── Q-learning: record closed position outcome ──
+                try:
+                    from ml.q_learning import get_q_learner
+                    ql = get_q_learner()
+                    ql.record_outcome(
+                        symbol=symbol,
+                        coin_data=holding,
+                        action="buy",
+                        pnl_pct=pnl_pct,
+                        hold_hours=hold_hours,
+                        exit_trigger=trigger["type"],
+                    )
+                except Exception as e:
+                    logger.debug(f"Q-learning outcome recording failed: {e}")
+
                 amount_gbp = current_price * quantity
                 result = engine.propose_and_auto_execute(
                     symbol=symbol,
