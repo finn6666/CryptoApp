@@ -459,47 +459,6 @@
             </div>
         </div>
 
-        <!-- Performance Summary Section -->
-        <div class="section-card">
-            <h2 class="section-header">📊 Performance Summary</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 700;" id="perfWinRate">0%</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Win Rate</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 700; color: #48bb78;" id="perfWins">0</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Winning Sells</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 700; color: #fc8181;" id="perfLosses">0</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Losing Sells</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="perfAvgTrade">£0.00</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Avg Trade Size</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="perfCoins">0</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Coins Traded</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="perfInvested">£0.00</div>
-                    <div style="font-size: 12px; color: var(--text-secondary);">Total Invested</div>
-                </div>
-            </div>
-            <div id="perfBestWorst" style="display: none; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                <div style="background: rgba(72,187,120,0.08); border: 1px solid rgba(72,187,120,0.3); border-radius: 8px; padding: 14px;">
-                    <div style="font-size: 12px; color: #48bb78; font-weight: 600; margin-bottom: 4px;">Best Trade</div>
-                    <div id="perfBest" style="font-size: 14px; color: var(--text-primary);">—</div>
-                </div>
-                <div style="background: rgba(252,129,129,0.08); border: 1px solid rgba(252,129,129,0.3); border-radius: 8px; padding: 14px;">
-                    <div style="font-size: 12px; color: #fc8181; font-weight: 600; margin-bottom: 4px;">Worst Trade</div>
-                    <div id="perfWorst" style="font-size: 14px; color: var(--text-primary);">—</div>
-                </div>
-            </div>
-        </div>
-
         <!-- Closed Positions Section -->
         <div class="section-card">
             <h2 class="section-header">🏁 Closed Positions</h2>
@@ -514,16 +473,6 @@
             <div id="activityLog" style="max-height: 300px; overflow-y: auto;">
                 <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
             </div>
-        </div>
-
-        <div class="info-box">
-            <strong>📝 How it works:</strong><br>
-            <strong>1. Automated Scanning</strong> — The scanner runs daily at the scheduled time, refreshing coin data and filtering to tradeable pairs on your configured exchanges.<br>
-            <strong>2. Multi-Agent Analysis</strong> — A team of AI agents (Research, Technical, Risk, Sentiment) analyses the top candidates and produces a consensus recommendation with a conviction score.<br>
-            <strong>3. Trade Proposals</strong> — When conviction is high enough (≥65%), a buy proposal is created. You receive an email with Approve/Reject links (proposals expire after 1 hour).<br>
-            <strong>4. Portfolio Tracking</strong> — Approved trades are executed on your exchange, tracked in the portfolio, and monitored for exit signals (profit targets, stop-losses, trailing stops).<br>
-            <strong>5. Hold-First Strategy</strong> — The system is biased toward accumulating positions and holding. Sells require manual approval and are only proposed when exit conditions are met or the outlook turns negative.<br>
-            The RL system learns automatically from the outcomes of executed trades.
         </div>
 
         <div class="alert" id="alert">
@@ -542,7 +491,6 @@
             loadExecutedTrades();
             loadScanStatus();
             loadPortfolio();
-            loadPerformance();
             loadClosedPositions();
             loadTradeLog();
             loadActivityLog();
@@ -972,38 +920,6 @@
                 }
             } catch (e) {
                 console.error('Error loading portfolio:', e);
-            }
-        }
-
-        // ─── Performance Summary ─────────────────────────────
-
-        async function loadPerformance() {
-            try {
-                const response = await fetch('/api/portfolio/performance');
-                const data = await response.json();
-
-                document.getElementById('perfWinRate').textContent = `${data.win_rate_pct || 0}%`;
-                document.getElementById('perfWinRate').style.color = (data.win_rate_pct || 0) >= 50 ? '#48bb78' : '#fc8181';
-                document.getElementById('perfWins').textContent = data.winning_trades || 0;
-                document.getElementById('perfLosses').textContent = data.losing_trades || 0;
-                document.getElementById('perfAvgTrade').textContent = `£${(data.avg_trade_gbp || 0).toFixed(4)}`;
-                document.getElementById('perfCoins').textContent = data.unique_coins_traded || 0;
-                document.getElementById('perfInvested').textContent = `£${(data.total_invested_gbp || 0).toFixed(4)}`;
-
-                const bestWorstEl = document.getElementById('perfBestWorst');
-                if (data.best_trade || data.worst_trade) {
-                    bestWorstEl.style.display = 'grid';
-                    document.getElementById('perfBest').textContent = data.best_trade
-                        ? `${data.best_trade.symbol} +£${data.best_trade.pnl_gbp.toFixed(4)}`
-                        : '—';
-                    document.getElementById('perfWorst').textContent = data.worst_trade
-                        ? `${data.worst_trade.symbol} £${data.worst_trade.pnl_gbp.toFixed(4)}`
-                        : '—';
-                } else {
-                    bestWorstEl.style.display = 'none';
-                }
-            } catch (e) {
-                console.error('Error loading performance:', e);
             }
         }
 
