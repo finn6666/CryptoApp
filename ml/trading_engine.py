@@ -311,7 +311,7 @@ class TradingEngine:
             id=uuid.uuid4().hex[:12],
             symbol=symbol.upper(),
             side=side.lower(),
-            amount_gbp=round(amount_gbp, 4),
+            amount_gbp=round(amount_gbp, 2),
             price_at_proposal=current_price,
             reason=reason,
             confidence=confidence,
@@ -586,7 +586,7 @@ class TradingEngine:
             self._write_audit("trade_executed", {
                 "symbol": proposal.symbol,
                 "side": proposal.side,
-                "amount_gbp": round(proposal.amount_gbp, 4),
+                "amount_gbp": round(proposal.amount_gbp, 2),
                 "price": proposal.execution_price,
                 "exchange": exchange_used,
                 "confidence": proposal.confidence,
@@ -613,7 +613,7 @@ class TradingEngine:
             self._write_audit("trade_failed", {
                 "symbol": proposal.symbol,
                 "side": proposal.side,
-                "amount_gbp": round(proposal.amount_gbp, 4),
+                "amount_gbp": round(proposal.amount_gbp, 2),
                 "error": str(e),
                 "confidence": proposal.confidence,
             })
@@ -741,7 +741,7 @@ class TradingEngine:
             min_gbp = max(min_gbp_qty, min_gbp_cost)
             if min_gbp > 0:
                 min_gbp *= 1.05  # 5% safety buffer
-            return round(min_gbp, 4)
+            return round(min_gbp, 2)
         except Exception as e:
             logger.debug(f"Could not determine min order GBP for {symbol}: {e}")
             return 0
@@ -967,11 +967,11 @@ class TradingEngine:
         return {
             "active": not self.kill_switch,
             "daily_budget_gbp": self.daily_budget_gbp,
-            "spent_today_gbp": round(budget.spent_gbp, 4),
-            "remaining_today_gbp": round(self.get_remaining_budget(), 4),
-            "sell_proceeds_today_gbp": round(budget.sell_proceeds_gbp, 4),
+            "spent_today_gbp": round(budget.spent_gbp, 2),
+            "remaining_today_gbp": round(self.get_remaining_budget(), 2),
+            "sell_proceeds_today_gbp": round(budget.sell_proceeds_gbp, 2),
             "sells_today": budget.sells_executed,
-            "fees_today_gbp": round(budget.fees_gbp, 4),
+            "fees_today_gbp": round(budget.fees_gbp, 2),
             "trades_today": budget.trades_executed,
             "proposals_today": budget.trades_proposed,
             "pending_proposals": len(pending),

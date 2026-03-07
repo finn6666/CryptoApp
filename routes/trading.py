@@ -341,7 +341,7 @@ def propose_trade_api():
         result = engine.propose_trade(
             symbol=symbol,
             side=side,
-            amount_gbp=round(amount_gbp, 4),
+            amount_gbp=round(amount_gbp, 2),
             current_price=current_price,
             reason=reason[:500],            # cap at 500 chars
             confidence=confidence,
@@ -409,7 +409,7 @@ def auto_evaluate_trade():
 
         remaining = engine.get_remaining_budget()
         if engine.is_budget_exhausted():
-            return jsonify({"error": "Daily budget exhausted", "remaining": round(remaining, 4)}), 400
+            return jsonify({"error": "Daily budget exhausted", "remaining": round(remaining, 2)}), 400
 
         # Run the full multi-agent orchestrator (includes trading_specialist)
         if not state.official_adk_available or not state.analyze_crypto_adk:
@@ -467,7 +467,7 @@ def auto_evaluate_trade():
             proposal = engine.propose_trade(
                 symbol=symbol,
                 side=trade_side,
-                amount_gbp=round(amount, 4),
+                amount_gbp=round(amount, 2),
                 current_price=current_price,
                 reason=trade_reasoning[:500] if trade_reasoning else "Multi-agent system recommended trade",
                 confidence=conviction,
@@ -746,7 +746,7 @@ def exchange_balance():
                     info = raw.get(cur, {})
                     free = info.get("free", 0) or 0
                     if free > 0.001:
-                        cash[cur] = round(free, 4)
+                        cash[cur] = round(free, 2)
                 balances[eid] = cash
             except Exception as e:
                 balances[eid] = {"error": str(e)}

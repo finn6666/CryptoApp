@@ -773,7 +773,7 @@ class ExchangeManager:
             if min_gbp > 0:
                 min_gbp *= 1.05  # 5% buffer
 
-            return round(min_gbp, 4)
+            return round(min_gbp, 2)
         except Exception as e:
             logger.warning(f"Could not determine min order for {symbol}: {e}")
             return 0

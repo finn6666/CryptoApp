@@ -456,10 +456,22 @@
                 </div>
             </div>
             <div id="marketState" style="margin-bottom: 16px;">
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                    <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">🌡️ Market</div>
-                    <div id="fngDisplay" style="display: flex; align-items: center; gap: 10px;">
-                        <span style="color: var(--text-secondary); font-size: 13px;">Loading…</span>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 16px;">
+                    <!-- Top row: FnG gauge + global stats + session change -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div id="fngDisplay" style="display: flex; align-items: center; gap: 10px;">
+                                <span style="color: var(--text-secondary); font-size: 13px;">Loading…</span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div id="globalStats" style="display: flex; align-items: center; gap: 10px;"></div>
+                            <div id="sessionChange" style="display: none; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 6px;"></div>
+                        </div>
+                    </div>
+                    <!-- Headlines: what's actually moving the market -->
+                    <div id="marketHeadlines" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+                        <div style="color: var(--text-secondary); font-size: 12px;">Fetching headlines…</div>
                     </div>
                 </div>
             </div>
@@ -600,7 +612,7 @@
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                     <div>
                                         <span style="font-weight: 700; font-size: 15px;">${sideIcon} ${p.side.toUpperCase()} ${p.symbol}</span>
-                                        <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${p.amount_gbp.toFixed(4)}</span>
+                                        <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${p.amount_gbp.toFixed(2)}</span>
                                     </div>
                                     <div style="display: flex; gap: 6px;">
                                         <button onclick="approveTrade('${p.id}')" style="padding: 6px 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">✅ Approve</button>
@@ -690,7 +702,7 @@
                         const sideIcon = isBuy ? '🟢' : '🔴';
                         const time = new Date(t.timestamp).toLocaleString();
                         const pnlStr = t.realised_pnl_gbp !== undefined && t.realised_pnl_gbp !== null
-                            ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(4)}`
+                            ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(2)}`
                             : '';
                         return `
                             <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
@@ -700,7 +712,7 @@
                                     <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${t.side.toUpperCase()}</span>
                                     <span style="color: var(--text-secondary);"> ${(t.quantity || 0).toFixed(6)} @ £${(t.price || 0).toFixed(6)}</span>
                                     <div style="color: var(--text-secondary); font-size: 11px; margin-top: 3px;">
-                                        £${(t.amount_gbp || 0).toFixed(4)} • ${t.exchange} • Fee: £${(t.fee_gbp || 0).toFixed(4)}${pnlStr}
+                                        £${(t.amount_gbp || 0).toFixed(2)} • ${t.exchange} • Fee: £${(t.fee_gbp || 0).toFixed(2)}${pnlStr}
                                     </div>
                                     ${t.reasoning ? `<div style="color: var(--text-secondary); font-size: 11px; margin-top: 2px; font-style: italic;">"${t.reasoning.substring(0, 120)}${t.reasoning.length > 120 ? '…' : ''}"</div>` : ''}
                                 </div>
@@ -876,6 +888,8 @@
 
         // ─── Portfolio Functions ──────────────────────────────
 
+        let sessionStartValue = null;  // Track portfolio value at page load
+
         async function refreshPortfolio() {
             const btn = document.getElementById('portfolioRefreshBtn');
             const origText = btn.textContent;
@@ -899,10 +913,10 @@
                 const summary = data.summary || {};
 
                 // Summary cards
-                document.getElementById('portfolioValue').textContent = `£${(summary.total_value_gbp || 0).toFixed(4)}`;
+                document.getElementById('portfolioValue').textContent = `£${(summary.total_value_gbp || 0).toFixed(2)}`;
                 document.getElementById('portfolioCount').textContent = summary.active_holdings || 0;
                 document.getElementById('portfolioTotalTrades').textContent = summary.total_trades || 0;
-                document.getElementById('portfolioFees').textContent = `£${(summary.total_fees_gbp || 0).toFixed(4)}`;
+                document.getElementById('portfolioFees').textContent = `£${(summary.total_fees_gbp || 0).toFixed(2)}`;
 
                 // Update timestamp
                 const now = new Date();
@@ -910,13 +924,29 @@
 
                 const pnlEl = document.getElementById('portfolioPnl');
                 const unrealisedPnl = summary.unrealised_pnl_gbp || 0;
-                pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : ''}£${unrealisedPnl.toFixed(4)}`;
+                pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : ''}£${unrealisedPnl.toFixed(2)}`;
                 pnlEl.style.color = unrealisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
 
                 const realisedEl = document.getElementById('portfolioRealisedPnl');
                 const realisedPnl = summary.realised_pnl_gbp || 0;
-                realisedEl.textContent = `${realisedPnl >= 0 ? '+' : ''}£${realisedPnl.toFixed(4)}`;
+                realisedEl.textContent = `${realisedPnl >= 0 ? '+' : ''}£${realisedPnl.toFixed(2)}`;
                 realisedEl.style.color = realisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
+
+                // Session change tracking
+                const currentTotal = summary.total_value_gbp || 0;
+                if (sessionStartValue === null && currentTotal > 0) {
+                    sessionStartValue = currentTotal;
+                }
+                const sessionEl = document.getElementById('sessionChange');
+                if (sessionStartValue !== null && currentTotal > 0) {
+                    const diff = currentTotal - sessionStartValue;
+                    const pct = sessionStartValue > 0 ? ((diff / sessionStartValue) * 100) : 0;
+                    const isUp = diff >= 0;
+                    sessionEl.style.display = 'block';
+                    sessionEl.style.color = isUp ? '#48bb78' : '#fc8181';
+                    sessionEl.style.background = isUp ? 'rgba(72,187,120,0.12)' : 'rgba(252,129,129,0.12)';
+                    sessionEl.textContent = `Session: ${isUp ? '+' : ''}£${diff.toFixed(2)} (${isUp ? '+' : ''}${pct.toFixed(1)}%)`;
+                }
 
                 // Holdings list
                 const container = document.getElementById('holdingsList');
@@ -936,10 +966,10 @@
                                 <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${h.symbol}</span>
                                 <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
                             </div>
-                            <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(4)}</div>
+                            <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(2)}</div>
                             <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary);">
-                                <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>£${(h.total_cost_gbp || 0).toFixed(4)}</span></div>
-                                <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(4)}</span></div>
+                                <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>£${(h.total_cost_gbp || 0).toFixed(2)}</span></div>
+                                <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(2)}</span></div>
                                 <div style="display: flex; justify-content: space-between;"><span>Qty</span><span>${h.quantity?.toFixed(4) || 0}</span></div>
                                 <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${h.exchange || '—'}</span></div>
                             </div>
@@ -957,12 +987,15 @@
 
         async function loadMarketState() {
             const el = document.getElementById('fngDisplay');
+            const headlinesEl = document.getElementById('marketHeadlines');
+            const statsEl = document.getElementById('globalStats');
             try {
                 const response = await fetch('/api/market/state');
                 const data = await response.json();
 
                 if (data.error || data.current_value === null) {
                     el.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">Unavailable</span>';
+                    headlinesEl.innerHTML = '';
                     return;
                 }
 
@@ -984,7 +1017,7 @@
                 else if (trend === 'DETERIORATING') trendIcon = ' ↘';
                 else if (trend === 'STABLE') trendIcon = ' →';
 
-                // 7d sparkline (tiny inline bars)
+                // 7d sparkline
                 let sparkline = '';
                 if (data.history_7d && data.history_7d.length > 1) {
                     const vals = data.history_7d.map(h => h.value).reverse();
@@ -1007,14 +1040,52 @@
                         <span style="font-size: 22px; font-weight: 700; color: ${color};">${val}</span>
                         <div>
                             <div style="font-size: 13px; font-weight: 600; color: ${color};">${cls}${trendIcon}</div>
-                            <div style="font-size: 11px; color: var(--text-secondary);">Fear &amp; Greed</div>
                         </div>
                         ${sparkline}
                     </div>
-                    <span style="font-size: 12px; color: var(--text-secondary);">${data.trading_signal || ''}</span>
+                    <span style="font-size: 12px; color: var(--text-secondary); font-style: italic;">${data.trading_signal || ''}</span>
                 `;
+
+                // Global market stats
+                const gs = data.global_stats || {};
+                if (gs.btc_dominance) {
+                    const mcapChange = gs.market_cap_change_24h || 0;
+                    const mcapColor = mcapChange >= 0 ? '#68d391' : '#fc8181';
+                    const mcapArrow = mcapChange >= 0 ? '▲' : '▼';
+                    statsEl.innerHTML = `
+                        <span style="font-size: 12px; color: var(--text-secondary);">BTC ${gs.btc_dominance}%</span>
+                        <span style="font-size: 11px; color: rgba(255,255,255,0.15);">|</span>
+                        <span style="font-size: 12px; color: ${mcapColor};">${mcapArrow} ${Math.abs(mcapChange).toFixed(1)}% 24h</span>
+                    `;
+                }
+
+                // Headlines — what's actually moving the market
+                const headlines = data.headlines || [];
+                if (headlines.length > 0) {
+                    headlinesEl.innerHTML = `
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            ${headlines.map(h => `
+                                <div style="display: flex; align-items: flex-start; gap: 8px; line-height: 1.4;">
+                                    <span style="color: rgba(255,255,255,0.15); font-size: 11px; flex-shrink: 0; margin-top: 2px;">●</span>
+                                    <div>
+                                        <a href="${h.link}" target="_blank" rel="noopener noreferrer"
+                                           style="font-size: 12px; color: var(--text-secondary); text-decoration: none; transition: color 0.15s;"
+                                           onmouseover="this.style.color='var(--text-primary)'"
+                                           onmouseout="this.style.color='var(--text-secondary)'">
+                                            ${h.title}
+                                        </a>
+                                        <span style="font-size: 10px; color: rgba(255,255,255,0.2); margin-left: 6px;">${h.source}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                } else {
+                    headlinesEl.innerHTML = '<div style="color: var(--text-secondary); font-size: 12px;">No headlines available</div>';
+                }
             } catch (e) {
                 el.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">Unavailable</span>';
+                headlinesEl.innerHTML = '';
                 console.error('Error loading market state:', e);
             }
         }
@@ -1063,8 +1134,8 @@
                                         <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${p.trades} trades</span>
                                     </div>
                                     <div style="text-align: right;">
-                                        <div style="font-weight: 700; color: ${pnlColor}; font-size: 14px;">${p.realised_pnl_gbp >= 0 ? '+' : ''}£${p.realised_pnl_gbp.toFixed(4)}</div>
-                                        <div style="font-size: 11px; color: var(--text-secondary);">Cost: £${p.total_cost_gbp.toFixed(4)} • Fees: £${p.total_fees_gbp.toFixed(4)}</div>
+                                        <div style="font-weight: 700; color: ${pnlColor}; font-size: 14px;">${p.realised_pnl_gbp >= 0 ? '+' : ''}£${p.realised_pnl_gbp.toFixed(2)}</div>
+                                        <div style="font-size: 11px; color: var(--text-secondary);">Cost: £${p.total_cost_gbp.toFixed(2)} • Fees: £${p.total_fees_gbp.toFixed(2)}</div>
                                     </div>
                                 </div>
                                 <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">

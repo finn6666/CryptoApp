@@ -147,11 +147,11 @@ class PortfolioTracker:
                 holding["current_price"] = current_price
                 holding["current_value_gbp"] = current_price * h["quantity"]
                 holding["unrealised_pnl_gbp"] = (
-                    (current_price - h["avg_entry_price"]) * h["quantity"]
+                    holding["current_value_gbp"] - h.get("total_cost_gbp", 0)
                 )
                 holding["unrealised_pnl_pct"] = (
-                    ((current_price - h["avg_entry_price"]) / h["avg_entry_price"] * 100)
-                    if h["avg_entry_price"] > 0
+                    (holding["unrealised_pnl_gbp"] / h["total_cost_gbp"] * 100)
+                    if h.get("total_cost_gbp", 0) > 0
                     else 0
                 )
 
@@ -175,12 +175,12 @@ class PortfolioTracker:
         )
 
         return {
-            "total_cost_gbp": round(total_cost, 4),
-            "total_value_gbp": round(total_value, 4),
-            "unrealised_pnl_gbp": round(total_unrealised, 4),
-            "realised_pnl_gbp": round(total_realised, 4),
-            "total_pnl_gbp": round(total_unrealised + total_realised, 4),
-            "total_fees_gbp": round(total_fees, 4),
+            "total_cost_gbp": round(total_cost, 2),
+            "total_value_gbp": round(total_value, 2),
+            "unrealised_pnl_gbp": round(total_unrealised, 2),
+            "realised_pnl_gbp": round(total_realised, 2),
+            "total_pnl_gbp": round(total_unrealised + total_realised, 2),
+            "total_fees_gbp": round(total_fees, 2),
             "active_holdings": len(holdings),
             "total_trades": len(self.trade_log),
         }
@@ -197,9 +197,9 @@ class PortfolioTracker:
                 continue
             closed.append({
                 "symbol": sym,
-                "total_cost_gbp": round(h.get("total_cost_gbp", 0), 4),
-                "realised_pnl_gbp": round(h.get("realised_pnl_gbp", 0), 4),
-                "total_fees_gbp": round(h.get("total_fees_gbp", 0), 4),
+                "total_cost_gbp": round(h.get("total_cost_gbp", 0), 2),
+                "realised_pnl_gbp": round(h.get("realised_pnl_gbp", 0), 2),
+                "total_fees_gbp": round(h.get("total_fees_gbp", 0), 2),
                 "trades": h.get("trades", 0),
                 "first_buy_at": h.get("first_buy_at", ""),
                 "closed_at": h.get("closed_at", ""),
@@ -260,23 +260,23 @@ class PortfolioTracker:
             "total_trades": len(self.trade_log),
             "total_buys": len(buys),
             "total_sells": len(sells),
-            "total_invested_gbp": round(total_invested, 4),
-            "total_fees_gbp": round(total_fees, 4),
-            "realised_pnl_gbp": round(total_realised, 4),
+            "total_invested_gbp": round(total_invested, 2),
+            "total_fees_gbp": round(total_fees, 2),
+            "realised_pnl_gbp": round(total_realised, 2),
             "winning_trades": len(winning),
             "losing_trades": len(losing),
             "win_rate_pct": round(win_rate, 1),
             "avg_trade_gbp": round(
-                sum(t.get("amount_gbp", 0) for t in self.trade_log) / len(self.trade_log), 4
+                sum(t.get("amount_gbp", 0) for t in self.trade_log) / len(self.trade_log), 2
             ),
             "best_trade": {
                 "symbol": best["symbol"],
-                "pnl_gbp": round(best["realised_pnl_gbp"], 4),
+                "pnl_gbp": round(best["realised_pnl_gbp"], 2),
                 "timestamp": best.get("timestamp", ""),
             } if best else None,
             "worst_trade": {
                 "symbol": worst["symbol"],
-                "pnl_gbp": round(worst["realised_pnl_gbp"], 4),
+                "pnl_gbp": round(worst["realised_pnl_gbp"], 2),
                 "timestamp": worst.get("timestamp", ""),
             } if worst else None,
             "unique_coins_traded": len(coins),

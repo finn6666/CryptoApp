@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Fear & Greed Index cache (avoid hammering the API)
 _fear_greed_cache: Dict[str, Any] = {"data": None, "fetched_at": 0}
+_headlines_cache: Dict[str, Any] = {"data": None, "fetched_at": 0}
 
 
 # === Research Tools ===
@@ -347,15 +348,15 @@ def get_fear_greed_index() -> Dict[str, Any]:
         
         # Interpret for trading context
         if value <= 20:
-            trading_signal = "EXTREME_FEAR — prime buying zone, be greedy when others are fearful. Good projects are on sale."
+            trading_signal = "Blood in the streets — accumulation territory"
         elif value <= 35:
-            trading_signal = "FEAR — market is nervous but this means discounts. Look for fundamentally strong coins to accumulate."
+            trading_signal = "Crowd's spooked — decent entries if the fundamentals check out"
         elif value <= 55:
-            trading_signal = "NEUTRAL — no strong sentiment edge, rely on fundamentals/technicals"
+            trading_signal = "Sideways vibes — let technicals and agents do the heavy lifting"
         elif value <= 75:
-            trading_signal = "GREED — momentum favourable but watch for overextension"
+            trading_signal = "Momentum's cooking — ride it but keep stops tight"
         else:
-            trading_signal = "EXTREME_GREED — high risk of correction, tighten stops"
+            trading_signal = "Euphoria zone — everyone's a genius, watch for the rug"
         
         result = {
             "current_value": value,
@@ -381,6 +382,89 @@ def get_fear_greed_index() -> Dict[str, Any]:
             "classification": "UNKNOWN",
             "trading_signal": "Unable to fetch — proceed without sentiment baseline",
         }
+
+
+def get_market_headlines() -> Dict[str, Any]:
+    """
+    Fetch real crypto news headlines and global market stats.
+    Uses CoinDesk RSS via rss2json and CoinGecko global data.
+    Cached for 15 minutes.
+    """
+    import urllib.request
+    import json
+
+    cache_age = time.time() - _headlines_cache["fetched_at"]
+    if _headlines_cache["data"] and cache_age < 900:
+        return _headlines_cache["data"]
+
+    headlines = []
+    global_stats = {}
+
+    # Fetch news headlines from CoinDesk RSS
+    try:
+        url = "https://api.rss2json.com/v1/api.json?rss_url=https://www.coindesk.com/arc/outboundfeeds/rss/"
+        req = urllib.request.Request(url, headers={"User-Agent": "CryptoApp/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        for item in data.get("items", [])[:5]:
+            headlines.append({
+                "title": item.get("title", ""),
+                "date": item.get("pubDate", "")[:10],
+                "source": "CoinDesk",
+                "link": item.get("link", ""),
+            })
+    except Exception as e:
+        logger.warning(f"Failed to fetch CoinDesk headlines: {e}")
+
+    # Add CoinTelegraph as secondary source
+    try:
+        url = "https://api.rss2json.com/v1/api.json?rss_url=https://cointelegraph.com/rss"
+        req = urllib.request.Request(url, headers={"User-Agent": "CryptoApp/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        for item in data.get("items", [])[:3]:
+            headlines.append({
+                "title": item.get("title", ""),
+                "date": item.get("pubDate", "")[:10],
+                "source": "CoinTelegraph",
+                "link": item.get("link", ""),
+            })
+    except Exception as e:
+        logger.warning(f"Failed to fetch CoinTelegraph headlines: {e}")
+
+    # Fetch global market data from CoinGecko
+    try:
+        url = "https://api.coingecko.com/api/v3/global"
+        req = urllib.request.Request(url, headers={"User-Agent": "CryptoApp/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode()).get("data", {})
+        mcap_pct = data.get("market_cap_percentage", {})
+        global_stats = {
+            "btc_dominance": round(mcap_pct.get("btc", 0), 1),
+            "eth_dominance": round(mcap_pct.get("eth", 0), 1),
+            "market_cap_change_24h": round(data.get("market_cap_change_percentage_24h_usd", 0), 2),
+            "active_coins": data.get("active_cryptocurrencies", 0),
+        }
+    except Exception as e:
+        logger.warning(f"Failed to fetch CoinGecko global data: {e}")
+
+    # Sort headlines by date descending, deduplicate
+    seen = set()
+    unique = []
+    for h in headlines:
+        if h["title"] not in seen:
+            seen.add(h["title"])
+            unique.append(h)
+    unique.sort(key=lambda x: x["date"], reverse=True)
+
+    result = {
+        "headlines": unique[:6],
+        "global_stats": global_stats,
+    }
+
+    _headlines_cache["data"] = result
+    _headlines_cache["fetched_at"] = time.time()
+    return result
 
 
 def analyze_social_sentiment(symbol: str, sources: Optional[List[str]] = None) -> Dict[str, Any]:

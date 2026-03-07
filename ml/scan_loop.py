@@ -524,7 +524,7 @@ class ScanLoop:
                 result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side=trade_side,
-                    amount_gbp=round(amount, 4),
+                    amount_gbp=round(amount, 2),
                     current_price=coin_data.get("price") or 0,
                     reason=trade_reasoning[:500] if trade_reasoning else "Multi-agent orchestrator recommended trade",
                     confidence=conviction,

@@ -165,10 +165,13 @@ def debug_coins():
 
 @health_bp.route('/api/market/state')
 def market_state():
-    """Current crypto market state — Fear & Greed Index"""
+    """Current crypto market state — Fear & Greed + news headlines + global stats"""
     try:
-        from ml.tools.adk_tools import get_fear_greed_index
-        data = get_fear_greed_index()
-        return jsonify(data)
+        from ml.tools.adk_tools import get_fear_greed_index, get_market_headlines
+        fng = get_fear_greed_index()
+        news = get_market_headlines()
+        fng["headlines"] = news.get("headlines", [])
+        fng["global_stats"] = news.get("global_stats", {})
+        return jsonify(fng)
     except Exception as e:
         return jsonify({'error': str(e), 'current_value': None, 'classification': 'UNKNOWN'}), 500
