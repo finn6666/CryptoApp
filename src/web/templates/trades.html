@@ -521,6 +521,7 @@
             setInterval(loadScanStatus, 60000);
             setInterval(loadPortfolio, 60000);  // Refresh portfolio every 60s
             setInterval(loadMarketState, 600000);  // Refresh market state every 10min
+            setInterval(loadActivityLog, 30000);
         });
 
         // ─── Auth Helper ────────────────────────────────────
@@ -1089,9 +1090,21 @@
 
         // ─── Activity Log ────────────────────────────────────
 
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function truncate(str, max) {
+            if (!str || str.length <= max) return str;
+            return str.slice(0, max) + '…';
+        }
+
         async function loadActivityLog() {
             try {
-                const response = await fetch('/api/trades/audit-trail?limit=30');
+                const response = await fetch('/api/trades/audit-trail?limit=50');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 const entries = data.entries || [];
                 const container = document.getElementById('activityLog');
@@ -1101,6 +1114,7 @@
                         const time = new Date(e.timestamp).toLocaleString();
                         let icon = '📋', color = 'var(--text-secondary)';
                         if (e.event === 'proposal') { icon = '📨'; color = '#667eea'; }
+                        else if (e.event === 'sell_proposal') { icon = '📤'; color = '#ed8936'; }
                         else if (e.event === 'skip') { icon = '⏭️'; color = 'var(--text-secondary)'; }
                         else if (e.event === 'scan_start') { icon = '🔍'; color = '#ed8936'; }
                         else if (e.event === 'scan_complete') { icon = '✅'; color = '#48bb78'; }
@@ -1108,21 +1122,23 @@
                         else if (e.event === 'trade_failed') { icon = '⚠️'; color = '#fc8181'; }
                         else if (e.event === 'error') { icon = '❌'; color = '#fc8181'; }
                         else if (e.event === 'scan_no_coins') { icon = '⚠️'; color = '#ecc94b'; }
+                        else if (e.event === 'budget_exhausted') { icon = '💸'; color = '#ecc94b'; }
 
                         let detail = '';
-                        if (e.symbol) detail += `<strong>${e.symbol}</strong> `;
-                        if (e.side) detail += `${e.side.toUpperCase()} `;
-                        if (e.amount_gbp) detail += `£${e.amount_gbp.toFixed(2)} `;
-                        if (e.exchange) detail += `on ${e.exchange} `;
-                        if (e.reason) detail += `— ${e.reason} `;
-                        if (e.confidence) detail += `(${e.confidence}% conf) `;
-                        if (e.proposals !== undefined) detail += `${e.proposals} proposals `;
-                        if (e.error) detail += `— ${e.error} `;
+                        if (e.symbol) detail += `<strong>${escapeHtml(e.symbol)}</strong> `;
+                        if (e.side) detail += `${escapeHtml(e.side.toUpperCase())} `;
+                        if (e.amount_gbp) detail += `£${Number(e.amount_gbp).toFixed(2)} `;
+                        if (e.price) detail += `@ £${Number(e.price).toFixed(6)} `;
+                        if (e.exchange) detail += `on ${escapeHtml(e.exchange)} `;
+                        if (e.reason) detail += `— ${escapeHtml(truncate(e.reason, 120))} `;
+                        if (e.confidence) detail += `(${Number(e.confidence)}% conf) `;
+                        if (e.proposals !== undefined) detail += `${Number(e.proposals)} proposals `;
+                        if (e.error) detail += `— ${escapeHtml(truncate(e.error, 120))} `;
 
                         return `<div style="display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
                             <span>${icon}</span>
                             <div style="flex: 1;">
-                                <span style="color: ${color}; font-weight: 600;">${e.event}</span>
+                                <span style="color: ${color}; font-weight: 600;">${escapeHtml(e.event)}</span>
                                 <span style="color: var(--text-secondary);"> ${detail}</span>
                             </div>
                             <span style="color: var(--text-secondary); font-size: 11px; white-space: nowrap;">${time}</span>
@@ -1133,6 +1149,10 @@
                 }
             } catch (e) {
                 console.error('Error loading activity log:', e);
+                const container = document.getElementById('activityLog');
+                if (container && container.textContent.includes('Loading')) {
+                    container.innerHTML = '<p style="color: #fc8181; text-align: center; padding: 20px; font-size: 13px;">Failed to load activity log.</p>';
+                }
             }
         }
 
