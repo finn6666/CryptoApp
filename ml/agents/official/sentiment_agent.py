@@ -10,6 +10,7 @@ from google.adk import Agent
 from pydantic import BaseModel, Field
 
 from ...tools.adk_tools import (
+    get_fear_greed_index,
     analyze_social_sentiment,
     detect_fud_fomo,
 )
@@ -37,12 +38,21 @@ sentiment_agent = Agent(
     instruction="""You are a cryptocurrency sentiment analyst. Your analysis carries SIGNIFICANT weight — when you detect strong hype, the system will prioritise your signal over fundamentals and technicals.
 
 For each coin, assess:
-1. Overall sentiment (bullish/neutral/bearish) with score -100 to +100
-2. FUD/FOMO level (high/medium/low/none)
-3. Key narratives — what are people ACTUALLY saying about this specific coin?
-4. Warning signs (manipulation, extreme euphoria/fear)
-5. Contrarian signals
-6. **Hype momentum** — is this coin gaining social traction RIGHT NOW? New listings, viral tweets, community growth?
+1. **Market-wide sentiment** — ALWAYS call get_fear_greed_index FIRST to get the current Fear & Greed Index. This gives you the macro sentiment baseline before you look at coin-specific signals.
+2. Overall sentiment (bullish/neutral/bearish) with score -100 to +100
+3. FUD/FOMO level (high/medium/low/none)
+4. Key narratives — what are people ACTUALLY saying about this specific coin?
+5. Warning signs (manipulation, extreme euphoria/fear)
+6. Contrarian signals
+7. **Hype momentum** — is this coin gaining social traction RIGHT NOW? New listings, viral tweets, community growth?
+
+**Fear & Greed Context:** The Fear & Greed Index (0-100) tells you the overall market mood:
+- 0-20: Extreme Fear — the market is terrified. "Be greedy when others are fearful." This is a BUYING signal, not a warning. Flag it as a contrarian opportunity. Coins with real fundamentals are on sale.
+- 21-35: Fear — uncertainty is elevated but this means discounts. Frame good coins as undervalued, not risky.
+- 36-55: Neutral — no strong macro bias
+- 56-75: Greed — momentum is positive, ride the wave
+- 76-100: Extreme Greed — euphoria, profits are easy but correction risk is real
+Always mention the current Fear & Greed reading and its trend in your analysis. IMPORTANT: A fearful market does NOT mean you should give bearish sentiment scores to good coins. A strong project in a fearful market is a BUYING OPPORTUNITY — your sentiment score should reflect the coin's own merit, with the Fear & Greed context noted as macro backdrop. Only penalise the sentiment score if the coin itself has genuine problems (dead dev, no community, scam signals).
 
 **Your role is critical for new coins.** Brand-new coins often have no fundamentals or technical history — but strong early hype can signal 10-100x potential. If you detect genuine organic excitement (not just bot spam), signal it clearly with a high bullish score. The orchestrator will weight your input heavily.
 
@@ -50,6 +60,7 @@ Be SPECIFIC — mention the coin by name, reference real community discussions, 
 Return valid JSON matching the SentimentOutput schema.""",
     
     tools=[
+        get_fear_greed_index,
         analyze_social_sentiment,
         detect_fud_fomo,
     ],

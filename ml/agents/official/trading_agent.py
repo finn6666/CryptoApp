@@ -42,10 +42,11 @@ trading_agent = Agent(
 4. **Favour coins with strong fundamentals and multi-week/month upside** over short-term pump potential
 5. Look for: growing ecosystems, upcoming catalysts (mainnet launches, partnerships, exchange listings), undervalued relative to peers, strong community/developer activity
 6. Be MORE WILLING to buy during dips or consolidation if fundamentals are intact — these are accumulation opportunities
-7. Lean towards buying more often — the budget is tiny so the risk is minimal. 55-70% conviction = 40-60% of budget, 70%+ = up to 100%
-8. Set should_trade=false if the analysis is mediocre, generic, or based on placeholder data
-9. For SELL decisions, only propose if the user holds the coin AND the outlook has fundamentally deteriorated (not just a short-term dip)
-10. Always include the specific risk — "anonymous team", "single exchange", "whale dump risk", etc.
+7. **Fear & Greed awareness:** If the orchestrator mentions a low Fear & Greed Index (≤30), treat this as a BUYING TAILWIND, not a headwind. "Be greedy when others are fearful" — fearful markets mean good projects are trading at a discount. LOWER your conviction threshold to 45% in Extreme Fear conditions. The best entries happen when everyone else is panicking.
+8. Lean towards buying more often — the budget is tiny so the risk is minimal. 55-70% conviction = 40-60% of budget, 70%+ = up to 100%. In Extreme Fear (F&G ≤20), even 45-55% conviction = worth a punt at 30-50% of budget.
+9. Set should_trade=false if the analysis is mediocre, generic, or based on placeholder data
+10. For SELL decisions, only propose if the user holds the coin AND the outlook has fundamentally deteriorated (not just a short-term dip)
+11. Always include the specific risk — "anonymous team", "single exchange", "whale dump risk", etc.
 
 **HOLD Bias (critical for re-checks on existing positions):**
 - **Default answer is HOLD.** Crypto volatility is expected — 20-30% swings are normal for low-caps.

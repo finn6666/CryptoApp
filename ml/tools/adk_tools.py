@@ -5,8 +5,12 @@ Function implementations for Google Generative AI SDK function calling.
 
 from typing import Dict, Any, List, Optional
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+# Fear & Greed Index cache (avoid hammering the API)
+_fear_greed_cache: Dict[str, Any] = {"data": None, "fetched_at": 0}
 
 
 # === Research Tools ===
@@ -287,6 +291,98 @@ def generate_exit_strategy(
 
 # === Sentiment Analysis Tools ===
 
+def get_fear_greed_index() -> Dict[str, Any]:
+    """
+    Get the current Crypto Fear & Greed Index.
+    
+    Returns real-time market sentiment from alternative.me (0 = Extreme Fear, 100 = Extreme Greed).
+    Includes today's value plus recent history to show trend.
+    
+    Returns:
+        Fear & Greed Index data with value, classification, and trend
+    """
+    import urllib.request
+    import json
+    
+    # Return cached data if fresh (< 10 minutes old)
+    cache_age = time.time() - _fear_greed_cache["fetched_at"]
+    if _fear_greed_cache["data"] and cache_age < 600:
+        return _fear_greed_cache["data"]
+    
+    try:
+        url = "https://api.alternative.me/fng/?limit=7&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "CryptoApp/1.0"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = json.loads(resp.read().decode())
+        
+        entries = raw.get("data", [])
+        if not entries:
+            return {"error": "No data returned from Fear & Greed API"}
+        
+        current = entries[0]
+        value = int(current["value"])
+        classification = current["value_classification"]
+        
+        # Build 7-day trend
+        history = []
+        for entry in entries:
+            history.append({
+                "value": int(entry["value"]),
+                "classification": entry["value_classification"],
+                "date": entry.get("timestamp", ""),
+            })
+        
+        # Calculate trend direction
+        if len(history) >= 2:
+            recent_avg = sum(h["value"] for h in history[:3]) / min(len(history), 3)
+            older_avg = sum(h["value"] for h in history[3:]) / max(len(history[3:]), 1) if len(history) > 3 else recent_avg
+            if recent_avg > older_avg + 5:
+                trend = "IMPROVING"
+            elif recent_avg < older_avg - 5:
+                trend = "DETERIORATING"
+            else:
+                trend = "STABLE"
+        else:
+            trend = "UNKNOWN"
+        
+        # Interpret for trading context
+        if value <= 20:
+            trading_signal = "EXTREME_FEAR — prime buying zone, be greedy when others are fearful. Good projects are on sale."
+        elif value <= 35:
+            trading_signal = "FEAR — market is nervous but this means discounts. Look for fundamentally strong coins to accumulate."
+        elif value <= 55:
+            trading_signal = "NEUTRAL — no strong sentiment edge, rely on fundamentals/technicals"
+        elif value <= 75:
+            trading_signal = "GREED — momentum favourable but watch for overextension"
+        else:
+            trading_signal = "EXTREME_GREED — high risk of correction, tighten stops"
+        
+        result = {
+            "current_value": value,
+            "classification": classification,
+            "trend": trend,
+            "trading_signal": trading_signal,
+            "history_7d": history,
+            "source": "alternative.me",
+        }
+        
+        # Cache the result
+        _fear_greed_cache["data"] = result
+        _fear_greed_cache["fetched_at"] = time.time()
+        
+        logger.info(f"Fear & Greed Index: {value} ({classification}) — {trend}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch Fear & Greed Index: {e}")
+        return {
+            "error": str(e),
+            "current_value": None,
+            "classification": "UNKNOWN",
+            "trading_signal": "Unable to fetch — proceed without sentiment baseline",
+        }
+
+
 def analyze_social_sentiment(symbol: str, sources: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Analyze social media sentiment for a cryptocurrency.
@@ -395,6 +491,7 @@ ADK_TOOLS = [
     assess_correlation,
     generate_exit_strategy,
     # Sentiment tools
+    get_fear_greed_index,
     analyze_social_sentiment,
     detect_fud_fomo,
     # Common tools
