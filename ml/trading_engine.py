@@ -123,15 +123,14 @@ class TradingEngine:
         if self.buy_auto_approve:
             logger.info("🤖 Buy-side: auto-approve ENABLED — buys within budget execute immediately")
 
-        # Sell-side control: auto-approve sells below a GBP threshold
-        self.sell_auto_approve_max_gbp = float(os.getenv("SELL_AUTO_APPROVE_MAX_GBP", "25.0"))
+        # Sell-side control
         self.sell_require_approval = os.getenv(
             "SELL_REQUIRE_APPROVAL", "false"
         ).lower() in ("1", "true", "yes")
         if self.sell_require_approval:
             logger.info("🔒 Sell-side: manual approval REQUIRED for ALL sells")
         else:
-            logger.info(f"🤖 Sell-side: auto-approve for sells up to £{self.sell_auto_approve_max_gbp:.2f}")
+            logger.info("🤖 Sell-side: auto-approve ENABLED for all sells")
 
         # Exchange (lazy init — prefers ExchangeManager for multi-exchange)
         self._exchange = None
@@ -332,10 +331,7 @@ class TradingEngine:
         # Auto-approved trades skip this — the execution email covers it.
         will_auto_approve = False
         if is_sell:
-            will_auto_approve = (
-                not self.sell_require_approval
-                and proposal.amount_gbp < self.sell_auto_approve_max_gbp
-            )
+            will_auto_approve = not self.sell_require_approval
         else:
             will_auto_approve = self.buy_auto_approve
 
@@ -372,8 +368,7 @@ class TradingEngine:
         immediately approve and execute it.  Falls back to the normal
         email-approval flow when auto-approve is off.
 
-        Sells under SELL_AUTO_APPROVE_MAX_GBP auto-execute; larger sells
-        still require manual email approval.
+        Sells auto-execute unless SELL_REQUIRE_APPROVAL is set.
         """
         result = self.propose_trade(
             symbol=symbol,
@@ -394,10 +389,7 @@ class TradingEngine:
         # Determine whether to auto-approve this trade
         should_auto = False
         if is_sell:
-            # Sells: auto-approve if under threshold AND manual-approval not forced
-            if (not self.sell_require_approval
-                    and amount_gbp < self.sell_auto_approve_max_gbp):
-                should_auto = True
+            should_auto = not self.sell_require_approval
         else:
             # Buys: honour existing buy_auto_approve flag
             should_auto = self.buy_auto_approve
