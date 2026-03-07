@@ -632,7 +632,7 @@ class ExchangeManager:
         Returns True if conversion succeeded, False otherwise.
         """
         gbp_free = balance.get("GBP", {}).get("free", 0) or 0
-        if gbp_free < 0.50:  # Need at least £0.50 to bother
+        if gbp_free < 0.10:  # Need at least £0.10 to bother
             logger.info(f"Auto-convert skipped: only £{gbp_free:.2f} GBP available")
             return False
 
@@ -652,11 +652,11 @@ class ExchangeManager:
             # GBP/USD means selling GBP gives USD: gbp_amount * rate = usd_amount
             gbp_to_sell = (amount_needed / rate) * 1.03  # 3% buffer for slippage + fees
 
-            # Don't convert more than we have (leave £1 cushion)
-            max_gbp = gbp_free - 1.0
+            # Don't convert more than we have (leave £0.10 cushion for micro accounts)
+            max_gbp = gbp_free - 0.10
             if gbp_to_sell > max_gbp:
                 gbp_to_sell = max_gbp
-            if gbp_to_sell < 0.50:
+            if gbp_to_sell < 0.10:
                 logger.info(f"Auto-convert: not enough GBP to convert (need £{gbp_to_sell:.2f})")
                 return False
 

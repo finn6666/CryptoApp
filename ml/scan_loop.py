@@ -504,6 +504,18 @@ class ScanLoop:
 
             if should_trade and conviction >= 45:
                 remaining = engine.get_remaining_budget()
+                if remaining < engine.min_useful_budget_gbp:
+                    return {"outcome": "skipped", "proposed": False, "reason": "Daily budget exhausted"}
+
+                # Check exchange minimum before wasting an API proposal
+                min_order = engine._get_min_order_gbp(symbol)
+                max_trade = min(remaining, engine.daily_budget_gbp * engine.max_trade_pct)
+                if min_order > 0 and min_order > max_trade:
+                    return {
+                        "outcome": "skipped", "proposed": False,
+                        "reason": f"Exchange minimum £{min_order:.2f} exceeds max trade £{max_trade:.2f}",
+                    }
+
                 amount = remaining * (allocation_pct / 100)
                 amount = min(amount, remaining)
 

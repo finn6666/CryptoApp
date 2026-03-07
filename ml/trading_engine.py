@@ -641,7 +641,12 @@ class TradingEngine:
             logger.error(f"Failed to write audit log: {e}")
 
     def _execute_via_exchange_manager(self, proposal: TradeProposal) -> Optional[Dict[str, Any]]:
-        """Try executing via the multi-exchange manager."""
+        """Try executing via the multi-exchange manager.
+        
+        Returns the result dict on success, raises on insufficient funds
+        (so the caller doesn't fall through to the legacy path), or
+        returns None when the manager is unavailable.
+        """
         try:
             from ml.exchange_manager import get_exchange_manager
             mgr = get_exchange_manager()
@@ -654,7 +659,14 @@ class TradingEngine:
             )
             if result.get("success"):
                 return result
+            # If the exchange explicitly rejected (balance/budget), propagate
+            # instead of falling through to legacy which would just fail again.
+            error = result.get("error", "")
+            if "nsufficient" in error or "budget" in error or "minimum" in error:
+                raise RuntimeError(error)
             return None
+        except RuntimeError:
+            raise  # re-raise our own insufficient-funds errors
         except Exception as e:
             logger.debug(f"Exchange manager not available, using legacy: {e}")
             return None

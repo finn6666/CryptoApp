@@ -592,13 +592,22 @@ def portfolio_holdings():
         if holdings_raw:
             held_symbols = {h["symbol"] for h in holdings_raw}
 
-            # 1) Try the analyzer's coin list (fast, no API calls)
+            # 1) Use monitor's cached exchange prices (refreshed every 5 min)
+            try:
+                from ml.market_monitor import get_market_monitor
+                monitor = get_market_monitor()
+                live_prices.update(monitor.get_portfolio_prices())
+            except Exception:
+                pass
+
+            # 2) Fill gaps from analyzer's coin list (free, cached CMC data)
             if state.analyzer:
                 for coin in state.analyzer.coins:
                     if coin.price and coin.symbol.upper() in held_symbols:
-                        live_prices[coin.symbol.upper()] = coin.price
+                        if coin.symbol.upper() not in live_prices:
+                            live_prices[coin.symbol.upper()] = coin.price
 
-            # 2) Fallback: fetch from exchange for coins not in the analyzer
+            # 3) Fallback: fetch from exchange for any still missing
             missing = [h["symbol"] for h in holdings_raw if h["symbol"] not in live_prices]
             if missing:
                 try:
@@ -609,7 +618,7 @@ def portfolio_holdings():
                 except Exception as e:
                     logger.warning(f"Exchange price fetch failed: {e}")
 
-            # 3) Last resort: use last_buy_price (will show 0% P&L)
+            # 4) Last resort: use last_buy_price (will show 0% P&L)
             for h in holdings_raw:
                 sym = h["symbol"]
                 if sym not in live_prices and h.get("last_buy_price"):
@@ -705,6 +714,34 @@ def exchange_status():
     except Exception as e:
         logger.error(f"Exchange status error: {e}")
         return jsonify({"error": "Failed to get exchange status"}), 500
+
+
+@trading_bp.route('/api/exchanges/balance')
+def exchange_balance():
+    """Get free cash balances across all connected exchanges."""
+    try:
+        from ml.exchange_manager import get_exchange_manager
+        mgr = get_exchange_manager()
+        balances = {}
+        for eid in mgr.exchange_priority:
+            ex = mgr.get_exchange(eid)
+            if not ex:
+                continue
+            try:
+                raw = ex.fetch_balance()
+                cash = {}
+                for cur in ["GBP", "USD", "USDT", "USDC", "EUR"]:
+                    info = raw.get(cur, {})
+                    free = info.get("free", 0) or 0
+                    if free > 0.001:
+                        cash[cur] = round(free, 4)
+                balances[eid] = cash
+            except Exception as e:
+                balances[eid] = {"error": str(e)}
+        return jsonify({"balances": balances}), 200
+    except Exception as e:
+        logger.error(f"Exchange balance error: {e}")
+        return jsonify({"error": "Failed to get exchange balances"}), 500
 
 
 @trading_bp.route('/api/exchanges/check/<symbol>')

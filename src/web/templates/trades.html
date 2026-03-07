@@ -422,9 +422,12 @@
         <div class="section-card">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
                 <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0;">💼 Portfolio Holdings</h2>
-                <button id="portfolioRefreshBtn" onclick="refreshPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
-                    🔄 Refresh
-                </button>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span id="portfolioUpdated" style="font-size: 11px; color: var(--text-secondary);"></span>
+                    <button id="portfolioRefreshBtn" onclick="refreshPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+                        🔄 Refresh
+                    </button>
+                </div>
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
@@ -507,6 +510,7 @@
             setInterval(loadPendingProposals, 30000);
             setInterval(loadTradingStatus, 30000);
             setInterval(loadScanStatus, 60000);
+            setInterval(loadPortfolio, 60000);  // Refresh portfolio every 60s
         });
 
         // ─── Auth Helper ────────────────────────────────────
@@ -888,6 +892,10 @@
                 document.getElementById('portfolioCount').textContent = summary.active_holdings || 0;
                 document.getElementById('portfolioTotalTrades').textContent = summary.total_trades || 0;
                 document.getElementById('portfolioFees').textContent = `£${(summary.total_fees_gbp || 0).toFixed(4)}`;
+
+                // Update timestamp
+                const now = new Date();
+                document.getElementById('portfolioUpdated').textContent = `Updated ${now.toLocaleTimeString()}`;
 
                 const pnlEl = document.getElementById('portfolioPnl');
                 const unrealisedPnl = summary.unrealised_pnl_gbp || 0;

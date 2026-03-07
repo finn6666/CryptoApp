@@ -96,6 +96,10 @@ class MarketMonitor:
         # Alert cooldowns: "type:symbol" → last_alert datetime
         self._alert_cooldowns: Dict[str, datetime] = {}
 
+        # Portfolio price cache: symbol → {price_gbp, updated_at}
+        self._portfolio_prices: Dict[str, Dict] = {}
+        self._last_portfolio_refresh = datetime.min
+
         # Counters for status
         self._stats = {
             "price_checks": 0,
@@ -133,19 +137,50 @@ class MarketMonitor:
     # Tier 1 — Price Monitor (stop-loss / take-profit / trailing)
     # ═══════════════════════════════════════════════════════════
 
+    def _refresh_portfolio_prices(self):
+        """Fetch current exchange prices for all held coins (lightweight — 1 ticker per coin)."""
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            tracker = get_portfolio_tracker()
+            held = [sym for sym, h in tracker.holdings.items() if h.get("quantity", 0) > 0]
+            if not held:
+                return
+
+            from ml.exchange_manager import get_exchange_manager
+            mgr = get_exchange_manager()
+            prices = mgr.get_live_prices_gbp(held)
+
+            now = datetime.utcnow().isoformat()
+            for sym, price in prices.items():
+                self._portfolio_prices[sym] = {"price_gbp": price, "updated_at": now}
+
+            self._last_portfolio_refresh = datetime.utcnow()
+            logger.debug(f"[Monitor] Portfolio prices refreshed: {len(prices)}/{len(held)} coins")
+        except Exception as e:
+            logger.warning(f"[Monitor] Portfolio price refresh error: {e}")
+
+    def get_portfolio_prices(self) -> Dict[str, float]:
+        """Return cached portfolio prices as {symbol: price_gbp}."""
+        return {sym: data["price_gbp"] for sym, data in self._portfolio_prices.items()}
+
     def _run_price_check(self):
         """Check held positions against exit thresholds using cached prices."""
         try:
+            # Refresh exchange prices for held coins
+            self._refresh_portfolio_prices()
+
             import services.app_state as state
 
             if not state.analyzer or not state.analyzer.coins:
                 return
 
-            # Build live prices from cached analyser data (no API call!)
-            live_prices = {}
+            # Build live prices: portfolio cache first, then analyser fallback
+            live_prices = self.get_portfolio_prices()
             for coin in state.analyzer.coins:
                 if hasattr(coin, "price") and coin.price:
-                    live_prices[coin.symbol.upper()] = coin.price
+                    sym = coin.symbol.upper()
+                    if sym not in live_prices:
+                        live_prices[sym] = coin.price
 
             if not live_prices:
                 return
