@@ -161,3 +161,14 @@ def debug_coins():
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@health_bp.route('/api/market/state')
+def market_state():
+    """Current crypto market state — Fear & Greed Index"""
+    try:
+        from ml.tools.adk_tools import get_fear_greed_index
+        data = get_fear_greed_index()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e), 'current_value': None, 'classification': 'UNKNOWN'}), 500

@@ -455,6 +455,14 @@
                     <div style="font-size: 12px; color: var(--text-secondary);">Fees Paid</div>
                 </div>
             </div>
+            <div id="marketState" style="margin-bottom: 16px;">
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <div style="font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">🌡️ Market</div>
+                    <div id="fngDisplay" style="display: flex; align-items: center; gap: 10px;">
+                        <span style="color: var(--text-secondary); font-size: 13px;">Loading…</span>
+                    </div>
+                </div>
+            </div>
             <div id="holdingsList">
                 <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
                     No holdings yet. The portfolio tracker records every executed trade automatically.
@@ -502,6 +510,7 @@
             loadExecutedTrades();
             loadScanStatus();
             loadPortfolio();
+            loadMarketState();
             loadClosedPositions();
             loadRlInsights();
             loadTradeLog();
@@ -511,6 +520,7 @@
             setInterval(loadTradingStatus, 30000);
             setInterval(loadScanStatus, 60000);
             setInterval(loadPortfolio, 60000);  // Refresh portfolio every 60s
+            setInterval(loadMarketState, 600000);  // Refresh market state every 10min
         });
 
         // ─── Auth Helper ────────────────────────────────────
@@ -909,6 +919,7 @@
 
                 // Holdings list
                 const container = document.getElementById('holdingsList');
+
                 if (holdings.length > 0) {
                     container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">` + holdings.map(h => {
                         const pnlPct = h.unrealised_pnl_pct || 0;
@@ -938,6 +949,72 @@
                 }
             } catch (e) {
                 console.error('Error loading portfolio:', e);
+            }
+        }
+
+        // ─── Market State ────────────────────────────────────
+
+        async function loadMarketState() {
+            const el = document.getElementById('fngDisplay');
+            try {
+                const response = await fetch('/api/market/state');
+                const data = await response.json();
+
+                if (data.error || data.current_value === null) {
+                    el.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">Unavailable</span>';
+                    return;
+                }
+
+                const val = data.current_value;
+                const cls = data.classification;
+                const trend = data.trend || '';
+
+                // Color based on value
+                let color, bg;
+                if (val <= 20) { color = '#fc8181'; bg = 'rgba(252,129,129,0.12)'; }
+                else if (val <= 35) { color = '#f6ad55'; bg = 'rgba(246,173,85,0.12)'; }
+                else if (val <= 55) { color = '#ecc94b'; bg = 'rgba(236,201,75,0.12)'; }
+                else if (val <= 75) { color = '#68d391'; bg = 'rgba(104,211,145,0.12)'; }
+                else { color = '#48bb78'; bg = 'rgba(72,187,120,0.12)'; }
+
+                // Trend arrow
+                let trendIcon = '';
+                if (trend === 'IMPROVING') trendIcon = ' ↗';
+                else if (trend === 'DETERIORATING') trendIcon = ' ↘';
+                else if (trend === 'STABLE') trendIcon = ' →';
+
+                // 7d sparkline (tiny inline bars)
+                let sparkline = '';
+                if (data.history_7d && data.history_7d.length > 1) {
+                    const vals = data.history_7d.map(h => h.value).reverse();
+                    const max = Math.max(...vals, 1);
+                    sparkline = `<div style="display: flex; align-items: flex-end; gap: 2px; height: 20px; margin-left: 4px;">` +
+                        vals.map(v => {
+                            const h = Math.max(3, (v / max) * 20);
+                            let barColor;
+                            if (v <= 20) barColor = '#fc8181';
+                            else if (v <= 35) barColor = '#f6ad55';
+                            else if (v <= 55) barColor = '#ecc94b';
+                            else if (v <= 75) barColor = '#68d391';
+                            else barColor = '#48bb78';
+                            return `<div style="width: 4px; height: ${h}px; background: ${barColor}; border-radius: 1px; opacity: 0.7;"></div>`;
+                        }).join('') + `</div>`;
+                }
+
+                el.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 8px; background: ${bg}; border: 1px solid ${color}33; border-radius: 8px; padding: 6px 12px;">
+                        <span style="font-size: 22px; font-weight: 700; color: ${color};">${val}</span>
+                        <div>
+                            <div style="font-size: 13px; font-weight: 600; color: ${color};">${cls}${trendIcon}</div>
+                            <div style="font-size: 11px; color: var(--text-secondary);">Fear &amp; Greed</div>
+                        </div>
+                        ${sparkline}
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-secondary);">${data.trading_signal || ''}</span>
+                `;
+            } catch (e) {
+                el.innerHTML = '<span style="color: var(--text-secondary); font-size: 13px;">Unavailable</span>';
+                console.error('Error loading market state:', e);
             }
         }
 
