@@ -466,7 +466,6 @@
                         </div>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <div id="globalStats" style="display: flex; align-items: center; gap: 10px;"></div>
-                            <div id="sessionChange" style="display: none; font-size: 13px; font-weight: 600; padding: 4px 12px; border-radius: 6px;"></div>
                         </div>
                     </div>
                     <!-- Headlines: what's actually moving the market -->
@@ -888,8 +887,6 @@
 
         // ─── Portfolio Functions ──────────────────────────────
 
-        let sessionStartValue = null;  // Track portfolio value at page load
-
         async function refreshPortfolio() {
             const btn = document.getElementById('portfolioRefreshBtn');
             const origText = btn.textContent;
@@ -931,22 +928,6 @@
                 const realisedPnl = summary.realised_pnl_gbp || 0;
                 realisedEl.textContent = `${realisedPnl >= 0 ? '+' : ''}£${realisedPnl.toFixed(2)}`;
                 realisedEl.style.color = realisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
-
-                // Session change tracking
-                const currentTotal = summary.total_value_gbp || 0;
-                if (sessionStartValue === null && currentTotal > 0) {
-                    sessionStartValue = currentTotal;
-                }
-                const sessionEl = document.getElementById('sessionChange');
-                if (sessionStartValue !== null && currentTotal > 0) {
-                    const diff = currentTotal - sessionStartValue;
-                    const pct = sessionStartValue > 0 ? ((diff / sessionStartValue) * 100) : 0;
-                    const isUp = diff >= 0;
-                    sessionEl.style.display = 'block';
-                    sessionEl.style.color = isUp ? '#48bb78' : '#fc8181';
-                    sessionEl.style.background = isUp ? 'rgba(72,187,120,0.12)' : 'rgba(252,129,129,0.12)';
-                    sessionEl.textContent = `Session: ${isUp ? '+' : ''}£${diff.toFixed(2)} (${isUp ? '+' : ''}${pct.toFixed(1)}%)`;
-                }
 
                 // Holdings list
                 const container = document.getElementById('holdingsList');
