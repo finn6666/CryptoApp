@@ -3,6 +3,7 @@ Live trading engine and RL learning routes.
 """
 
 import os
+import hmac
 import json as _json
 import re
 import logging
@@ -40,7 +41,7 @@ def require_trading_auth(f):
             return jsonify({'error': 'Missing or malformed Authorization header'}), 401
 
         provided = auth_header[7:]  # strip "Bearer "
-        if not provided or provided[:6] != api_key[:6]:
+        if not provided or not hmac.compare_digest(provided, api_key):
             logger.warning(f'Rejected trading request — bad API key from {request.remote_addr}')
             return jsonify({'error': 'Invalid API key'}), 403
 
@@ -244,6 +245,7 @@ def _error_page(title: str, message: str) -> str:
 
 @trading_bp.route('/api/trades/approve/<proposal_id>', methods=['POST'])
 @limiter.limit('10 per minute')
+@require_trading_auth
 def approve_trade_api(proposal_id):
     """Approve a pending trade proposal from the web UI."""
     try:
@@ -255,11 +257,12 @@ def approve_trade_api(proposal_id):
         return jsonify(result), 400
     except Exception as e:
         logger.error(f"Approve trade error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to approve trade'}), 500
 
 
 @trading_bp.route('/api/trades/reject/<proposal_id>', methods=['POST'])
 @limiter.limit('10 per minute')
+@require_trading_auth
 def reject_trade_api(proposal_id):
     """Reject a pending trade proposal from the web UI."""
     try:
@@ -271,7 +274,7 @@ def reject_trade_api(proposal_id):
         return jsonify(result), 400
     except Exception as e:
         logger.error(f"Reject trade error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to reject trade'}), 500
 
 
 @trading_bp.route('/api/trades/propose', methods=['POST'])

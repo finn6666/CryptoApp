@@ -140,7 +140,7 @@ class TradingEngine:
         secret = os.getenv('SECRET_KEY')
         if not secret:
             logger.error('SECRET_KEY not set — trade approval tokens will be insecure!')
-            secret = 'fallback-insecure-key'
+            secret = os.urandom(32).hex()  # random per-instance; tokens won't survive restarts
         self._serializer = URLSafeTimedSerializer(secret, salt='trade-approval')
 
         # Load persisted state

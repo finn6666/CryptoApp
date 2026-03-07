@@ -1,5 +1,12 @@
 ## Current work
 
+### Security Hardening
+
+- [ ] Replace `str(e)` error leaks with generic messages (~20 endpoints return raw exception strings)
+- [ ] Fix `innerHTML` XSS in frontend JS (use `textContent` or DOMPurify)
+- [ ] Add HTTPS redirect in nginx config
+- [ ] Set `SECRET_KEY` in production env (random fallback doesn't persist across restarts)
+
 
 ## Future work
 

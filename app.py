@@ -30,6 +30,12 @@ app.secret_key = os.environ.get('SECRET_KEY') or os.urandom(32)
 if not os.environ.get('SECRET_KEY'):
     logger.warning('⚠️  No SECRET_KEY set — using random key (sessions won\'t persist across restarts)')
 
+app.config.update(
+    SESSION_COOKIE_SECURE=not app.debug,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',
+)
+
 # ---------------------------------------------------------------------------
 # Extensions — CORS + rate limiting
 # ---------------------------------------------------------------------------

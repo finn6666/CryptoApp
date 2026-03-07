@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from flask import Blueprint, jsonify, render_template
 
+from routes.trading import require_trading_auth
 import services.app_state as state
 
 logger = logging.getLogger(__name__)
@@ -148,6 +149,7 @@ def api_metrics():
 
 
 @health_bp.route('/api/debug/coins')
+@require_trading_auth
 def debug_coins():
     """Debug endpoint to see what coins are currently loaded"""
     try:

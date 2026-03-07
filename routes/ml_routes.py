@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 
 from services.app_state import run_async, parse_market_cap, parse_volume, project_root
 import services.app_state as state
+from routes.trading import require_trading_auth
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,7 @@ def check_gemini_quota():
 
 
 @ml_bp.route('/api/debug/ml')
+@require_trading_auth
 def debug_ml_system():
     try:
         models_dir = os.path.join(project_root, 'models')
