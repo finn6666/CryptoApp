@@ -191,9 +191,15 @@ class PortfolioTracker:
 
     def get_closed_positions(self) -> List[Dict[str, Any]]:
         """Get all fully sold (closed) positions with outcomes."""
+        # Treat dust quantities (< 0.1% of original buy) as fully closed
         closed = []
         for sym, h in self.holdings.items():
-            if h.get("quantity", 0) > 0:
+            qty = h.get("quantity", 0)
+            cost = h.get("total_cost_gbp", 0)
+            entry = h.get("avg_entry_price", 0)
+            # Consider closed if quantity is zero, or remaining value is < £0.01
+            remaining_value = qty * entry if entry > 0 else qty
+            if qty > 0 and remaining_value >= 0.01:
                 continue
             closed.append({
                 "symbol": sym,

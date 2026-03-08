@@ -87,6 +87,13 @@ class SellAutomation:
         if not holdings:
             return []
 
+        # Build set of symbols that already have a pending sell proposal
+        # to avoid creating duplicates on every run
+        pending_sell_symbols = {
+            p.symbol for p in engine.proposals.values()
+            if p.status == "pending" and p.side == "sell"
+        }
+
         proposals = []
 
         for holding in holdings:
@@ -117,6 +124,11 @@ class SellAutomation:
                 self._peak_prices[symbol] = current_price
 
             trigger = self._evaluate_exit(symbol, current_price, entry_price, pnl_pct, hold_hours)
+
+            # Skip if there's already a pending sell for this symbol
+            if trigger and symbol in pending_sell_symbols:
+                logger.info(f"Sell trigger ({trigger['type']}) for {symbol} — already has a pending sell proposal, skipping")
+                continue
 
             # ── Q-learning: checkpoint unrealised P&L for open positions ──
             if not trigger:

@@ -804,15 +804,15 @@ def rl_insights():
         else:
             insights.append(f"Mostly running on learnt experience now ({eps*100:.0f}% exploration). Sticking with patterns that have worked before.")
 
-        # Loss memory — which coins keep underperforming
+        # Loss memory — which coins keep underperforming (show top 3 worst)
         losses = stats.get('loss_memory', {})
-        loss_coins = [sym for sym, count in sorted(losses.items(), key=lambda x: -x[1]) if count > 0]
+        loss_coins = [sym for sym, count in sorted(losses.items(), key=lambda x: -x[1]) if count > 0][:3]
         if loss_coins:
             if len(loss_coins) == 1:
                 insights.append(f"{loss_coins[0]} keeps sitting in the red. The system's getting more cautious about buying similar setups.")
             else:
                 coin_list = ', '.join(loss_coins[:-1]) + ' and ' + loss_coins[-1]
-                insights.append(f"{coin_list} have all been underperforming. The system's penalising these and will need stronger signals before buying similar coins again.")
+                insights.append(f"{coin_list} have been the worst underperformers. The system's penalising these and will need stronger signals before buying similar coins again.")
 
         # Best/worst known patterns
         best = stats.get('best_state')
@@ -847,10 +847,14 @@ def rl_insights():
             else:
                 insights.append(f"Recent record: {len(wins)}W / {len(losses_list)}L from the last {len(history)} trades.")
 
-            # Call out notable recent trades
-            for o in history[:3]:
-                pnl = o.get('pnl_pct', 0)
+            # Call out notable recent trades (dedupe by symbol)
+            seen_symbols = set()
+            for o in history[:5]:
                 sym = o.get('symbol', '?')
+                if sym in seen_symbols:
+                    continue
+                seen_symbols.add(sym)
+                pnl = o.get('pnl_pct', 0)
                 if pnl >= 10:
                     insights.append(f"{sym} was a solid win at +{pnl:.1f}%. Reinforcing that pattern.")
                 elif pnl <= -10:
