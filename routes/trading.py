@@ -9,7 +9,7 @@ import re
 import logging
 import asyncio
 from functools import wraps
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, redirect
 from itsdangerous import SignatureExpired, BadSignature
 
 from extensions import limiter
@@ -868,8 +868,8 @@ def rl_insights():
 
 @trading_bp.route('/trades')
 def trades_page():
-    """Trade journal page"""
-    return render_template('trades.html')
+    """Redirect to merged dashboard"""
+    return redirect('/')
 
 
 # ─── Sell Automation ──────────────────────────────────────────

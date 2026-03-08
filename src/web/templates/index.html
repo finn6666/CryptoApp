@@ -6,9 +6,71 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <title>Low Cap Crypto Analyzer</title>
+    <title>Crypto Investment Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260305a">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260308a">
+    <style>
+        .section-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px var(--shadow);
+        }
+        .section-header {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        .stat-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .stat-card.success .stat-value { color: var(--success); }
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: slideIn 0.3s;
+        }
+        .alert.success { background: rgba(72, 187, 120, 0.1); border: 1px solid var(--success); color: var(--success); }
+        .alert.error { background: rgba(245, 101, 101, 0.1); border: 1px solid var(--error); color: var(--error); }
+        .alert.show { display: block; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -19,9 +81,6 @@
                     <div>Last: <span class="last-updated" id="lastUpdated">Loading...</span></div>
                     <div>Next: <span id="nextRefresh">-</span></div>
                 </div>
-                <button class="btn" onclick="window.location.href='/trades'" style="background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 600; padding: 8px 18px; border: none; font-size: 14px;">
-                    📈 Trades &amp; Scanning
-                </button>
                 <button class="btn" onclick="window.location.href='/health-dashboard'" style="background: linear-gradient(135deg, #48bb78, #38a169); color: #fff; font-weight: 600; padding: 8px 18px; border: none; font-size: 14px;">
                     🖥️ Health
                 </button>
@@ -92,17 +151,162 @@
                 </div>
             </div>
 
-            <!-- Portfolio Analysis Container (PHASE 5) -->
-            <div class="portfolio-container" id="portfolioContainer" style="display: none;">
-                <div class="coins-header">
-                    <h2>🤖 AI Portfolio Analysis</h2>
-                    <button class="close-btn" onclick="closePortfolioAnalysis()">✕</button>
+            <!-- Trade Stats -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTrades">0</div>
+                    <div class="stat-label">Total Trades</div>
                 </div>
-                <div id="portfolioContent">
-                    <div class="loading">Running multi-agent portfolio analysis...</div>
+                <div class="stat-card success">
+                    <div class="stat-value" id="winRate">0%</div>
+                    <div class="stat-label">Success Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="budgetRemaining">—</div>
+                    <div class="stat-label">Budget Left Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="tradesToday">0</div>
+                    <div class="stat-label">Trades Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="winningTrades">0</div>
+                    <div class="stat-label">Winning</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="losingTrades">0</div>
+                    <div class="stat-label">Losing</div>
                 </div>
             </div>
-            
+
+            <!-- Portfolio Holdings Section -->
+            <div class="section-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
+                    <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0;">💼 Portfolio Holdings</h2>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span id="portfolioUpdated" style="font-size: 11px; color: var(--text-secondary);"></span>
+                        <button id="portfolioRefreshBtn" onclick="refreshTradesPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+                            🔄 Refresh
+                        </button>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpValue">£0.00</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Total Value</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700;" id="tpPnl">£0.00</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Unrealised P&L</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700;" id="tpRealisedPnl">£0.00</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Realised P&L</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpCount">0</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Holdings</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpTotalTrades">0</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Total Trades</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpFees">£0.00</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Fees Paid</div>
+                    </div>
+                </div>
+                <div id="marketState" style="margin-bottom: 16px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 16px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div id="fngDisplay" style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="color: var(--text-secondary); font-size: 13px;">Loading…</span>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div id="globalStats" style="display: flex; align-items: center; gap: 10px;"></div>
+                            </div>
+                        </div>
+                        <div id="marketHeadlines" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+                            <div style="color: var(--text-secondary); font-size: 12px;">Fetching headlines…</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="holdingsList">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
+                        No holdings yet. The portfolio tracker records every executed trade automatically.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Live Trading Section -->
+            <div class="section-card">
+                <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    ⚡ Live Trading
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span id="tradingStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600;"></span>
+                        <button id="killSwitchBtn" onclick="toggleKillSwitch()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
+                            🛑 Kill Switch
+                        </button>
+                    </div>
+                </h2>
+
+                <div id="configWarning" style="display: none; background: rgba(237,137,54,0.15); border: 1px solid rgba(237,137,54,0.4); border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: #ecc94b;">
+                    ⚠️ <strong>Setup required:</strong> Add your Kraken API keys and Gmail app password to <code>.env</code> — see <code>.env.example</code>
+                </div>
+
+                <div id="pendingSection" style="display: none;">
+                    <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px;">Pending Approval</h3>
+                    <div id="pendingProposals"></div>
+                </div>
+
+                <div id="executedSection" style="margin-top: 16px;">
+                    <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px; display: flex; justify-content: space-between; align-items: center;">
+                        Trade Log
+                        <button onclick="loadTradeLog(); loadExecutedTrades();" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer;">🔄 Refresh</button>
+                    </h3>
+                    <div id="tradeLogUnified" style="max-height: 500px; overflow-y: auto;">
+                        <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
+                            No trades yet. Agents will propose trades when they find high-conviction opportunities.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scan & Automation Section -->
+            <div class="section-card">
+                <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    📊 Automated Scanning
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <span id="scanStatusDetail" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
+                        <button id="scanNowBtn" onclick="triggerScan()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--accent-primary); background: rgba(102,126,234,0.1); color: var(--accent-primary); cursor: pointer; font-weight: 600;">
+                            🔍 Scan Now
+                        </button>
+                    </div>
+                </h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanNextTime">—</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Next Scan</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanLastRun">Never</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Last Scan</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanCoinsAnalysed">0</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Coins Analysed</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
+                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanProposals">0</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Proposals Made</div>
+                    </div>
+                </div>
+                <div id="scanResultMsg" style="display: none; background: rgba(102,126,234,0.1); border: 1px solid var(--accent-primary); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--text-secondary);"></div>
+            </div>
+
+            <!-- Favorites -->
             <div class="favorites-container" id="favoritesContainer">
                 <div class="coins-header">
                     <h2>Favorites</h2>
@@ -112,6 +316,42 @@
                 </div>
             </div>
 
+            <!-- Portfolio Analysis Container -->
+            <div class="portfolio-container" id="portfolioContainer" style="display: none;">
+                <div class="coins-header">
+                    <h2>🤖 AI Portfolio Analysis</h2>
+                    <button class="close-btn" onclick="closePortfolioAnalysis()">✕</button>
+                </div>
+                <div id="portfolioContent">
+                    <div class="loading">Running multi-agent portfolio analysis...</div>
+                </div>
+            </div>
+
+            <!-- RL Insights Section -->
+            <div class="section-card">
+                <h2 class="section-header">RL Insights</h2>
+                <div id="rlInsights">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
+                </div>
+            </div>
+
+            <!-- Closed Positions Section -->
+            <div class="section-card">
+                <h2 class="section-header">🏁 Closed Positions</h2>
+                <div id="closedPositions">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No closed positions yet.</p>
+                </div>
+            </div>
+
+            <!-- Activity Log Section -->
+            <div class="section-card">
+                <h2 class="section-header">📜 Activity Log</h2>
+                <div id="activityLog" style="max-height: 300px; overflow-y: auto;">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
+                </div>
+            </div>
+
+            <!-- Symbol Search -->
             <div class="symbol-search-container" id="symbolSearchContainer" style="display: none;">
                 <div class="coins-header">
                     <h2>Add to Favorites</h2>
@@ -129,24 +369,27 @@
                     </button>
                 </div>
                 
-                <div id="searchResults">
-                    <!-- Results will be populated here -->
-                </div>
+                <div id="searchResults"></div>
             </div>
 
+            <!-- Trade Alert -->
+            <div class="alert" id="tradeAlert">
+                <span id="tradeAlertMessage"></span>
+            </div>
 
         </div>
     </div>
 
     <!-- Modular JavaScript -->
-    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260305a"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260305a"></script>
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/trades.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260308a"></script>
 </body>
 </html>

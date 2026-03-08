@@ -302,9 +302,12 @@ class TradingEngine:
                     "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
                 }
 
-        # Ensure current_price is never None (can happen if coin data has price=None)
-        if current_price is None:
-            current_price = 0
+        # Reject if no valid price (can happen if coin data has price=None)
+        if not current_price or current_price <= 0:
+            return {
+                "success": False,
+                "error": f"No valid price for {symbol} — cannot propose trade",
+            }
 
         proposal = TradeProposal(
             id=uuid.uuid4().hex[:12],
@@ -846,7 +849,7 @@ class TradingEngine:
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{(proposal.quantity or 0):.8f}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{(proposal.execution_price or 0):.6f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{(proposal.execution_price or proposal.price_at_proposal or 0):.6f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Order ID</td><td style="text-align: right; font-size: 11px;">{proposal.order_id}</td></tr>
                 </table>
                 <div style="margin-top: 16px; font-size: 12px; color: #a0aec0;">
