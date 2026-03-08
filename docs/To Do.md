@@ -21,8 +21,10 @@
 - Are we actuall using /services/redis cache?
 - Think we have a few readmes so just make sure were having redundant docs
 - Are we still using main.py?
--
--
+- Can I have a symbol for my page on the internet, instead of the grey world symbol (when i look at tabs at the top of my screen i'm talking about)
+- Remove 'success rate', 'winning' and 'loosing' tabs on the main page, don't really think there needed
+- On live trading - trade log, i don't need to see so much history, maybe just cut this off at a certain point
+
 ## Future work
 
 ### Phase 1 — More CEXes via ccxt (effort: ~2 hours)
