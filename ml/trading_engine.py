@@ -309,11 +309,19 @@ class TradingEngine:
                 "error": f"No valid price for {symbol} — cannot propose trade",
             }
 
+        # Use 4dp rounding to avoid tiny amounts becoming £0.00
+        rounded_amount = round(amount_gbp, 4)
+        if rounded_amount < 0.01:
+            return {
+                "success": False,
+                "error": f"Trade amount too small (£{amount_gbp:.6f}) — dust position",
+            }
+
         proposal = TradeProposal(
             id=uuid.uuid4().hex[:12],
             symbol=symbol.upper(),
             side=side.lower(),
-            amount_gbp=round(amount_gbp, 2),
+            amount_gbp=rounded_amount,
             price_at_proposal=current_price,
             reason=reason,
             confidence=confidence,

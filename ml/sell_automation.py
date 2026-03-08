@@ -87,12 +87,21 @@ class SellAutomation:
         if not holdings:
             return []
 
-        # Build set of symbols that already have a pending sell proposal
+        # Build set of symbols that already have a pending OR recently failed sell
         # to avoid creating duplicates on every run
-        pending_sell_symbols = {
-            p.symbol for p in engine.proposals.values()
-            if p.status == "pending" and p.side == "sell"
-        }
+        pending_sell_symbols = set()
+        for p in engine.proposals.values():
+            if p.side != "sell":
+                continue
+            if p.status == "pending":
+                pending_sell_symbols.add(p.symbol)
+            elif p.status in ("rejected", "executed") and p.created_at:
+                try:
+                    created = datetime.fromisoformat(p.created_at)
+                    if (datetime.utcnow() - created).total_seconds() < 3600:
+                        pending_sell_symbols.add(p.symbol)
+                except Exception:
+                    pass
 
         proposals = []
 
@@ -105,6 +114,12 @@ class SellAutomation:
             entry_price = holding.get("avg_entry_price", 0)
             quantity = holding.get("quantity", 0)
             if entry_price <= 0 or quantity <= 0:
+                continue
+
+            # Skip dust positions — not worth selling if below exchange minimum
+            holding_value_gbp = current_price * quantity
+            if holding_value_gbp < 0.50:
+                logger.debug(f"Skipping {symbol}: dust position worth £{holding_value_gbp:.4f}")
                 continue
 
             pnl_pct = ((current_price - entry_price) / entry_price) * 100
