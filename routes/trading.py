@@ -749,7 +749,7 @@ def exchange_balance():
                         cash[cur] = round(free, 2)
                 balances[eid] = cash
             except Exception as e:
-                balances[eid] = {"error": str(e)}
+                balances[eid] = {"error": "Balance unavailable"}
         return jsonify({"balances": balances}), 200
     except Exception as e:
         logger.error(f"Exchange balance error: {e}")
@@ -886,7 +886,8 @@ def sell_automation_status():
         auto = get_sell_automation()
         return jsonify({'success': True, **auto.get_status()}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Sell automation status error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get sell automation status'}), 500
 
 
 @trading_bp.route('/api/trades/sell-automation/check', methods=['POST'])
@@ -916,7 +917,7 @@ def sell_automation_check():
         }), 200
     except Exception as e:
         logger.error(f"Sell automation check failed: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Sell automation check failed'}), 500
 
 
 # ========================================
@@ -957,7 +958,7 @@ def backtest_run():
         return jsonify({'success': True, 'result': summary}), 200
     except Exception as e:
         logger.exception("Backtest failed")
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Backtest failed'}), 500
 
 
 @trading_bp.route('/api/backtest/results')
@@ -968,7 +969,8 @@ def backtest_results():
         results = BacktestEngine.list_results()
         return jsonify({'success': True, 'results': results}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Backtest results error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to list backtest results'}), 500
 
 
 
@@ -984,7 +986,8 @@ def retrain_status():
         sched = get_ml_scheduler()
         return jsonify({'success': True, **sched.get_status()}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Retrain status error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get retrain status'}), 500
 
 
 @trading_bp.route('/api/retrain/trigger', methods=['POST'])
@@ -998,7 +1001,8 @@ def retrain_trigger():
         threading.Thread(target=sched.weekly_retrain, daemon=True).start()
         return jsonify({'success': True, 'message': 'Retraining started in background'}), 202
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Retrain trigger error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to trigger retraining'}), 500
 
 
 @trading_bp.route('/api/cache/status')
@@ -1008,4 +1012,5 @@ def cache_status():
         from services.redis_cache import get_cache_stats
         return jsonify({'success': True, **get_cache_stats()}), 200
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Cache status error: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get cache status'}), 500

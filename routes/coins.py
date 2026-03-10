@@ -144,7 +144,8 @@ def force_refresh():
             return jsonify({'success': True, 'message': 'Live data refreshed successfully'})
         return jsonify({'success': False, 'error': 'Failed to fetch live data'}), 500
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Refresh failed: {e}")
+        return jsonify({'success': False, 'error': 'An unexpected error occurred'}), 500
 
 
 @coins_bp.route('/api/market/conditions')
@@ -189,7 +190,7 @@ def get_market_conditions():
         })
     except Exception as e:
         logger.error(f"Market conditions error: {e}")
-        return jsonify({'error': str(e), 'risk_level': 'UNKNOWN', 'risk_score': 50, 'risk_percentage': 50}), 500
+        return jsonify({'error': 'Failed to load market conditions', 'risk_level': 'UNKNOWN', 'risk_score': 50, 'risk_percentage': 50}), 500
 
 
 # ─── Favorites ────────────────────────────────────────────────
@@ -269,7 +270,7 @@ def get_favorites():
         return jsonify({'favorites': favorite_coins, 'ml_enhanced': ml_status, 'missing_count': len(missing_coins)})
     except Exception as e:
         logger.error(f"Error in get_favorites: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Failed to load favorites'}), 500
 
 
 @coins_bp.route('/api/favorites/add', methods=['POST'])
@@ -287,7 +288,8 @@ def add_favorite():
             return jsonify({'success': False, 'error': 'Failed to save favorites'}), 500
         return jsonify({'success': False, 'error': f'{symbol} is already in favorites'}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error adding favorite: {e}")
+        return jsonify({'success': False, 'error': 'Failed to add favorite'}), 500
 
 
 @coins_bp.route('/api/favorites/remove', methods=['POST'])
@@ -305,4 +307,5 @@ def remove_favorite():
             return jsonify({'success': False, 'error': 'Failed to save favorites'}), 500
         return jsonify({'success': False, 'error': f'{symbol} is not in favorites'}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Error removing favorite: {e}")
+        return jsonify({'success': False, 'error': 'Failed to remove favorite'}), 500

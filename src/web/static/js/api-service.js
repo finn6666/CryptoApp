@@ -28,7 +28,7 @@ async function loadFavorites(withAgents = false) {
     } catch (error) {
         console.error('Error loading favorites:', error);
         document.getElementById('favoritesContent').innerHTML = 
-            `<div class="error">❌ Error loading favorites: ${error.message}</div>`;
+            `<div class="error">❌ Error loading favorites</div>`;
         document.getElementById('favoritesContainer').style.display = 'block';
     }
 }
@@ -69,7 +69,7 @@ async function loadMLStatus() {
         if (data.error) {
             console.error('ML Status Error:', data.error);
             document.getElementById('mlStatusContent').innerHTML = 
-                `<div class="error">❌ ${data.error}</div>`;
+                `<div class="error">❌ ML status unavailable</div>`;
             return;
         }
 
@@ -116,7 +116,7 @@ async function loadMLStatus() {
     } catch (error) {
         console.error('Error loading ML status:', error);
         document.getElementById('mlStatusContent').innerHTML = 
-            `<div class="error">❌ Error: ${error.message}</div>`;
+            `<div class="error">❌ Error loading ML status</div>`;
     }
 }
 

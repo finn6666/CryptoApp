@@ -33,29 +33,26 @@ trading_agent = Agent(
 
 **Context:** The user has a small daily budget (~£3). Each trade matters but it's still low-stakes. Propose trades when you're genuinely convinced.
 
-**Strategy: BUY AND HOLD.** The user wants to accumulate promising positions and hold them for medium-to-long-term gains. Quick flips are NOT the goal.
+**Strategy: BUY AND HOLD.** The user wants to accumulate promising positions and hold them medium-to-long-term.
 
 **Rules:**
-1. Only propose BUY trades with conviction ≥55% — this is real money but the budget is tiny, so we WANT to test buying regularly
+1. Only propose BUY trades with conviction ≥55% — this is real money but the budget is tiny, so buy regularly when convinced
 2. Never propose trades on coins you don't recognise or can't find real info about
 3. Be specific about WHY — "it's going up" is not a reason. "This L2 has strong developer activity, TVL growing 15% week-over-week, and is still under $50M market cap" IS a reason
-4. **Favour coins with strong fundamentals and multi-week/month upside** over short-term pump potential
-5. Look for: growing ecosystems, upcoming catalysts (mainnet launches, partnerships, exchange listings), undervalued relative to peers, strong community/developer activity
-6. Be MORE WILLING to buy during dips or consolidation if fundamentals are intact — these are accumulation opportunities
-7. **Fear & Greed awareness:** If the orchestrator mentions a low Fear & Greed Index (≤30), treat this as a BUYING TAILWIND, not a headwind. "Be greedy when others are fearful" — fearful markets mean good projects are trading at a discount. LOWER your conviction threshold to 45% in Extreme Fear conditions. The best entries happen when everyone else is panicking.
-8. Lean towards buying more often — the budget is tiny so the risk is minimal. 55-70% conviction = 40-60% of budget, 70%+ = up to 100%. In Extreme Fear (F&G ≤20), even 45-55% conviction = worth a punt at 30-50% of budget.
+4. Favour coins with strong fundamentals and multi-week/month upside over short-term pump potential
+5. Look for: growing ecosystems, upcoming catalysts (mainnet launches, partnerships, exchange listings), undervalued relative to peers
+6. **Dips are opportunities:** Be MORE WILLING to buy during dips or consolidation if fundamentals are intact — these are accumulation opportunities
+7. **Fear & Greed awareness:** If Fear & Greed ≤30 (Extreme Fear), treat this as a BUYING TAILWIND. Lower conviction threshold to 45%. Fearful markets mean good projects trading at a discount.
+8. **Budget allocation:** 55-70% conviction = 40-60% of budget, 70%+ = up to 100%. In Extreme Fear (F&G ≤20), even 45-55% conviction = 30-50% of budget.
 9. Set should_trade=false if the analysis is mediocre, generic, or based on placeholder data
-10. For SELL decisions, only propose if the user holds the coin AND the outlook has fundamentally deteriorated (not just a short-term dip)
+10. For SELL decisions, only propose if the outlook has fundamentally deteriorated (not just a short-term dip)
 11. Always include the specific risk — "anonymous team", "single exchange", "whale dump risk", etc.
+12. **Position reinforcing:** If a coin already in the portfolio still has strong fundamentals and is consolidating or dipping, this is a GOOD reason to add more. Averaging into winners builds larger positions for bigger gains.
 
-**HOLD Bias (critical for re-checks on existing positions):**
-- **Default answer is HOLD.** Crypto volatility is expected — 20-30% swings are normal for low-caps.
-- Only recommend SELL when the thesis is BROKEN: team abandoned, project exploited, development dead, exchange delisting.
-- Price dips, reduced volume, or cooling hype are NOT sell signals — they're consolidation.
-- DO recommend SELL if upside is genuinely short-lived: pure pump-and-dump with no real product, volume crashing after artificial spike, or project is clearly a scam.
-- The user is building a portfolio for medium/long-term gains. Patience through volatility is how 5-10x returns happen.
-
-**Think like a patient investor** building a portfolio of promising low-cap gems. If you wouldn't hold this for at least a week, don't propose it.
+**HOLD Bias for existing positions:**
+- Default answer is HOLD. 20-30% swings are normal for low-caps.
+- Only recommend SELL when the thesis is BROKEN: team abandoned, project exploited, development dead, exchange delisting. NOT for price dips or cooling hype.
+- DO recommend SELL for pure pump-and-dumps with no real product, or clear scams.
 
 Return valid JSON matching TradeDecision schema.""",
     output_schema=TradeDecision,
@@ -67,6 +64,7 @@ async def evaluate_trade(
     analysis: Dict[str, Any],
     current_price: float,
     daily_budget_remaining: float,
+    existing_position: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Evaluate whether an analysis warrants a real trade.
@@ -76,6 +74,8 @@ async def evaluate_trade(
         analysis: Agent analysis results (gem_score, recommendation, etc.)
         current_price: Current price in GBP
         daily_budget_remaining: How much budget is left today
+        existing_position: Optional dict with current holdings info
+            (e.g. {'quantity': 100, 'avg_cost': 0.001, 'current_value_gbp': 0.50, 'pnl_pct': -10})
         
     Returns:
         Trade decision dict
@@ -114,8 +114,24 @@ Summary: {summary}
 
 Strengths: {'; '.join(strengths[:3]) if strengths else 'None listed'}
 Weaknesses: {'; '.join(weaknesses[:3]) if weaknesses else 'None listed'}
+"""
 
-Based on this analysis, should I place a real trade? Remember this is real money — be honest."""
+    if existing_position:
+        qty = existing_position.get('quantity', 0)
+        avg_cost = existing_position.get('avg_cost', 0)
+        val = existing_position.get('current_value_gbp', 0)
+        pnl = existing_position.get('pnl_pct', 0)
+        prompt += f"""
+EXISTING POSITION: Already holding {qty:.6f} {symbol}
+  Average cost: £{avg_cost:.6f}
+  Current value: £{val:.2f}
+  P&L: {pnl:+.1f}%
+Consider whether adding to this position makes sense (averaging in on dips, reinforcing a winner).
+"""
+    else:
+        prompt += "\nNo existing position — this would be a new entry.\n"
+
+    prompt += "\nBased on this analysis, should I place a real trade? Remember this is real money — be honest."
 
     try:
         user_message = types.Content(

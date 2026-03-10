@@ -7,6 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Crypto Investment Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260308a">
     <style>
@@ -157,10 +158,6 @@
                     <div class="stat-value" id="totalTrades">0</div>
                     <div class="stat-label">Total Trades</div>
                 </div>
-                <div class="stat-card success">
-                    <div class="stat-value" id="winRate">0%</div>
-                    <div class="stat-label">Success Rate</div>
-                </div>
                 <div class="stat-card">
                     <div class="stat-value" id="budgetRemaining">—</div>
                     <div class="stat-label">Budget Left Today</div>
@@ -168,14 +165,6 @@
                 <div class="stat-card">
                     <div class="stat-value" id="tradesToday">0</div>
                     <div class="stat-label">Trades Today</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="winningTrades">0</div>
-                    <div class="stat-label">Winning</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="losingTrades">0</div>
-                    <div class="stat-label">Losing</div>
                 </div>
             </div>
 

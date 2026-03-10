@@ -37,7 +37,7 @@ async function analyzePortfolio() {
         
     } catch (error) {
         console.error('Portfolio analysis error:', error);
-        content.innerHTML = `<div class="error">Analysis failed: ${error.message}</div>`;
+        content.innerHTML = `<div class="error">Analysis failed</div>`;
         button.textContent = '📊 Portfolio Analysis';
         button.disabled = false;
         showStatus('Portfolio analysis failed', 'error');

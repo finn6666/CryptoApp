@@ -133,6 +133,9 @@ class TradingEngine:
         else:
             logger.info("🤖 Sell-side: auto-approve ENABLED for all sells")
 
+        # Manual approval threshold: trades above this amount always require approval
+        self.approval_threshold_gbp = float(os.getenv("APPROVAL_THRESHOLD_GBP", "50.0"))
+
         # Exchange (lazy init — prefers ExchangeManager for multi-exchange)
         self._exchange = None
 
@@ -409,6 +412,14 @@ class TradingEngine:
         else:
             # Buys: honour existing buy_auto_approve flag
             should_auto = self.buy_auto_approve
+
+        # Override: trades above approval threshold always require manual approval
+        if amount_gbp > self.approval_threshold_gbp:
+            logger.info(
+                f"Trade £{amount_gbp:.2f} exceeds approval threshold "
+                f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
+            )
+            should_auto = False
 
         if not should_auto:
             return result  # normal email-approval flow

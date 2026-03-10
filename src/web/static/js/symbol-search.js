@@ -47,13 +47,15 @@ async function searchSymbols() {
         if (data.results && data.results.length > 0) {
             let html = '<div class="search-results-grid">';
             data.results.forEach(coin => {
+                const safeSym = coin.symbol.replace(/[^A-Z0-9]/gi, '');
+                const safeName = coin.name.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&#39;'}[c]));
                 html += `
                     <div class="search-result-card">
                         <div class="search-result-info">
-                            <div class="search-result-symbol">${coin.symbol}</div>
-                            <div class="search-result-name">${coin.name}</div>
+                            <div class="search-result-symbol">${safeSym}</div>
+                            <div class="search-result-name">${safeName}</div>
                         </div>
-                        <button class="btn-small" onclick="addSymbol('${coin.symbol}', '${coin.name}')">
+                        <button class="btn-small" onclick="addSymbol('${safeSym}', '${safeName}')">
                             ➕ Add
                         </button>
                     </div>
@@ -67,7 +69,7 @@ async function searchSymbols() {
         
     } catch (error) {
         console.error('Search error:', error);
-        resultsDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
+        resultsDiv.innerHTML = `<div class="error">❌ Search failed</div>`;
     } finally {
         searchBtn.textContent = '🔍 Search';
         searchBtn.disabled = false;

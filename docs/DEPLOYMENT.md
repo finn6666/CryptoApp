@@ -125,7 +125,7 @@ cp ~/CryptoApp/data/portfolio.json ~/backups/ 2>/dev/null
 
 ## SSL (Optional)
 
-The included `deploy/setup-ssl-rhel.sh` is for RHEL/Fedora servers. On Raspberry Pi OS (Debian), install certbot manually:
+On Raspberry Pi OS (Debian), install certbot:
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx

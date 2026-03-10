@@ -5,7 +5,6 @@ import asyncio
 import threading
 from datetime import datetime
 from ml.training_pipeline import CryptoMLPipeline
-from ml.weekly_report import WeeklyReportGenerator
 import os
 
 logger = logging.getLogger(__name__)
@@ -14,7 +13,6 @@ logger = logging.getLogger(__name__)
 class MLScheduler:
     def __init__(self):
         self.pipeline = CryptoMLPipeline()
-        self.weekly_reporter = WeeklyReportGenerator()
 
         # Use relative paths that work anywhere
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -104,29 +102,6 @@ class MLScheduler:
         except Exception:
             logger.error(f"ALERT (email failed): {message}")
 
-    def weekly_report_job(self):
-        """Generate and send weekly email report."""
-        logger.info(f"Starting weekly report generation at {datetime.utcnow().isoformat()}")
-
-        try:
-            if not self.gem_detector or not self.analyzer:
-                logger.warning("Gem detector or analyzer not initialized for weekly report")
-                return
-
-            result = self.weekly_reporter.generate_and_send_report(
-                self.gem_detector,
-                self.analyzer
-            )
-
-            if result['success']:
-                logger.info(f"Weekly report sent. Opportunities: {result['opportunities_count']}")
-            else:
-                logger.error(f"Weekly report failed: {result.get('error', 'Unknown')}")
-
-        except Exception as e:
-            logger.error(f"Weekly report generation failed: {e}")
-            self.send_alert(f"Weekly report failed: {e}")
-
     def start_scheduler(self):
         """Start the ML retraining scheduler in a background thread."""
         if self._running:
@@ -136,12 +111,8 @@ class MLScheduler:
         # Schedule retraining every Sunday at 2 AM
         schedule.every().sunday.at("02:00").do(self.weekly_retrain)
 
-        # Schedule weekly report every Monday at 9 AM
-        schedule.every().monday.at("09:00").do(self.weekly_report_job)
-
         logger.info("ML Scheduler started:")
         logger.info("  - Model retraining: Every Sunday at 2:00 AM")
-        logger.info("  - Weekly report: Every Monday at 9:00 AM")
 
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)

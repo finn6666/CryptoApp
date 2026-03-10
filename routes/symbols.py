@@ -26,7 +26,7 @@ def search_coins():
         return jsonify({'success': True, 'results': results})
     except Exception as e:
         logger.error(f"Search error: {e}")
-        return jsonify({'success': False, 'error': f'Search failed: {str(e)}'})
+        return jsonify({'success': False, 'error': 'Search failed'})
 
 
 @symbols_bp.route('/api/symbols/search', methods=['GET'])
@@ -41,7 +41,8 @@ def search_symbols():
         results = run_async(state.data_pipeline.search_symbols(query, limit))
         return jsonify({'success': True, 'query': query, 'results': results, 'count': len(results)})
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Search failed: {str(e)}'}), 500
+        logger.error(f"Symbol search error: {e}")
+        return jsonify({'success': False, 'error': 'Search failed'}), 500
 
 
 @symbols_bp.route('/api/symbols/validate', methods=['POST'])
@@ -60,7 +61,8 @@ def validate_symbol():
             return jsonify({'success': True, 'symbol': result['symbol'], 'cmc_id': result.get('cmc_id', result.get('coingecko_id')), 'name': result['name'], 'valid': True})
         return jsonify({'success': False, 'symbol': result['symbol'], 'valid': False, 'error': result.get('error', 'Symbol not found')}), 404
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Validation failed: {str(e)}'}), 500
+        logger.error(f"Symbol validation error: {e}")
+        return jsonify({'success': False, 'error': 'Validation failed'}), 500
 
 
 @symbols_bp.route('/api/symbols/add', methods=['POST'])
@@ -81,10 +83,11 @@ def add_symbol():
                 return jsonify({'success': True, 'symbol': symbol, 'message': f'Symbol {symbol} added successfully and data fetched'})
             except Exception as e:
                 logger.error(f"Failed to fetch data for {symbol}: {e}", exc_info=True)
-                return jsonify({'success': False, 'symbol': symbol, 'error': f'Failed to fetch data for {symbol}: {str(e)}'}), 500
+                return jsonify({'success': False, 'symbol': symbol, 'error': f'Symbol added but data fetch failed'}), 500
         return jsonify({'success': False, 'symbol': symbol, 'error': f'Failed to add symbol {symbol}. It may not exist or is already supported.'}), 400
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Failed to add symbol: {str(e)}'}), 500
+        logger.error(f"Failed to add symbol: {e}")
+        return jsonify({'success': False, 'error': 'Failed to add symbol'}), 500
 
 
 @symbols_bp.route('/api/symbols', methods=['GET'])
@@ -95,7 +98,8 @@ def get_supported_symbols():
         symbols = state.data_pipeline.supported_symbols
         return jsonify({'success': True, 'symbols': symbols, 'count': len(symbols)})
     except Exception as e:
-        return jsonify({'success': False, 'error': f'Failed to get symbols: {str(e)}'}), 500
+        logger.error(f"Failed to get symbols: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get symbols'}), 500
 
 
 @symbols_bp.route('/api/symbols/status', methods=['GET'])

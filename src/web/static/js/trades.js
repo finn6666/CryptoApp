@@ -73,17 +73,17 @@ async function loadPendingProposals() {
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${sideColor}; border-radius: 8px; padding: 14px; margin-bottom: 10px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <div>
-                                <span style="font-weight: 700; font-size: 15px;">${sideIcon} ${p.side.toUpperCase()} ${p.symbol}</span>
-                                <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${p.amount_gbp.toFixed(2)}</span>
+                                <span style="font-weight: 700; font-size: 15px;">${sideIcon} ${escapeHtml(p.side.toUpperCase())} ${escapeHtml(p.symbol)}</span>
+                                <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${Number(p.amount_gbp).toFixed(2)}</span>
                             </div>
                             <div style="display: flex; gap: 6px;">
-                                <button onclick="approveTrade('${p.id}')" style="padding: 6px 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">✅ Approve</button>
-                                <button onclick="rejectTrade('${p.id}')" style="padding: 6px 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">❌ Reject</button>
+                                <button onclick="approveTrade('${escapeHtml(p.id)}')" style="padding: 6px 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">✅ Approve</button>
+                                <button onclick="rejectTrade('${escapeHtml(p.id)}')" style="padding: 6px 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">❌ Reject</button>
                             </div>
                         </div>
                         <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
-                            <div style="margin-bottom: 4px;">${p.reason}</div>
-                            <div>Confidence: ${p.confidence}% • Price: £${p.price_at_proposal.toFixed(6)} • ${created}</div>
+                            <div style="margin-bottom: 4px;">${escapeHtml(p.reason)}</div>
+                            <div>Confidence: ${Number(p.confidence)}% • Price: £${Number(p.price_at_proposal).toFixed(6)} • ${created}</div>
                         </div>
                     </div>
                 `;
@@ -156,8 +156,11 @@ async function loadExecutedTrades() {
 
         allTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        if (allTrades.length > 0) {
-            container.innerHTML = allTrades.map(t => {
+        // Limit to most recent 30 trades
+        const displayTrades = allTrades.slice(0, 30);
+
+        if (displayTrades.length > 0) {
+            container.innerHTML = displayTrades.map(t => {
                 const isBuy = t.side === 'buy';
                 const sideColor = isBuy ? '#48bb78' : '#fc8181';
                 const sideIcon = isBuy ? '🟢' : '🔴';
@@ -170,13 +173,13 @@ async function loadExecutedTrades() {
                     <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
                         <span>${sideIcon}</span>
                         <div style="flex: 1;">
-                            <span style="font-weight: 700;">${t.symbol}</span>
-                            <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${t.side.toUpperCase()}</span>
+                            <span style="font-weight: 700;">${escapeHtml(t.symbol)}</span>
+                            <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${escapeHtml(t.side.toUpperCase())}</span>
                             <span style="color: var(--text-secondary);"> ${(t.quantity || 0).toFixed(6)} @ ${priceDisplay}</span>
                             <div style="color: var(--text-secondary); font-size: 11px; margin-top: 3px;">
-                                £${(t.amount_gbp || 0).toFixed(2)} • ${t.exchange} • Fee: £${(t.fee_gbp || 0).toFixed(2)}${pnlStr}
+                                £${(t.amount_gbp || 0).toFixed(2)} • ${escapeHtml(t.exchange)} • Fee: £${(t.fee_gbp || 0).toFixed(2)}${pnlStr}
                             </div>
-                            ${t.reasoning ? `<div style="color: var(--text-secondary); font-size: 11px; margin-top: 2px; font-style: italic;">"${t.reasoning.substring(0, 120)}${t.reasoning.length > 120 ? '…' : ''}"</div>` : ''}
+                            ${t.reasoning ? `<div style="color: var(--text-secondary); font-size: 11px; margin-top: 2px; font-style: italic;">${escapeHtml('"' + t.reasoning.substring(0, 120) + (t.reasoning.length > 120 ? '…' : '') + '"')}</div>` : ''}
                         </div>
                         <span style="color: var(--text-secondary); font-size: 11px; white-space: nowrap;">${time}</span>
                     </div>
@@ -328,18 +331,18 @@ async function triggerScan() {
         if (data.success) {
             resultEl.style.borderColor = 'var(--success)';
             resultEl.style.background = 'rgba(72,187,120,0.1)';
-            resultEl.innerHTML = `✅ Scan complete — <strong>${data.coins_analysed}</strong> coins analysed, <strong>${data.proposals_made}</strong> proposals made, <strong>${data.errors?.length || 0}</strong> errors`;
+            resultEl.innerHTML = `✅ Scan complete — <strong>${Number(data.coins_analysed)}</strong> coins analysed, <strong>${Number(data.proposals_made)}</strong> proposals made, <strong>${Number(data.errors?.length || 0)}</strong> errors`;
         } else {
             resultEl.style.borderColor = 'var(--error)';
             resultEl.style.background = 'rgba(245,101,101,0.1)';
-            resultEl.innerHTML = `⚠️ ${data.error || 'Scan failed'}`;
+            resultEl.innerHTML = `⚠️ ${escapeHtml(data.error || 'Scan failed')}`;
         }
 
         loadScanStatusDetail();
         loadPendingProposals();
     } catch (e) {
         resultEl.style.display = 'block';
-        resultEl.innerHTML = `❌ Network error: ${e.message}`;
+        resultEl.innerHTML = `❌ Network error`;
     } finally {
         btn.disabled = false;
         btn.textContent = '🔍 Scan Now';
@@ -402,7 +405,7 @@ async function loadTradesPortfolio() {
                 return `
                 <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-top: 3px solid ${borderAccent}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${h.symbol}</span>
+                        <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(h.symbol)}</span>
                         <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
                     </div>
                     <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(2)}</div>
@@ -410,7 +413,7 @@ async function loadTradesPortfolio() {
                         <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>£${(h.total_cost_gbp || 0).toFixed(2)}</span></div>
                         <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(2)}</span></div>
                         <div style="display: flex; justify-content: space-between;"><span>Qty</span><span>${h.quantity?.toFixed(4) || 0}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${h.exchange || '—'}</span></div>
+                        <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${escapeHtml(h.exchange || '—')}</span></div>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
@@ -479,7 +482,7 @@ async function loadMarketState() {
                 </div>
                 ${sparkline}
             </div>
-            <span style="font-size: 12px; color: var(--text-secondary); font-style: italic;">${data.trading_signal || ''}</span>
+            <span style="font-size: 12px; color: var(--text-secondary); font-style: italic;">${escapeHtml(data.trading_signal || '')}</span>
         `;
 
         const gs = data.global_stats || {};
@@ -498,20 +501,24 @@ async function loadMarketState() {
         if (headlines.length > 0) {
             headlinesEl.innerHTML = `
                 <div style="display: flex; flex-direction: column; gap: 6px;">
-                    ${headlines.map(h => `
+                    ${headlines.map(h => {
+                        const safeTitle = escapeHtml(h.title || '');
+                        const safeSource = escapeHtml(h.source || '');
+                        const safeLink = encodeURI(h.link || '#');
+                        return `
                         <div style="display: flex; align-items: flex-start; gap: 8px; line-height: 1.4;">
                             <span style="color: rgba(255,255,255,0.15); font-size: 11px; flex-shrink: 0; margin-top: 2px;">●</span>
                             <div>
-                                <a href="${h.link}" target="_blank" rel="noopener noreferrer"
+                                <a href="${safeLink}" target="_blank" rel="noopener noreferrer"
                                    style="font-size: 12px; color: var(--text-secondary); text-decoration: none; transition: color 0.15s;"
                                    onmouseover="this.style.color='var(--text-primary)'"
                                    onmouseout="this.style.color='var(--text-secondary)'">
-                                    ${h.title}
+                                    ${safeTitle}
                                 </a>
-                                <span style="font-size: 10px; color: rgba(255,255,255,0.2); margin-left: 6px;">${h.source}</span>
+                                <span style="font-size: 10px; color: rgba(255,255,255,0.2); margin-left: 6px;">${safeSource}</span>
                             </div>
                         </div>
-                    `).join('')}
+                    `;}).join('')}
                 </div>
             `;
         } else {
@@ -535,7 +542,7 @@ async function loadRlInsights() {
 
         if (insights.length > 0) {
             container.innerHTML = `<ul style="list-style: none; padding: 0; margin: 0;">${insights.map(text =>
-                `<li style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; color: var(--text-secondary); line-height: 1.5;"><span style="color: var(--text-secondary); margin-right: 8px;">&#8226;</span>${text}</li>`
+                `<li style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; color: var(--text-secondary); line-height: 1.5;"><span style="color: var(--text-secondary); margin-right: 8px;">&#8226;</span>${escapeHtml(text)}</li>`
             ).join('')}</ul>`;
         } else {
             container.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px; padding: 12px 0;">Nothing to report yet.</p>';
@@ -564,7 +571,7 @@ async function loadClosedPositions() {
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${pnlColor}; border-radius: 8px; padding: 14px; margin-bottom: 8px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="font-weight: 700; font-size: 15px;">${icon} ${p.symbol}</span>
+                                <span style="font-weight: 700; font-size: 15px;">${icon} ${escapeHtml(p.symbol)}</span>
                                 <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${p.trades} trades</span>
                             </div>
                             <div style="text-align: right;">
@@ -573,7 +580,7 @@ async function loadClosedPositions() {
                             </div>
                         </div>
                         <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;">
-                            Exchange: ${p.exchange || '—'} • Closed: ${closedDate}
+                            Exchange: ${escapeHtml(p.exchange || '—')} • Closed: ${closedDate}
                         </div>
                     </div>
                 `;
@@ -668,9 +675,6 @@ async function loadTradeStats() {
         const data = await response.json();
 
         document.getElementById('totalTrades').textContent = data.total_trades || 0;
-        document.getElementById('winRate').textContent = (data.win_rate_pct || 0).toFixed(1) + '%';
-        document.getElementById('winningTrades').textContent = data.winning_trades || 0;
-        document.getElementById('losingTrades').textContent = data.losing_trades || 0;
     } catch (error) {
         console.error('Error loading stats:', error);
     }

@@ -42,7 +42,7 @@ def get_ml_status():
         return jsonify({'ml_status': status, 'service_available': True})
     except Exception as e:
         logger.error(f"Error getting ML status: {e}")
-        return jsonify({'error': str(e), 'service_available': False}), 500
+        return jsonify({'error': 'ML status unavailable', 'service_available': False}), 500
 
 
 @ml_bp.route('/api/ml/predict/<symbol>')
@@ -64,7 +64,8 @@ def get_ml_prediction(symbol):
         result['coin'] = {'symbol': coin.symbol, 'name': coin.name, 'current_price': coin.price, 'attractiveness_score': coin.attractiveness_score}
         return jsonify(result)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"ML prediction error for {symbol}: {e}")
+        return jsonify({'error': 'Prediction failed'}), 500
 
 
 @ml_bp.route('/api/ml/train', methods=['POST'])
@@ -84,7 +85,7 @@ def train_ml_model():
         return jsonify({'success': True, 'message': 'Model trained successfully!', 'training_result': training_result, 'status': state.ml_pipeline.get_status(), 'rows_trained': len(sample_df)})
     except Exception as e:
         logger.error(f"ML training failed: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': f'Training failed: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': 'Training failed'}), 500
 
 
 @ml_bp.route('/api/ml/initialize', methods=['POST'])
@@ -107,10 +108,11 @@ def check_gemini_quota():
             return jsonify({'status': 'SUCCESS', 'message': '✅ Gemini API is working!', 'test_response': response.text})
         except Exception as e:
             if '429' in str(e) or 'quota' in str(e).lower():
-                return jsonify({'status': 'QUOTA_ERROR', 'message': '⚠️ Still hitting quota limits', 'error': str(e)})
+                return jsonify({'status': 'QUOTA_ERROR', 'message': 'Still hitting quota limits'})
             raise
     except Exception as e:
-        return jsonify({'error': str(e), 'message': 'Failed to test Gemini API'}), 500
+        logger.error(f"Gemini quota check failed: {e}")
+        return jsonify({'error': 'Failed to test Gemini API', 'message': 'Failed to test Gemini API'}), 500
 
 
 @ml_bp.route('/api/debug/ml')
@@ -142,7 +144,8 @@ def debug_ml_system():
             },
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Debug ML error: {e}")
+        return jsonify({'error': 'Debug info unavailable'}), 500
 
 
 # ─── Gem Detection ────────────────────────────────────────────
@@ -170,7 +173,8 @@ def detect_hidden_gem(symbol):
         prediction['coin'] = {'symbol': coin.symbol, 'name': coin.name, 'price': coin.price, 'market_cap_rank': coin_data['market_cap_rank'], 'attractiveness_score': coin_data['attractiveness_score']}
         return jsonify(prediction)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Gem detection error for {symbol}: {e}")
+        return jsonify({'error': 'Gem detection failed'}), 500
 
 
 @ml_bp.route('/api/gems/scan')
@@ -221,7 +225,8 @@ def scan_for_hidden_gems():
             },
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Gem scan error: {e}")
+        return jsonify({'error': 'Gem scan failed'}), 500
 
 
 @ml_bp.route('/api/gems/train', methods=['POST'])
@@ -257,7 +262,8 @@ def train_gem_detector():
             })
         return jsonify({'success': False, 'error': 'Training failed'}), 500
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        logger.error(f"Gem training error: {e}")
+        return jsonify({'success': False, 'error': 'Training failed'}), 500
 
 
 @ml_bp.route('/api/gems/status')
@@ -321,7 +327,8 @@ def get_top_hidden_gems(count):
             },
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Top gems error: {e}")
+        return jsonify({'error': 'Failed to get top gems'}), 500
 
 
 # ─── Agent Analysis ───────────────────────────────────────────
@@ -358,7 +365,7 @@ def analyze_with_agents(symbol):
         return jsonify(analysis)
     except Exception as e:
         logger.error(f"Agent analysis error for {symbol}: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Agent analysis failed'}), 500
 
 
 @ml_bp.route('/api/agents/scan')
@@ -405,7 +412,7 @@ def scan_with_agents():
         })
     except Exception as e:
         logger.error(f"Agent scan error: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Agent scan failed'}), 500
 
 
 @ml_bp.route('/api/agents/metrics')
@@ -415,7 +422,8 @@ def get_agent_metrics():
     try:
         return jsonify(state.gem_detector.orchestrator.get_metrics())
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Agent metrics error: {e}")
+        return jsonify({'error': 'Metrics unavailable'}), 500
 
 
 # ─── Portfolio ────────────────────────────────────────────────
@@ -462,7 +470,7 @@ def analyze_portfolio():
         })
     except Exception as e:
         logger.error(f"Portfolio analysis error: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Portfolio analysis failed'}), 500
 
 
 # ─── Gem Score History ────────────────────────────────────────
