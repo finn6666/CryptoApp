@@ -33,6 +33,7 @@ class TradeProposal:
     reason: str  # agent's explanation
     confidence: int  # 0-100
     agent_recommendation: str  # BUY/SELL/HOLD
+    coin_name: str = ""  # human-readable name (e.g. "Vaulta")
     created_at: str = ""
     status: str = "pending"  # pending / approved / rejected / executed / expired
     executed_at: Optional[str] = None
@@ -238,6 +239,7 @@ class TradingEngine:
         reason: str,
         confidence: int,
         recommendation: str,
+        coin_name: str = "",
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -326,6 +328,7 @@ class TradingEngine:
             reason=reason,
             confidence=confidence,
             agent_recommendation=recommendation,
+            coin_name=coin_name,
         )
 
         self.proposals[proposal.id] = proposal
@@ -373,6 +376,7 @@ class TradingEngine:
         reason: str,
         confidence: int,
         recommendation: str,
+        coin_name: str = "",
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -389,6 +393,7 @@ class TradingEngine:
             reason=reason,
             confidence=confidence,
             recommendation=recommendation,
+            coin_name=coin_name,
         )
 
         if not result.get("success"):
@@ -772,10 +777,11 @@ class TradingEngine:
         approve_url = f"{self.server_url}/api/trades/confirm/{approve_token}"
         reject_url = f"{self.server_url}/api/trades/confirm/{reject_token}"
 
-        subject = f"{'[SELL]' if proposal.side == 'sell' else '[Trade]'} Proposal: {proposal.side.upper()} {proposal.symbol} - GBP {proposal.amount_gbp:.4f}"
+        subject = f"{'[SELL]' if proposal.side == 'sell' else '[Trade]'} Proposal: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
 
         is_sell = proposal.side == "sell"
         header_gradient = "linear-gradient(90deg, #e53e3e, #c53030)" if is_sell else "linear-gradient(90deg, #667eea, #764ba2)"
+        display_name = f"{proposal.symbol} ({proposal.coin_name})" if proposal.coin_name else proposal.symbol
         sell_warning = ""
         if is_sell:
             sell_warning = """
@@ -790,7 +796,7 @@ class TradingEngine:
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
                 <div style="background: {header_gradient}; padding: 16px 20px;">
                     <h2 style="margin: 0; color: white; font-size: 18px;">
-                        {'&#x1F7E2;' if proposal.side == 'buy' else '&#x1F534;'} {proposal.side.upper()} {proposal.symbol}
+                        {'&#x1F7E2;' if proposal.side == 'buy' else '&#x1F534;'} {proposal.side.upper()} {display_name}
                     </h2>
                 </div>
                 
@@ -846,14 +852,15 @@ class TradingEngine:
         if not self.smtp_user or not self.smtp_password:
             return False
 
-        subject = f"Trade Executed: {proposal.side.upper()} {proposal.symbol} - GBP {proposal.amount_gbp:.4f}"
+        subject = f"Trade Executed: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
+        display_name = f"{proposal.symbol} ({proposal.coin_name})" if proposal.coin_name else proposal.symbol
 
         body = f"""
         <html>        <head><meta charset="utf-8"></head>        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; padding: 20px;">
                 <h2 style="color: #48bb78; margin-top: 0;">Trade Executed</h2>
                 <table style="width: 100%; border-collapse: collapse;">
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{proposal.symbol}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{display_name}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{(proposal.quantity or 0):.8f}</td></tr>
@@ -875,7 +882,8 @@ class TradingEngine:
         if not self.smtp_user or not self.smtp_password:
             return False
 
-        subject = f"[FAILED] {proposal.side.upper()} {proposal.symbol} - GBP {proposal.amount_gbp:.4f}"
+        subject = f"[FAILED] {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
+        display_name = f"{proposal.symbol} ({proposal.coin_name})" if proposal.coin_name else proposal.symbol
 
         body = f"""
         <html>
@@ -887,7 +895,7 @@ class TradingEngine:
                 </div>
                 <div style="padding: 20px;">
                     <table style="width: 100%; border-collapse: collapse;">
-                        <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{proposal.symbol}</td></tr>
+                        <tr><td style="padding: 6px 0; color: #a0aec0;">Symbol</td><td style="text-align: right; font-weight: 700;">{display_name}</td></tr>
                         <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
                         <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
                         <tr><td style="padding: 6px 0; color: #a0aec0;">Confidence</td><td style="text-align: right;">{proposal.confidence}%</td></tr>

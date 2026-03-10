@@ -529,6 +529,7 @@ class ScanLoop:
                     reason=trade_reasoning[:500] if trade_reasoning else "Multi-agent orchestrator recommended trade",
                     confidence=conviction,
                     recommendation=analysis.get("recommendation", "BUY"),
+                    coin_name=coin_data.get("name", ""),
                 )
 
                 outcome = "executed" if result.get("auto_approved") else "proposed"

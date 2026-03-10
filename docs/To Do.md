@@ -24,6 +24,7 @@
 - Can I have a symbol for my page on the internet, instead of the grey world symbol (when i look at tabs at the top of my screen i'm talking about)
 - Remove 'success rate', 'winning' and 'loosing' tabs on the main page, don't really think there needed
 - On live trading - trade log, i don't need to see so much history, maybe just cut this off at a certain point
+- Seems like maybe we're not doing the best with amounts and how much we should be spending on each coin, I see trades up 200/300% but we're still down overall
 
 ## Future work
 
