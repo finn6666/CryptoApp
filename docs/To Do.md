@@ -1,8 +1,6 @@
 ## Current work
 
-- Remove favorites functionality as im not uisng it
-- checked closed positions are picking up correct data
-- I dont need to see so far back on the Activity log and trade log on the dashboard
+_Nothing in progress — all previous items completed._
 
 ## Future work
 

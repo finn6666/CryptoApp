@@ -695,8 +695,11 @@
                 // Sort by timestamp, newest first
                 allTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-                if (allTrades.length > 0) {
-                    container.innerHTML = allTrades.map(t => {
+                // Limit to most recent 15 trades
+                const displayTrades = allTrades.slice(0, 15);
+
+                if (displayTrades.length > 0) {
+                    container.innerHTML = displayTrades.map(t => {
                         const isBuy = t.side === 'buy';
                         const sideColor = isBuy ? '#48bb78' : '#fc8181';
                         const sideIcon = isBuy ? '🟢' : '🔴';
@@ -1156,7 +1159,7 @@
 
         async function loadActivityLog() {
             try {
-                const response = await fetch('/api/trades/audit-trail?limit=50');
+                const response = await fetch('/api/trades/audit-trail?limit=20');
                 if (!response.ok) throw new Error(`HTTP ${response.status}`);
                 const data = await response.json();
                 const entries = data.entries || [];

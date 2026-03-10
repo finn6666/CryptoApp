@@ -1,5 +1,5 @@
 """
-Coin data, favorites, stats, and refresh routes.
+Coin data, stats, and refresh routes.
 """
 
 import logging
@@ -7,7 +7,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from services.app_state import (
-    analyzer, load_favorites, save_favorites, run_async,
+    analyzer, run_async,
     _build_gem_analysis, _sanitize_ai_text, parse_market_cap, parse_volume,
     fetch_and_add_new_symbol_data,
 )
@@ -193,119 +193,4 @@ def get_market_conditions():
         return jsonify({'error': 'Failed to load market conditions', 'risk_level': 'UNKNOWN', 'risk_score': 50, 'risk_percentage': 50}), 500
 
 
-# ─── Favorites ────────────────────────────────────────────────
 
-@coins_bp.route('/api/favorites')
-def get_favorites():
-    """Get all favorite coins with current data and comprehensive AI analysis."""
-    try:
-        from src.core.live_data_fetcher import fetch_specific_coin
-
-        favorites = load_favorites()
-        favorite_coins = []
-        missing_coins = []
-
-        # Guard: if analyzer hasn't loaded yet, still try to fetch coin data
-        analyzer_coins = state.analyzer.coins if state.analyzer else []
-
-        for symbol in favorites:
-            found = False
-            for coin in analyzer_coins:
-                if coin.symbol.upper() == symbol.upper():
-                    found = True
-                    cd = {
-                        'symbol': coin.symbol, 'name': coin.name,
-                        'price': coin.price, 'price_change_24h': coin.price_change_24h,
-                        'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
-                        'score': min(10, coin.attractiveness_score / 10),
-                        'market_cap': coin.market_cap, 'market_cap_rank': coin.market_cap_rank,
-                        'ai_analysis': None, 'enhanced_score': min(10, coin.attractiveness_score / 10),
-                        'ai_sentiment': None,
-                    }
-                    coin_dict = _prepare_coin_dict(coin)
-                    done = _run_gem_analysis(coin_dict, cd)
-                    if not done:
-                        _run_ml_fallback(coin, cd)
-                    favorite_coins.append(cd)
-                    break
-
-            if not found:
-                logger.info(f"Fetching {symbol} directly from API (not in low-cap list)")
-                try:
-                    raw = fetch_specific_coin(symbol)
-                    if raw:
-                        cd = {
-                            'symbol': raw['symbol'], 'name': raw['name'],
-                            'price': raw['current_price'],
-                            'price_change_24h': raw['price_change_percentage_24h'],
-                            'score': 5.0, 'market_cap': raw['market_cap'],
-                            'market_cap_rank': raw['market_cap_rank'],
-                            'ai_analysis': None, 'enhanced_score': 5.0, 'ai_sentiment': None,
-                        }
-                        coin_dict = {
-                            'symbol': raw['symbol'], 'name': raw['name'],
-                            'price': raw['current_price'] or 0,
-                            'market_cap': raw['market_cap'] or 0,
-                            'volume_24h': raw['total_volume'] or 0,
-                            'price_change_24h': raw['price_change_percentage_24h'] or 0,
-                            'market_cap_rank': raw['market_cap_rank'],
-                        }
-                        _run_gem_analysis(coin_dict, cd)
-                        favorite_coins.append(cd)
-                    else:
-                        missing_coins.append(symbol)
-                except Exception as e:
-                    missing_coins.append(symbol)
-                    logger.error(f"Error fetching {symbol}: {e}")
-
-        # Opt-in agent analysis for favorites
-        run_agents = request.args.get('agents', 'false').lower() == 'true'
-        if run_agents and state.GEM_DETECTOR_AVAILABLE and state.gem_detector and state.gem_detector.multi_agent_enabled:
-            for cd in favorite_coins:
-                matching = next((c for c in analyzer_coins if c.symbol.upper() == cd['symbol'].upper()), None)
-                if matching:
-                    _run_agent_analysis(matching, cd)
-
-        ml_status = state.ML_AVAILABLE and state.ml_pipeline and state.ml_pipeline.model_loaded
-        return jsonify({'favorites': favorite_coins, 'ml_enhanced': ml_status, 'missing_count': len(missing_coins)})
-    except Exception as e:
-        logger.error(f"Error in get_favorites: {e}")
-        return jsonify({'error': 'Failed to load favorites'}), 500
-
-
-@coins_bp.route('/api/favorites/add', methods=['POST'])
-def add_favorite():
-    try:
-        data = request.get_json()
-        symbol = data.get('symbol', '').upper()
-        if not symbol:
-            return jsonify({'success': False, 'error': 'Symbol is required'}), 400
-        favorites = load_favorites()
-        if symbol not in favorites:
-            favorites.append(symbol)
-            if save_favorites(favorites):
-                return jsonify({'success': True, 'message': f'{symbol} added to favorites'})
-            return jsonify({'success': False, 'error': 'Failed to save favorites'}), 500
-        return jsonify({'success': False, 'error': f'{symbol} is already in favorites'}), 400
-    except Exception as e:
-        logger.error(f"Error adding favorite: {e}")
-        return jsonify({'success': False, 'error': 'Failed to add favorite'}), 500
-
-
-@coins_bp.route('/api/favorites/remove', methods=['POST'])
-def remove_favorite():
-    try:
-        data = request.get_json()
-        symbol = data.get('symbol', '').upper()
-        if not symbol:
-            return jsonify({'success': False, 'error': 'Symbol is required'}), 400
-        favorites = load_favorites()
-        if symbol in favorites:
-            favorites.remove(symbol)
-            if save_favorites(favorites):
-                return jsonify({'success': True, 'message': f'{symbol} removed from favorites'})
-            return jsonify({'success': False, 'error': 'Failed to save favorites'}), 500
-        return jsonify({'success': False, 'error': f'{symbol} is not in favorites'}), 400
-    except Exception as e:
-        logger.error(f"Error removing favorite: {e}")
-        return jsonify({'success': False, 'error': 'Failed to remove favorite'}), 500

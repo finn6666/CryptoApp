@@ -1,38 +1,5 @@
 // API and Data Loading Functions
 
-async function loadFavorites(withAgents = false) {
-    try {
-        const agentParam = withAgents ? 'true' : 'false';
-        const response = await fetch(`/api/favorites?agents=${agentParam}`);
-        const data = await response.json();
-
-        if (data.error) {
-            throw new Error(data.error);
-        }
-
-        const favorites = data.favorites || [];
-        userFavorites = favorites.map(fav => fav.symbol);
-        
-        if (favorites.length > 0) {
-            const favoritesHtml = generateFavoritesTable(favorites, data.ml_enhanced);
-            document.getElementById('favoritesContent').innerHTML = favoritesHtml;
-            document.getElementById('favoritesContainer').style.display = 'block';
-        } else {
-            document.getElementById('favoritesContent').innerHTML = 
-                '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No favorites yet — click "Add Favorite" to track coins here.</div>';
-            document.getElementById('favoritesContainer').style.display = 'block';
-        }
-        
-        updateFavoriteButtons();
-        
-    } catch (error) {
-        console.error('Error loading favorites:', error);
-        document.getElementById('favoritesContent').innerHTML = 
-            `<div class="error">❌ Error loading favorites</div>`;
-        document.getElementById('favoritesContainer').style.display = 'block';
-    }
-}
-
 async function loadMarketConditions() {
     try {
         const response = await fetch('/api/market/conditions');
@@ -172,8 +139,6 @@ async function trainMLModel() {
         showStatus(`${data.message} (Trained on ${data.rows_trained || 'multiple'} data points)`, 'success', 8000);
         console.log('Training result:', data.training_result);
         
-        // Reload favorites to show ML predictions
-        await loadFavorites(false);
         
     } catch (error) {
         if (error.name === 'AbortError') {
@@ -191,11 +156,8 @@ async function trainMLModel() {
 async function refreshData() {
     await Promise.all([
         loadOverviewCards(),
-        loadFavorites(false),
         loadMarketConditions()
     ]);
-    // Then load agent analyses in background
-    loadAgentAnalysesInBackground();
 }
 
 // Called after auto-refresh succeeds — reloads entire dashboard
@@ -203,46 +165,8 @@ async function refreshData_afterAutoLoad() {
     console.log('Data became available — reloading entire dashboard...');
     await Promise.all([
         loadOverviewCards(),
-        loadFavorites(false),
         loadMarketConditions()
     ]);
-}
-
-// Background agent analysis loader - fetches favorites with agent analysis and updates cards
-async function loadAgentAnalysesInBackground() {
-    console.log('Loading agent analyses in background...');
-    
-    try {
-        const favsResponse = await fetch('/api/favorites?agents=true');
-        if (favsResponse.ok) {
-            const favsData = await favsResponse.json();
-            if (favsData.favorites) {
-                updateCardsWithAgentData(favsData.favorites, true);
-                console.log('Favorites agent analyses loaded');
-            }
-        }
-    } catch (e) {
-        console.warn('Background favorites agent load failed:', e);
-    }
-}
-
-// Update existing coin cards with agent analysis data without re-rendering everything
-function updateCardsWithAgentData(coins, isFavorites) {
-    coins.forEach((coin, index) => {
-        if (!coin.agent_analysis && !coin.ai_analysis) return;
-        
-        // Find the card by symbol
-        const card = document.querySelector(`.coin-card[data-symbol="${coin.symbol}"]`);
-        if (!card) return;
-        
-        // Find the AI analysis section and update it
-        const coinId = isFavorites ? `fav-${index}` : card.dataset.coinId;
-        const analysisEl = card.querySelector('.unified-ai-analysis');
-        if (analysisEl) {
-            const newHtml = generateUnifiedAIAnalysis(coin, coinId);
-            analysisEl.outerHTML = newHtml;
-        }
-    });
 }
 
 async function forceRefresh() {

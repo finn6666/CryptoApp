@@ -287,17 +287,6 @@ body::before {
     margin-bottom: 16px;
 }
 
-.favorites-container {
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 4px 16px var(--shadow);
-    backdrop-filter: blur(10px);
-    transition: all 0.3s ease;
-    margin-bottom: 16px;
-}
-
 .ml-status-container {
     background: var(--card-bg);
     border: 1px solid var(--border);
@@ -429,21 +418,6 @@ body::before {
 .hidden-gems-container {
     border-color: var(--accent-gold);
     background: linear-gradient(135deg, var(--card-bg), rgba(246, 213, 92, 0.05));
-}
-
-.favorites-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-    margin-top: 16px;
-}
-
-.favorites-content {
-    display: none;
-}
-
-.favorites-content.has-favorites {
-    display: block;
 }
 
 .coins-header {
@@ -672,34 +646,6 @@ body::before {
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.favorite-btn-card {
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.08);
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-size: 14px;
-    padding: 4px;
-    border-radius: 6px;
-    transition: all 0.2s ease;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.favorite-btn-card:hover {
-    background: rgba(255, 215, 0, 0.1);
-    border-color: gold;
-    transform: scale(1.1);
-}
-
-.favorite-btn-card.active {
-    background: rgba(255, 215, 0, 0.2);
-    border-color: gold;
-    color: gold;
 }
 
 .coin-identity {
@@ -1987,35 +1933,6 @@ body::before {
 }
 
 /* ===== UTILITIES ===== */
-.favorite-btn {
-    background: var(--secondary-bg);
-    border: 1px solid var(--border);
-    font-size: 1.1rem;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 10px;
-    transition: all 0.2s ease;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-}
-
-.favorite-btn:hover {
-    background: var(--accent-primary);
-    color: white;
-    transform: scale(1.05);
-    border-color: var(--accent-primary);
-}
-
-.favorite-btn.favorited {
-    background: var(--accent-gold);
-    color: #1a1a1a;
-    border-color: var(--accent-gold);
-}
-
 .error {
     text-align: center;
     padding: 50px;
@@ -2511,7 +2428,6 @@ body::before {
     
     .dashboard-card,
     .coins-container,
-    .favorites-container,
     .ml-status-container,
     .hidden-gems-container { padding: 14px; }
     
@@ -2532,7 +2448,6 @@ body::before {
     
     .dashboard-card,
     .coins-container,
-    .favorites-container,
     .ml-status-container,
     .hidden-gems-container { padding: 12px; }
 }

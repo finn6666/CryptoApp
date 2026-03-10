@@ -208,7 +208,7 @@ class PortfolioTracker:
                 "total_fees_gbp": round(h.get("total_fees_gbp", 0), 2),
                 "trades": h.get("trades", 0),
                 "first_buy_at": h.get("first_buy_at", ""),
-                "closed_at": h.get("closed_at", ""),
+                "closed_at": h.get("closed_at", "") or h.get("last_sell_at", ""),
                 "exchange": h.get("exchange", ""),
                 "won": h.get("realised_pnl_gbp", 0) > 0,
             })

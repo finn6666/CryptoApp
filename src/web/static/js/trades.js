@@ -156,8 +156,8 @@ async function loadExecutedTrades() {
 
         allTrades.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        // Limit to most recent 30 trades
-        const displayTrades = allTrades.slice(0, 30);
+        // Limit to most recent 15 trades
+        const displayTrades = allTrades.slice(0, 15);
 
         if (displayTrades.length > 0) {
             container.innerHTML = displayTrades.map(t => {
@@ -614,7 +614,7 @@ function truncate(str, max) {
 
 async function loadActivityLog() {
     try {
-        const response = await fetch('/api/trades/audit-trail?limit=50');
+        const response = await fetch('/api/trades/audit-trail?limit=20');
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         const entries = data.entries || [];

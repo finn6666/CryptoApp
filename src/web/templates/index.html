@@ -85,9 +85,6 @@
                 <button class="btn" onclick="window.location.href='/health-dashboard'" style="background: linear-gradient(135deg, #48bb78, #38a169); color: #fff; font-weight: 600; padding: 8px 18px; border: none; font-size: 14px;">
                     🖥️ Health
                 </button>
-                <button class="btn" onclick="toggleSymbolSearch()" id="symbolToggleBtn">
-                    Add Favorite
-                </button>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">
                     Refresh
                 </button>
@@ -295,16 +292,6 @@
                 <div id="scanResultMsg" style="display: none; background: rgba(102,126,234,0.1); border: 1px solid var(--accent-primary); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--text-secondary);"></div>
             </div>
 
-            <!-- Favorites -->
-            <div class="favorites-container" id="favoritesContainer">
-                <div class="coins-header">
-                    <h2>Favorites</h2>
-                </div>
-                <div id="favoritesContent">
-                    <div class="loading">🔄 Loading favorites...</div>
-                </div>
-            </div>
-
             <!-- Portfolio Analysis Container -->
             <div class="portfolio-container" id="portfolioContainer" style="display: none;">
                 <div class="coins-header">
@@ -340,27 +327,6 @@
                 </div>
             </div>
 
-            <!-- Symbol Search -->
-            <div class="symbol-search-container" id="symbolSearchContainer" style="display: none;">
-                <div class="coins-header">
-                    <h2>Add to Favorites</h2>
-                    <p>Search for any cryptocurrency and add it to your favorites</p>
-                </div>
-                
-                <div class="symbol-search-form">
-                    <input type="text" 
-                           id="symbolSearchInput" 
-                           class="symbol-search-input" 
-                           placeholder="Enter symbol (e.g., BTC, ETH, MATIC)"
-                           maxlength="20">
-                    <button class="symbol-search-btn" onclick="searchSymbols()" id="searchBtn">
-                        Search
-                    </button>
-                </div>
-                
-                <div id="searchResults"></div>
-            </div>
-
             <!-- Trade Alert -->
             <div class="alert" id="tradeAlert">
                 <span id="tradeAlertMessage"></span>
@@ -370,14 +336,11 @@
     </div>
 
     <!-- Modular JavaScript -->
-    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/coin-display.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/favorites.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/symbol-search.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260308a"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260308a"></script>
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260310a"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260310a"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260310a"></script>
+    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260310a"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260310a"></script>
     <script src="{{ url_for('static', filename='js/trades.js') }}?v=20260308a"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}?v=20260308a"></script>
 </body>

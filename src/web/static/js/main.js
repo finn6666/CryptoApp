@@ -2,27 +2,22 @@
 
 // Global state
 let refreshing = false;
-let userFavorites = [];
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('CryptoApp Dashboard initializing...');
     
     try {
-        // Load overview cards, favorites, market conditions, and trading sections
+        // Load overview cards, market conditions, and trading sections
         await Promise.all([
             loadOverviewCards(),
-            loadFavorites(false),
             loadMarketConditions()
         ]);
 
         // Init trading/portfolio/scanning sections
         initTradingSections();
         
-        console.log('Dashboard loaded (basic data). Loading agent analyses in background...');
-        
-        // Load agent analyses in background (non-blocking)
-        loadAgentAnalysesInBackground();
+        console.log('Dashboard loaded (basic data).');
         
         // Fast retry: if market data isn't loaded yet, retry every 10s for up to 2 min
         startInitialRetry();
