@@ -4,8 +4,8 @@ Monitors holdings for exit triggers and automatically proposes sell trades.
 
 Exit triggers:
 - Profit target hit (configurable, default 75%) — only after min hold period
-- Stop-loss triggered (configurable, default -35%) — always fires for capital protection
-- Trailing stop (locks in gains, default 35% from peak) — only after min hold period
+- Stop-loss triggered (configurable, default -50%) — always fires for capital protection
+- Trailing stop (locks in gains, default 45% from peak) — only after min hold period
 - Agent re-analysis recommends SELL/AVOID
 - Minimum hold period (configurable, default 72h) before profit/trailing triggers fire
 - Agent re-analysis every 12h per held coin to catch fundamental deterioration
@@ -38,8 +38,8 @@ class SellAutomation:
         # Exit thresholds — intentionally wide for crypto volatility.
         # Small-cap coins routinely swing 20-30%/day; tight stops cause premature exits.
         self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "75.0"))
-        self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-35.0"))
-        self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "35.0"))
+        self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-50.0"))
+        self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "45.0"))
         self.enable_agent_recheck = os.getenv("SELL_AGENT_RECHECK", "true").lower() in ("1", "true", "yes")
         # 12h recheck keeps close tabs on held positions while scan frequency is reduced.
         # Each recheck = 6 Gemini calls per held coin, so with ~3 holdings = ~18 calls/12h.

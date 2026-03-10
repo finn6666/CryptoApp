@@ -31,7 +31,7 @@ if not app.secret_key:
     if os.environ.get('FLASK_ENV') == 'production' or not app.debug:
         raise RuntimeError('SECRET_KEY must be set in production — add it to .env')
     app.secret_key = os.urandom(32)
-    logger.warning('No SECRET_KEY set — using random key (sessions won\\'t persist across restarts)')
+    logger.warning("No SECRET_KEY set — using random key (sessions won't persist across restarts)")
 
 app.config.update(
     SESSION_COOKIE_SECURE=not app.debug,

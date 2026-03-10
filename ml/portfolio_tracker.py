@@ -76,8 +76,8 @@ class PortfolioTracker:
         # Update holdings
         sym = symbol.upper()
         if side.lower() == "buy":
-            if sym in self.holdings:
-                # Average in
+            if sym in self.holdings and self.holdings[sym]["quantity"] > 0:
+                # Average into existing open position
                 h = self.holdings[sym]
                 total_qty = h["quantity"] + quantity
                 total_cost = h["total_cost_gbp"] + amount_gbp
