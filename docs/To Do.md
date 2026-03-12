@@ -1,7 +1,5 @@
 ## Current work
 
--
-
 ## Future work
 
 ### Multi-agent teams

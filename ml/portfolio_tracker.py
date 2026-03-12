@@ -80,10 +80,13 @@ class PortfolioTracker:
                 # Average into existing open position
                 h = self.holdings[sym]
                 total_qty = h["quantity"] + quantity
-                total_cost = h["total_cost_gbp"] + amount_gbp
+                # Use current position cost (not total_cost_gbp which includes sold coins)
+                h["avg_entry_price"] = (
+                    (h["quantity"] * h["avg_entry_price"] + amount_gbp) / total_qty
+                    if total_qty > 0 else 0
+                )
                 h["quantity"] = total_qty
-                h["total_cost_gbp"] = total_cost
-                h["avg_entry_price"] = total_cost / total_qty if total_qty > 0 else 0
+                h["total_cost_gbp"] += amount_gbp
                 h["last_buy_price"] = price
                 h["last_buy_at"] = trade["timestamp"]
                 h["trades"] += 1
@@ -144,14 +147,15 @@ class PortfolioTracker:
 
             if live_prices and sym in live_prices:
                 current_price = live_prices[sym]
+                avg_entry = h.get("avg_entry_price", 0)
                 holding["current_price"] = current_price
                 holding["current_value_gbp"] = current_price * h["quantity"]
                 holding["unrealised_pnl_gbp"] = (
-                    holding["current_value_gbp"] - h.get("total_cost_gbp", 0)
+                    (current_price - avg_entry) * h["quantity"]
                 )
                 holding["unrealised_pnl_pct"] = (
-                    (holding["unrealised_pnl_gbp"] / h["total_cost_gbp"] * 100)
-                    if h.get("total_cost_gbp", 0) > 0
+                    ((current_price - avg_entry) / avg_entry * 100)
+                    if avg_entry > 0
                     else 0
                 )
 
