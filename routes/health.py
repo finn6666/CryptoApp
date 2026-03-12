@@ -149,7 +149,6 @@ def api_metrics():
 
 
 @health_bp.route('/api/debug/coins')
-@require_trading_auth
 def debug_coins():
     """Debug endpoint to see what coins are currently loaded"""
     try:

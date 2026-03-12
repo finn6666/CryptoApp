@@ -99,7 +99,6 @@ def initialize_ml_endpoint():
 
 
 @ml_bp.route('/api/gemini/quota')
-@require_trading_auth
 def check_gemini_quota():
     try:
         api_key = os.getenv('GOOGLE_API_KEY')

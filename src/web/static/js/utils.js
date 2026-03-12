@@ -2,13 +2,8 @@
 
 // ─── Auth ──────────────────────────────────────────────────
 
-/** Return stored API key, prompting once per session if not set. */
+/** Return stored API key (no prompt — key only needed for agent trade proposals). */
 function getApiKey() {
-    let key = sessionStorage.getItem('tradingApiKey');
-    if (!key) {
-        key = prompt('Enter your trading API key:');
-        if (key) sessionStorage.setItem('tradingApiKey', key.trim());
-    }
     return sessionStorage.getItem('tradingApiKey');
 }
 
