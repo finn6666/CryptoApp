@@ -1,7 +1,6 @@
 ## Current work
 
-- ~~Enable HTTPS on Pi~~ — Done: Cloudflare origin cert + nginx SSL on `finncryptoapp.co.uk`. HTTP→HTTPS redirect, HSTS header, cert valid until 2041.
-
+- 
 ## Future work
 
 ### Crypto Twitter sentiment
