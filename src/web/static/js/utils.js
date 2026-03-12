@@ -1,5 +1,27 @@
 // Utility Functions
 
+// ─── Auth ──────────────────────────────────────────────────
+
+/** Return stored API key without prompting. */
+function getApiKey() {
+    return sessionStorage.getItem('tradingApiKey');
+}
+
+/** Headers for authenticated GET requests. Returns {} if no key stored. */
+function authHeaders() {
+    const key = getApiKey();
+    if (!key) return {};
+    return { 'Authorization': `Bearer ${key}` };
+}
+
+/** Headers for authenticated POST requests (includes Content-Type). Returns {} if no key stored. */
+function authHeadersJson() {
+    const key = getApiKey();
+    if (!key) return {};
+    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
+}
+
+
 function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
     const lastUpdatedEl = document.getElementById('lastUpdated');
     const nextRefreshEl = document.getElementById('nextRefresh');

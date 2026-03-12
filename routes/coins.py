@@ -6,6 +6,8 @@ import logging
 from datetime import datetime
 from flask import Blueprint, jsonify, request
 
+from extensions import limiter
+from routes.trading import require_trading_auth
 from services.app_state import (
     analyzer, run_async,
     _build_gem_analysis, _sanitize_ai_text, parse_market_cap, parse_volume,
@@ -122,6 +124,8 @@ def _run_agent_analysis(coin, coin_data_out):
 # ─── Routes ───────────────────────────────────────────────────
 
 @coins_bp.route('/api/refresh', methods=['POST'])
+@limiter.limit('5 per hour')
+@require_trading_auth
 def force_refresh():
     import threading
     from src.core.live_data_fetcher import fetch_and_update_data

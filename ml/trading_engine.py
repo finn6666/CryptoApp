@@ -1029,7 +1029,7 @@ class TradingEngine:
     # ─── Persistence ──────────────────────────────────────────
 
     def _save_state(self):
-        """Save engine state to disk."""
+        """Save engine state to disk (atomic write to prevent corruption)."""
         state = {
             "proposals": {k: asdict(v) for k, v in self.proposals.items()},
             "trade_history": self.trade_history,
@@ -1037,11 +1037,15 @@ class TradingEngine:
             "kill_switch": self.kill_switch,
         }
         state_file = self.data_dir / "trading_state.json"
+        tmp = state_file.with_suffix(".tmp")
         try:
-            with open(state_file, "w") as f:
+            with open(tmp, "w") as f:
                 json.dump(state, f, indent=2, default=str)
+            os.replace(tmp, state_file)
         except Exception as e:
             logger.error(f"Failed to save trading state: {e}")
+            if tmp.exists():
+                tmp.unlink()
 
     def _load_state(self):
         """Load engine state from disk."""

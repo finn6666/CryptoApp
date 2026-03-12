@@ -5,6 +5,8 @@ Symbol search and management routes.
 import logging
 from flask import Blueprint, jsonify, request
 
+from extensions import limiter
+from routes.trading import require_trading_auth
 from services.app_state import run_async, fetch_and_add_new_symbol_data
 import services.app_state as state
 
@@ -46,6 +48,7 @@ def search_symbols():
 
 
 @symbols_bp.route('/api/symbols/validate', methods=['POST'])
+@require_trading_auth
 def validate_symbol():
     if not state.SYMBOLS_AVAILABLE or not state.data_pipeline:
         return jsonify({'success': False, 'error': 'Symbol validation service not available'}), 503
@@ -66,6 +69,8 @@ def validate_symbol():
 
 
 @symbols_bp.route('/api/symbols/add', methods=['POST'])
+@limiter.limit('30 per hour')
+@require_trading_auth
 def add_symbol():
     if not state.SYMBOLS_AVAILABLE or not state.data_pipeline:
         return jsonify({'success': False, 'error': 'Symbol management service not available'}), 503

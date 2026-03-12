@@ -38,8 +38,9 @@ class ScanLoop:
         # Interval-based scanning: run every N hours (0 = once-daily at scan_time only)
         # 12h balances Gemini API cost (~$0.84/day) with discovery frequency
         self.scan_interval_hours = float(os.getenv("SCAN_INTERVAL_HOURS", "12"))
-        self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "10"))
-        self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "5.0"))
+        self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "25"))
+        self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "6.0"))
+        self.quick_screen_min_confidence = int(os.getenv("SCAN_QUICK_SCREEN_MIN", "60"))
         self.scan_running = False
         self._scheduler_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
@@ -59,6 +60,7 @@ class ScanLoop:
         logger.info(
             f"Scan loop initialised — schedule={interval_desc}, "
             f"max_coins={self.max_coins_per_scan}, "
+            f"quick_screen_min={self.quick_screen_min_confidence}%, "
             f"max_proposals={self.max_proposals_per_scan}"
         )
 
@@ -93,6 +95,8 @@ class ScanLoop:
             "coins_refreshed": 0,
             "coins_tradeable": 0,
             "coins_analysed": 0,
+            "coins_quick_screened": 0,
+            "coins_passed_screen": 0,
             "proposals_made": 0,
             "proposals_skipped": 0,
             "errors": [],
@@ -120,13 +124,23 @@ class ScanLoop:
             # ── Step 3: Select top candidates ──
             logger.info(f"[Scan {scan_id}] Step 3: Selecting top {self.max_coins_per_scan} candidates...")
             candidates = self._select_candidates(tradeable_coins)
-            scan_result["coins_analysed"] = len(candidates)
 
-            # ── Step 4: Analyse + propose ──
-            logger.info(f"[Scan {scan_id}] Step 4: Running analysis pipeline on {len(candidates)} coins...")
+            # ── Step 4: Quick screen (Tier 1 — 1 Gemini call each) ──
+            logger.info(f"[Scan {scan_id}] Step 4: Quick-screening {len(candidates)} candidates...")
+            screened_candidates = self._quick_screen_candidates(candidates, scan_id)
+            scan_result["coins_quick_screened"] = len(candidates)
+            scan_result["coins_passed_screen"] = len(screened_candidates)
+            scan_result["coins_analysed"] = len(screened_candidates)
+            logger.info(
+                f"[Scan {scan_id}] Quick screen: {len(screened_candidates)}/{len(candidates)} "
+                f"passed (saved {len(candidates) - len(screened_candidates)} full analyses)"
+            )
+
+            # ── Step 5: Full multi-agent analysis (Tier 2 — 6 Gemini calls each) ──
+            logger.info(f"[Scan {scan_id}] Step 5: Full analysis on {len(screened_candidates)} coins...")
             proposals_made = 0
 
-            for coin_data in candidates:
+            for coin_data in screened_candidates:
                 if proposals_made >= self.max_proposals_per_scan:
                     logger.info(f"[Scan {scan_id}] Hit max proposals ({self.max_proposals_per_scan})")
                     break
@@ -194,7 +208,7 @@ class ScanLoop:
             scan_result["success"] = True
             self._last_scan_time = datetime.utcnow()
 
-            # ── Step 5: Sell-side automation ──
+            # ── Step 6: Sell-side automation ──
             try:
                 from ml.sell_automation import get_sell_automation
                 sell_auto = get_sell_automation()
@@ -231,13 +245,16 @@ class ScanLoop:
             self._save_scan_log(scan_result)
             self._audit("scan_complete", {
                 "scan_id": scan_id,
+                "coins_screened": scan_result.get("coins_quick_screened", 0),
+                "coins_analysed": scan_result["coins_analysed"],
                 "proposals": scan_result["proposals_made"],
                 "errors": len(scan_result["errors"]),
             })
 
         logger.info(
             f"[Scan {scan_id}] Complete — "
-            f"{scan_result['coins_analysed']} analysed, "
+            f"{scan_result.get('coins_quick_screened', 0)} screened, "
+            f"{scan_result['coins_analysed']} fully analysed, "
             f"{scan_result['proposals_made']} proposals, "
             f"{len(scan_result['errors'])} errors"
         )
@@ -346,6 +363,67 @@ class ScanLoop:
 
         # Cap to max
         return candidates[: self.max_coins_per_scan]
+
+    def _quick_screen_candidates(
+        self, candidates: List[Dict], scan_id: str
+    ) -> List[Dict]:
+        """
+        Tier 1: Run a single-call quick LLM screen on each candidate.
+        Only coins that pass (confidence >= threshold) proceed to the full
+        multi-agent pipeline, saving ~5 Gemini calls per filtered coin.
+        """
+        import services.app_state as state
+
+        if not state.official_adk_available:
+            # If ADK isn't available, skip screening — let gem detector handle it
+            return candidates
+
+        # Build trade history context once (shared across all screens)
+        try:
+            from ml.agents.official.orchestrator import _build_trade_history_context
+            trade_ctx = _build_trade_history_context()
+        except Exception:
+            trade_ctx = ""
+
+        passed = []
+
+        for coin in candidates:
+            symbol = coin["symbol"]
+
+            try:
+                from ml.agents.official.quick_screen import quick_screen_coin
+                result = state.run_async(
+                    quick_screen_coin(symbol, coin, trade_ctx)
+                )
+
+                did_pass = result.get("pass", True)
+                confidence = result.get("confidence", 0)
+                one_liner = result.get("one_liner", "")
+
+                if did_pass and confidence >= self.quick_screen_min_confidence:
+                    logger.info(
+                        f"[Scan {scan_id}] {symbol}: PASS ({confidence}%) — {one_liner}"
+                    )
+                    coin["screen_confidence"] = confidence
+                    coin["screen_note"] = one_liner
+                    passed.append(coin)
+                else:
+                    logger.info(
+                        f"[Scan {scan_id}] {symbol}: SKIP ({confidence}%) — {one_liner}"
+                    )
+                    self._audit("quick_screen_skip", {
+                        "scan_id": scan_id,
+                        "symbol": symbol,
+                        "confidence": confidence,
+                        "reason": one_liner,
+                    })
+
+            except Exception as e:
+                # On failure, pass through to avoid missing opportunities
+                logger.warning(f"[Scan {scan_id}] Quick screen error for {symbol}: {e} — passing")
+                passed.append(coin)
+
+        return passed
 
     def _analyse_and_evaluate(self, coin_data: Dict) -> Dict[str, Any]:
         """Step 4: Run ADK analysis + trading agent evaluation on a single coin."""

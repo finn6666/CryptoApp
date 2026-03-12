@@ -9,6 +9,7 @@ from .risk_agent import risk_agent
 from .sentiment_agent import sentiment_agent
 from .trading_agent import trading_agent
 from .orchestrator import crypto_orchestrator, analyze_crypto
+from .quick_screen import quick_screen_coin
 
 __all__ = [
     'research_agent',
@@ -18,4 +19,5 @@ __all__ = [
     'trading_agent',
     'crypto_orchestrator',
     'analyze_crypto',
+    'quick_screen_coin',
 ]

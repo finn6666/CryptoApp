@@ -347,16 +347,22 @@ class SellAutomation:
 
     def _save_state(self):
         import json
+        import os
         try:
             SELL_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
             state = {
                 "peak_prices": self._peak_prices,
                 "last_recheck": self._last_recheck,
             }
-            with open(SELL_STATE_FILE, "w") as f:
+            tmp = SELL_STATE_FILE.with_suffix(".tmp")
+            with open(tmp, "w") as f:
                 json.dump(state, f, indent=2)
+            os.replace(tmp, SELL_STATE_FILE)
         except Exception as e:
             logger.error(f"Failed to save sell state: {e}")
+            tmp = SELL_STATE_FILE.with_suffix(".tmp")
+            if tmp.exists():
+                tmp.unlink()
 
     def _load_state(self):
         import json

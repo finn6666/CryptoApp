@@ -1,28 +1,11 @@
 // Trade Journal & Live Trading Functions
 // Extracted from trades.html inline script for merged dashboard
 
-// ─── Auth Helper ────────────────────────────────────
-
-function getApiKey() {
-    let key = sessionStorage.getItem('tradingApiKey');
-    if (!key) {
-        key = prompt('Enter first 6 characters of your API key:');
-        if (key) sessionStorage.setItem('tradingApiKey', key);
-    }
-    return key;
-}
-
-function authHeaders() {
-    const key = getApiKey();
-    if (!key) return null;
-    return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` };
-}
-
 // ─── Live Trading Functions ──────────────────────────
 
 async function loadTradingStatus() {
     try {
-        const response = await fetch('/api/trades/status');
+        const response = await fetch('/api/trades/status', { headers: authHeaders() });
         const data = await response.json();
 
         document.getElementById('budgetRemaining').textContent = `£${data.remaining_today_gbp.toFixed(2)}`;
@@ -58,7 +41,7 @@ async function loadTradingStatus() {
 
 async function loadPendingProposals() {
     try {
-        const response = await fetch('/api/trades/pending');
+        const response = await fetch('/api/trades/pending', { headers: authHeaders() });
         const data = await response.json();
         const section = document.getElementById('pendingSection');
         const container = document.getElementById('pendingProposals');
@@ -103,18 +86,32 @@ function formatPrice(price) {
 
 async function loadExecutedTrades() {
     try {
+        const hdrs = { headers: authHeaders() };
         const [execRes, histRes] = await Promise.all([
-            fetch('/api/trades/history'),
-            fetch('/api/portfolio/history?limit=100')
+            fetch('/api/trades/history', hdrs),
+            fetch('/api/portfolio/history?limit=100', hdrs)
         ]);
         const execData = await execRes.json();
         const histData = await histRes.json();
         const container = document.getElementById('tradeLogUnified');
 
         const allTrades = [];
+        const seen = new Set();
 
+        // Dedup key: prefer proposal_id (UUID), then order_id, then symbol+side+normalised timestamp
+        function dedupeKey(t) {
+            if (t.proposal_id) return `pid:${t.proposal_id}`;
+            if (t.order_id)    return `oid:${t.order_id}`;
+            // Normalise timestamp to seconds-precision UTC for fallback comparison
+            const ts = new Date(t.timestamp).toISOString().slice(0, 19);
+            return `${t.symbol}|${t.side}|${ts}`;
+        }
+
+        // Engine trades first (they lack realised_pnl_gbp)
         if (execData.trades) {
             execData.trades.forEach(t => {
+                const key = dedupeKey(t);
+                seen.add(key);
                 allTrades.push({
                     symbol: t.symbol,
                     side: t.side,
@@ -131,26 +128,34 @@ async function loadExecutedTrades() {
             });
         }
 
+        // Portfolio trades — only add if not already seen
         if (histData.trades) {
             histData.trades.forEach(t => {
-                const isDupe = allTrades.some(
-                    e => e.symbol === t.symbol && e.timestamp === t.timestamp && e.side === t.side
-                );
-                if (!isDupe) {
-                    allTrades.push({
-                        symbol: t.symbol,
-                        side: t.side,
-                        quantity: t.quantity || 0,
-                        price: t.price || 0,
-                        amount_gbp: t.amount_gbp || 0,
-                        fee_gbp: t.fee_gbp || 0,
-                        exchange: t.exchange || '—',
-                        timestamp: t.timestamp,
-                        reasoning: t.reasoning || '',
-                        realised_pnl_gbp: t.realised_pnl_gbp,
-                        source: 'portfolio',
-                    });
+                const key = dedupeKey(t);
+                if (seen.has(key)) {
+                    // Merge realised P&L from portfolio into the existing engine entry
+                    if (t.realised_pnl_gbp !== undefined && t.realised_pnl_gbp !== null) {
+                        const existing = allTrades.find(e => dedupeKey(e) === key);
+                        if (existing && existing.realised_pnl_gbp == null) {
+                            existing.realised_pnl_gbp = t.realised_pnl_gbp;
+                        }
+                    }
+                    return;
                 }
+                seen.add(key);
+                allTrades.push({
+                    symbol: t.symbol,
+                    side: t.side,
+                    quantity: t.quantity || 0,
+                    price: t.price || 0,
+                    amount_gbp: t.amount_gbp || 0,
+                    fee_gbp: t.fee_gbp || 0,
+                    exchange: t.exchange || '—',
+                    timestamp: t.timestamp,
+                    reasoning: t.reasoning || '',
+                    realised_pnl_gbp: t.realised_pnl_gbp,
+                    source: 'portfolio',
+                });
             });
         }
 
@@ -197,7 +202,8 @@ async function approveTrade(proposalId) {
     if (!confirm('Approve and execute this trade?')) return;
     try {
         const response = await fetch(`/api/trades/approve/${proposalId}`, {
-            method: 'POST'
+            method: 'POST',
+            headers: authHeadersJson(),
         });
         const data = await response.json();
         if (data.success) {
@@ -220,7 +226,8 @@ async function rejectTrade(proposalId) {
     if (!confirm('Reject this trade proposal?')) return;
     try {
         const response = await fetch(`/api/trades/reject/${proposalId}`, {
-            method: 'POST'
+            method: 'POST',
+            headers: authHeadersJson(),
         });
         const data = await response.json();
         if (data.success) {
@@ -241,12 +248,10 @@ async function toggleKillSwitch() {
 
     if (!isHalted && !confirm('⛔ This will HALT all trading and reject pending proposals. Continue?')) return;
 
-    const hdrs = authHeaders();
-    if (!hdrs) return;
     try {
         await fetch('/api/trades/kill-switch', {
             method: 'POST',
-            headers: hdrs,
+            headers: authHeadersJson(),
             body: JSON.stringify({action})
         });
         showTradeAlert(isHalted ? 'Trading resumed' : 'Trading HALTED — all pending proposals rejected', isHalted ? 'success' : 'error');
@@ -261,7 +266,7 @@ async function toggleKillSwitch() {
 
 async function loadScanStatusDetail() {
     try {
-        const response = await fetch('/api/trades/scan-status');
+        const response = await fetch('/api/trades/scan-status', { headers: authHeaders() });
         const data = await response.json();
         const status = data.status || {};
 
@@ -318,12 +323,9 @@ async function triggerScan() {
     const resultEl = document.getElementById('scanResultMsg');
 
     try {
-        const hdrs = authHeaders();
-        if (!hdrs) { btn.disabled = false; btn.textContent = '🔍 Scan Now'; return; }
-
         const response = await fetch('/api/trades/scan-now', {
             method: 'POST',
-            headers: hdrs
+            headers: authHeadersJson(),
         });
         const data = await response.json();
 
@@ -368,7 +370,7 @@ async function refreshTradesPortfolio() {
 
 async function loadTradesPortfolio() {
     try {
-        const response = await fetch('/api/portfolio/holdings');
+        const response = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
         const data = await response.json();
         const holdings = data.holdings || [];
         const summary = data.summary || {};
@@ -556,7 +558,7 @@ async function loadRlInsights() {
 
 async function loadClosedPositions() {
     try {
-        const response = await fetch('/api/portfolio/closed');
+        const response = await fetch('/api/portfolio/closed', { headers: authHeaders() });
         const data = await response.json();
         const positions = data.positions || [];
         const container = document.getElementById('closedPositions');
@@ -614,7 +616,7 @@ function truncate(str, max) {
 
 async function loadActivityLog() {
     try {
-        const response = await fetch('/api/trades/audit-trail?limit=20');
+        const response = await fetch('/api/trades/audit-trail?limit=20', { headers: authHeaders() });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         const entries = data.entries || [];
@@ -671,7 +673,7 @@ async function loadActivityLog() {
 
 async function loadTradeStats() {
     try {
-        const response = await fetch('/api/portfolio/performance');
+        const response = await fetch('/api/portfolio/performance', { headers: authHeaders() });
         const data = await response.json();
 
         document.getElementById('totalTrades').textContent = data.total_trades || 0;

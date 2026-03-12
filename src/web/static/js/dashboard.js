@@ -13,7 +13,7 @@ async function loadOverviewCards() {
 // ─── Portfolio Summary ───────────────────────────────────────
 async function loadPortfolioCard() {
     try {
-        const res = await fetch('/api/portfolio/holdings');
+        const res = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
@@ -56,7 +56,7 @@ async function loadPortfolioCard() {
 // ─── Trading Engine ──────────────────────────────────────────
 async function loadTradingCard() {
     try {
-        const res = await fetch('/api/trades/status');
+        const res = await fetch('/api/trades/status', { headers: authHeaders() });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
@@ -100,7 +100,7 @@ async function loadTradingCard() {
 // ─── Scan Loop ───────────────────────────────────────────────
 async function loadScanCard() {
     try {
-        const res = await fetch('/api/trades/scan-status');
+        const res = await fetch('/api/trades/scan-status', { headers: authHeaders() });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
@@ -149,7 +149,7 @@ async function loadScanCard() {
 // ─── Market Monitor ──────────────────────────────────────────
 async function loadMonitorCard() {
     try {
-        const res = await fetch('/api/monitor/status');
+        const res = await fetch('/api/monitor/status', { headers: authHeaders() });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 

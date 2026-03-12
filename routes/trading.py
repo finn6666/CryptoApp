@@ -54,6 +54,7 @@ def require_trading_auth(f):
 # ========================================
 
 @trading_bp.route('/api/trades/status')
+@require_trading_auth
 def trading_status():
     """Get trading engine status — budget, active trades, kill switch state"""
     try:
@@ -66,6 +67,7 @@ def trading_status():
 
 
 @trading_bp.route('/api/trades/pending')
+@require_trading_auth
 def pending_proposals():
     """Get all pending trade proposals awaiting approval"""
     try:
@@ -78,6 +80,7 @@ def pending_proposals():
 
 
 @trading_bp.route('/api/trades/history')
+@require_trading_auth
 def trade_history():
     """Get executed trade history"""
     try:
@@ -510,6 +513,7 @@ def scan_now():
 
 
 @trading_bp.route('/api/trades/scan-status')
+@require_trading_auth
 def scan_status():
     """Get scan loop status and recent scan results."""
     try:
@@ -525,6 +529,7 @@ def scan_status():
 
 
 @trading_bp.route('/api/trades/audit-trail')
+@require_trading_auth
 def audit_trail():
     """Get recent audit trail entries."""
     try:
@@ -542,6 +547,7 @@ def audit_trail():
 # ========================================
 
 @trading_bp.route('/api/monitor/status')
+@require_trading_auth
 def monitor_status():
     """Get market monitor status — intervals, stats, alerts."""
     try:
@@ -554,6 +560,7 @@ def monitor_status():
 
 
 @trading_bp.route('/api/monitor/alerts')
+@require_trading_auth
 def monitor_alerts():
     """Get recent market monitor alerts."""
     try:
@@ -583,6 +590,7 @@ def monitor_price_history(symbol):
 # ========================================
 
 @trading_bp.route('/api/portfolio/holdings')
+@require_trading_auth
 def portfolio_holdings():
     """Get current portfolio holdings with live P&L."""
     try:
@@ -649,6 +657,7 @@ def portfolio_holdings():
 
 
 @trading_bp.route('/api/portfolio/history')
+@require_trading_auth
 def portfolio_history():
     """Get full trade log with outcomes."""
     try:
@@ -662,6 +671,7 @@ def portfolio_history():
 
 
 @trading_bp.route('/api/portfolio/sell-signals')
+@require_trading_auth
 def portfolio_sell_signals():
     """Check current holdings for sell signals (profit targets / stop losses)."""
     try:
@@ -683,6 +693,7 @@ def portfolio_sell_signals():
 
 
 @trading_bp.route('/api/portfolio/performance')
+@require_trading_auth
 def portfolio_performance():
     """Aggregated performance metrics — win rate, average return, best/worst trades."""
     try:
@@ -695,6 +706,7 @@ def portfolio_performance():
 
 
 @trading_bp.route('/api/portfolio/closed')
+@require_trading_auth
 def portfolio_closed():
     """Get all fully-sold (closed) positions with outcomes."""
     try:
@@ -729,6 +741,7 @@ def exchange_status():
 
 
 @trading_bp.route('/api/exchanges/balance')
+@require_trading_auth
 def exchange_balance():
     """Get free cash balances across all connected exchanges."""
     try:
@@ -879,6 +892,7 @@ def trades_page():
 # ─── Sell Automation ──────────────────────────────────────────
 
 @trading_bp.route('/api/trades/sell-automation/status')
+@require_trading_auth
 def sell_automation_status():
     """Get sell automation status and configuration."""
     try:

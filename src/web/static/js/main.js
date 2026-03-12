@@ -6,6 +6,13 @@ let refreshing = false;
 // Initialize application
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('CryptoApp Dashboard initializing...');
+
+    // Prompt for API key once per session so authenticated endpoints work.
+    if (!sessionStorage.getItem('tradingApiKey')) {
+        const key = prompt('Enter your API key to access the dashboard:');
+        if (key) sessionStorage.setItem('tradingApiKey', key.trim());
+    }
+
     
     try {
         // Load overview cards, market conditions, and trading sections

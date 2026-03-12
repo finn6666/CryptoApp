@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, request
 from services.app_state import run_async, parse_market_cap, parse_volume, project_root
 import services.app_state as state
 from routes.trading import require_trading_auth
+from extensions import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,8 @@ def get_ml_prediction(symbol):
 
 
 @ml_bp.route('/api/ml/train', methods=['POST'])
+@limiter.limit('2 per hour')
+@require_trading_auth
 def train_ml_model():
     try:
         logger.info("🎯 ML Training requested")
@@ -89,12 +92,14 @@ def train_ml_model():
 
 
 @ml_bp.route('/api/ml/initialize', methods=['POST'])
+@require_trading_auth
 def initialize_ml_endpoint():
     success = state.initialize_ml()
     return jsonify({'success': success, 'message': 'ML components initialized successfully' if success else 'Failed to initialize ML components', 'ml_available': state.ML_AVAILABLE})
 
 
 @ml_bp.route('/api/gemini/quota')
+@require_trading_auth
 def check_gemini_quota():
     try:
         api_key = os.getenv('GOOGLE_API_KEY')
@@ -230,6 +235,8 @@ def scan_for_hidden_gems():
 
 
 @ml_bp.route('/api/gems/train', methods=['POST'])
+@limiter.limit('2 per hour')
+@require_trading_auth
 def train_gem_detector():
     if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
         return jsonify({'error': 'Hidden Gem Detector not available'}), 503

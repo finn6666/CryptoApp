@@ -13,7 +13,7 @@ async function loadMarketConditions() {
         // If data isn't loaded yet, auto-trigger a refresh
         if (data.opportunity_level === 'UNKNOWN') {
             try {
-                const refreshRes = await fetch('/api/refresh', { method: 'POST' });
+                const refreshRes = await fetch('/api/refresh', { method: 'POST', headers: authHeadersJson() });
                 const refreshData = await refreshRes.json();
                 if (refreshData.success) {
                     setTimeout(() => refreshData_afterAutoLoad(), 2000);
@@ -126,6 +126,7 @@ async function trainMLModel() {
         
         const response = await fetch('/api/ml/train', { 
             method: 'POST',
+            headers: authHeadersJson(),
             signal: controller.signal
         });
         clearTimeout(timeoutId);
@@ -180,7 +181,7 @@ async function forceRefresh() {
     btn.disabled = true;
     
     try {
-        const response = await fetch('/api/refresh', { method: 'POST' });
+        const response = await fetch('/api/refresh', { method: 'POST', headers: authHeadersJson() });
         const data = await response.json();
         
         if (data.success) {

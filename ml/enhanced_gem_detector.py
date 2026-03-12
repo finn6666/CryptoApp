@@ -171,7 +171,21 @@ class HiddenGemDetector:
         features['risk_reward_ratio'] = self._calculate_risk_reward_ratio(coin_data)
         features['downside_protection'] = self._assess_downside_protection(coin_data)
         features['upside_potential'] = self._assess_upside_potential(coin_data)
-        
+
+        # Smart-money accumulation signals — derived from available price/volume data
+        # High volume + low price movement = possible quiet accumulation by informed buyers
+        price_abs = abs(features['price_change_24h'])
+        vol_ratio = features['volume_price_ratio']
+        features['whale_accumulation_score'] = float(
+            min(vol_ratio / 0.1, 1.0) * max(0.0, 1.0 - price_abs / 20.0)
+        )
+        features['quiet_accumulation_signal'] = float(
+            min(vol_ratio / 0.08, 1.0) * max(0.0, 1.0 - price_abs / 15.0)
+        )
+        # Off-peak anomaly: volume spike without matching price discovery (ratio vs breakout)
+        bp = features['breakout_potential']
+        features['off_peak_anomaly'] = float(min(vol_ratio * 2, 1.0) * max(0.0, 1.0 - bp))
+
         return features
     
     def _calculate_volume_price_ratio(self, coin_data: Dict) -> float:
@@ -197,7 +211,7 @@ class HiddenGemDetector:
                 # Normalize to 0-1 range, with 0.1+ being high activity
                 return min(ratio * 10, 1.0)
             return 0
-        except:
+        except Exception:
             return 0
     
     def _detect_volume_surge(self, coin_data: Dict) -> float:
@@ -214,7 +228,7 @@ class HiddenGemDetector:
             if rank > 100 and volume > 1000000:  # Low cap with decent volume
                 return min((volume / 1000000) / 10, 1.0)
             return 0
-        except:
+        except Exception:
             return 0
     
     def _estimate_whale_risk(self, coin_data: Dict) -> float:
@@ -230,7 +244,7 @@ class HiddenGemDetector:
                 return 0.4  # Lower whale risk
             else:
                 return 0.2  # Established coins have lower whale risk
-        except:
+        except Exception:
             return 0.5
     
     def _calculate_exchange_diversity(self, coin_data: Dict) -> float:
@@ -246,7 +260,7 @@ class HiddenGemDetector:
                 return 0.4  # Few exchanges
             else:
                 return 0.2  # Limited exchanges
-        except:
+        except Exception:
             return 0.3
     
     def _calculate_liquidity_score(self, coin_data: Dict) -> float:
@@ -262,7 +276,7 @@ class HiddenGemDetector:
             if volume > 0:
                 return min(np.log10(volume + 1) / 8, 1.0)  # Normalize to 0-1
             return 0
-        except:
+        except Exception:
             return 0
     
     def _detect_price_discovery(self, coin_data: Dict) -> float:
@@ -277,7 +291,7 @@ class HiddenGemDetector:
             elif rank > 100 and 5 < price_change < 25:
                 return 0.8
             return 0.3
-        except:
+        except Exception:
             return 0.3
     
     def _detect_accumulation(self, coin_data: Dict) -> float:
@@ -292,7 +306,7 @@ class HiddenGemDetector:
             elif volume_ratio > 0.05 and abs(price_change) < 3:
                 return 0.6
             return 0.2
-        except:
+        except Exception:
             return 0.2
     
     def _calculate_breakout_potential(self, coin_data: Dict) -> float:
@@ -307,7 +321,7 @@ class HiddenGemDetector:
             elif rank > 100 and volume_ratio > 0.05:
                 return 0.6
             return 0.3
-        except:
+        except Exception:
             return 0.3
     
     def _calculate_volatility_score(self, coin_data: Dict) -> float:
@@ -322,7 +336,7 @@ class HiddenGemDetector:
                 return 0.4  # Too stable
             else:
                 return 0.3  # Too volatile
-        except:
+        except Exception:
             return 0.5
     
     def _calculate_stability_score(self, coin_data: Dict) -> float:
@@ -330,7 +344,7 @@ class HiddenGemDetector:
         try:
             price_change = abs(coin_data.get('price_change_24h', 0))
             return max(0, 1 - (price_change / 100))  # Lower volatility = higher stability
-        except:
+        except Exception:
             return 0.5
     
     def _calculate_momentum_score(self, coin_data: Dict) -> float:
@@ -340,7 +354,7 @@ class HiddenGemDetector:
             if price_change > 0:
                 return min(price_change / 50, 1.0)  # Normalize positive changes
             return 0
-        except:
+        except Exception:
             return 0
     
     def _assess_technology_innovation(self, coin_data: Dict) -> float:
@@ -360,7 +374,7 @@ class HiddenGemDetector:
                     score += 0.1
             
             return min(score, 1.0)
-        except:
+        except Exception:
             return 0.5
     
     def _assess_token_utility(self, coin_data: Dict) -> float:
@@ -378,7 +392,7 @@ class HiddenGemDetector:
                 return 0.7  # High activity suggests utility
             else:
                 return 0.4  # Speculative
-        except:
+        except Exception:
             return 0.5
     
     def _assess_market_narrative(self, coin_data: Dict) -> float:
@@ -395,7 +409,7 @@ class HiddenGemDetector:
                 return 0.8  # Emerging narrative
             else:
                 return 0.4
-        except:
+        except Exception:
             return 0.5
     
     def _estimate_community_growth(self, coin_data: Dict) -> float:
@@ -411,7 +425,7 @@ class HiddenGemDetector:
                 return 0.6
             else:
                 return 0.4
-        except:
+        except Exception:
             return 0.5
     
     def _estimate_dev_activity(self, coin_data: Dict) -> float:
@@ -426,7 +440,7 @@ class HiddenGemDetector:
                 return 0.6
             else:
                 return 0.4
-        except:
+        except Exception:
             return 0.5
     
     def _calculate_social_momentum(self, coin_data: Dict) -> float:
@@ -443,7 +457,7 @@ class HiddenGemDetector:
                 return 0.7
             else:
                 return 0.4
-        except:
+        except Exception:
             return 0.5
     
     def _assess_market_cycle_position(self, coin_data: Dict, market_context: Optional[Dict]) -> float:
@@ -460,7 +474,7 @@ class HiddenGemDetector:
                 return 0.6
             else:
                 return 0.4
-        except:
+        except Exception:
             return 0.5
     
     def _assess_sector_momentum(self, coin_data: Dict) -> float:
@@ -469,7 +483,7 @@ class HiddenGemDetector:
         try:
             volume_ratio = self._calculate_volume_price_ratio(coin_data)
             return min(volume_ratio * 2, 1.0)
-        except:
+        except Exception:
             return 0.5
     
     def _calculate_market_correlation(self, coin_data: Dict) -> float:
@@ -479,7 +493,7 @@ class HiddenGemDetector:
             rank = coin_data.get('market_cap_rank', 999)
             # Lower ranked coins often have lower correlation
             return max(0, 1 - (rank / 1000))
-        except:
+        except Exception:
             return 0.5
     
     def _calculate_risk_reward_ratio(self, coin_data: Dict) -> float:
@@ -495,7 +509,7 @@ class HiddenGemDetector:
                 return 0.6
             else:
                 return 0.4
-        except:
+        except Exception:
             return 0.5
     
     def _assess_downside_protection(self, coin_data: Dict) -> float:
@@ -509,7 +523,7 @@ class HiddenGemDetector:
                 return 0.6
             else:
                 return 0.3  # Limited downside protection for micro caps
-        except:
+        except Exception:
             return 0.4
     
     def _assess_upside_potential(self, coin_data: Dict) -> float:
@@ -527,7 +541,7 @@ class HiddenGemDetector:
                 return 0.7  # Good upside potential
             else:
                 return 0.5  # Moderate upside potential
-        except:
+        except Exception:
             return 0.6
     
     def create_training_dataset(self, coins_data: List[Dict]) -> Tuple[pd.DataFrame, List[int]]:
@@ -559,74 +573,72 @@ class HiddenGemDetector:
         return df, labels
     
     def _create_hidden_gem_labels(self, df: pd.DataFrame) -> List[int]:
-        """Create sophisticated labels for hidden gems based on multiple criteria"""
+        """Create labels for hidden gems based on multiple criteria.
+
+        A coin is labelled a gem only when low market-cap is paired with
+        genuine trading activity, to avoid purely circular cap-rank labels.
+        """
         labels = []
-        
+
         for _, row in df.iterrows():
             score = 0
-            
-            # Core hidden gem criteria (weighted scoring)
-            
-            # 1. Market cap positioning (30% weight) - FAVOR LOW CAPS MORE
-            if row['is_nano_cap']:
-                score += 0.25  # Highest potential - extreme moonshot (boosted for better scores)
-            elif row['is_micro_cap']:
-                score += 0.20  # High potential (boosted)
-            elif row['is_low_cap']:
-                score += 0.15  # Good potential (boosted)
-            
-            # 2. Volume and activity signals (25% weight)
+
+            # 1. Market cap positioning — only contributes if backed by activity
+            cap_tier = (row['is_nano_cap'] * 3 + row['is_micro_cap'] * 2 + row['is_low_cap'])
+            activity_ok = row['volume_price_ratio'] > 0.04 or row['volume_surge'] > 0.3
+            if cap_tier >= 3 and activity_ok:
+                score += 0.25   # Nano-cap with real activity
+            elif cap_tier >= 2 and activity_ok:
+                score += 0.18   # Micro-cap with real activity
+            elif cap_tier >= 1 and activity_ok:
+                score += 0.12   # Small-cap with real activity
+
+            # 2. Volume and activity signals (25 % weight)
             if row['volume_surge'] > 0.6 and row['volume_price_ratio'] > 0.08:
-                score += 0.15  # Strong activity surge
+                score += 0.15
             elif row['volume_price_ratio'] > 0.05:
-                score += 0.10  # Good activity
-            
-            # 3. Technical setup (20% weight)
+                score += 0.10
+
+            # 3. Technical setup (20 % weight)
             if row['breakout_potential'] > 0.7 and row['accumulation_pattern'] > 0.6:
-                score += 0.12  # Strong technical setup
+                score += 0.12
             elif row['price_discovery_phase'] > 0.6:
-                score += 0.08  # In discovery phase
-            
-            # 4. Innovation and utility (15% weight)
+                score += 0.08
+
+            # 4. Innovation and utility (15 % weight)
             if row['technology_score'] > 0.7 and row['utility_score'] > 0.6:
-                score += 0.10  # Strong fundamentals
+                score += 0.10
             elif row['narrative_strength'] > 0.7:
-                score += 0.06  # Strong narrative
-            
-            # 5. Early signals and smart money (10% weight) - FOCUS ON EARLY DETECTION
-            # De-emphasize social momentum (retail indicator), emphasize smart money
+                score += 0.06
+
+            # 5. Accumulation signals (10 % weight)
             if row['whale_accumulation_score'] > 0.6 and row['quiet_accumulation_signal'] > 0.6:
-                score += 0.10  # Smart money accumulating (EARLY SIGNAL)
+                score += 0.10
             elif row['developer_activity'] > 0.7:
-                score += 0.05  # Active development (EARLY SIGNAL)
-            elif row['social_momentum'] > 0.8:  # Only use if extremely high
-                score += 0.02  # Reduced weight - can be retail hype
-            
-            # 6. Risk-reward profile (5% weight)
+                score += 0.05
+
+            # 6. Risk-reward profile (5 % weight)
             if row['upside_potential'] > 0.8 and row['risk_reward_ratio'] > 0.6:
-                score += 0.05  # Excellent risk-reward
-            
-            # Bonus criteria
-            # Perfect storm: low cap + high activity + technical setup + innovation
-            if (row['is_micro_cap'] and row['volume_price_ratio'] > 0.1 and 
-                row['breakout_potential'] > 0.6 and row['technology_score'] > 0.6):
-                score += 0.1  # Bonus for perfect setup
-            
-            # Early detection bonus: whale activity + quiet accumulation + off-peak signals
-            if (row['whale_accumulation_score'] > 0.6 and 
-                row['quiet_accumulation_signal'] > 0.6 and 
-                row['off_peak_anomaly'] > 0.5):
-                score += 0.15  # EARLY SIGNAL BONUS - smart money moving before retail (boosted)
-            
-            # Innovation play: high tech score + utility + narrative
-            if (row['technology_score'] > 0.8 and row['utility_score'] > 0.7 and 
-                row['narrative_strength'] > 0.7):
-                score += 0.08  # Innovation bonus
-            
-            # Aggressive threshold for hidden gem classification - favor high-risk plays
-            # Lower threshold to catch more speculative opportunities
-            labels.append(1 if score > 0.40 else 0)  # Lowered to 0.40 for more moonshot picks
-        
+                score += 0.05
+
+            # Bonus: low-cap + high activity + technical + innovation (all together)
+            if (row['is_micro_cap'] and row['volume_price_ratio'] > 0.1 and
+                    row['breakout_potential'] > 0.6 and row['technology_score'] > 0.6):
+                score += 0.10
+
+            # Early detection bonus: accumulation signals AND off-peak anomaly
+            if (row['whale_accumulation_score'] > 0.6 and
+                    row['quiet_accumulation_signal'] > 0.6 and
+                    row['off_peak_anomaly'] > 0.5):
+                score += 0.10
+
+            # Innovation play
+            if (row['technology_score'] > 0.8 and row['utility_score'] > 0.7 and
+                    row['narrative_strength'] > 0.7):
+                score += 0.08
+
+            labels.append(1 if score > 0.40 else 0)
+
         return labels
     
     def train_model(self, training_data: pd.DataFrame, labels: List[int]) -> Optional[Dict]:
@@ -739,13 +751,14 @@ class HiddenGemDetector:
             # BOOST probability for low-cap coins (favor speculation)
             raw_probability = float(probability[1])
             
-            # Apply AGGRESSIVE boost for low caps (user prefers high risk/reward)
+            # Apply a modest cap-size boost — small-caps have structural upside,
+            # but let the ML model do the heavy lifting.
             if features.get('is_nano_cap', 0):
-                boosted_probability = min(raw_probability + 0.35, 0.98)  # +35% boost for nano-caps (rank >500)
+                boosted_probability = min(raw_probability + 0.10, 0.95)  # +10% for nano-caps
             elif features.get('is_micro_cap', 0):
-                boosted_probability = min(raw_probability + 0.30, 0.95)  # +30% boost for micro-caps (rank >300)
+                boosted_probability = min(raw_probability + 0.07, 0.92)  # +7% for micro-caps
             elif features.get('is_low_cap', 0):
-                boosted_probability = min(raw_probability + 0.25, 0.90)  # +25% boost for small-caps (rank >100)
+                boosted_probability = min(raw_probability + 0.05, 0.88)  # +5% for small-caps
             else:
                 boosted_probability = raw_probability
             

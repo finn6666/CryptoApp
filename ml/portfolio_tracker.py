@@ -334,17 +334,21 @@ class PortfolioTracker:
     # ─── Persistence ──────────────────────────────────────────
 
     def _save(self):
-        """Save portfolio state to disk."""
+        """Save portfolio state to disk (atomic write to prevent corruption)."""
         state = {
             "holdings": self.holdings,
             "trade_log": self.trade_log,
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
+        tmp = PORTFOLIO_FILE.with_suffix(".tmp")
         try:
-            with open(PORTFOLIO_FILE, "w") as f:
+            with open(tmp, "w") as f:
                 json.dump(state, f, indent=2, default=str)
+            os.replace(tmp, PORTFOLIO_FILE)
         except Exception as e:
             logger.error(f"Failed to save portfolio: {e}")
+            if tmp.exists():
+                tmp.unlink()
 
     def _load(self):
         """Load portfolio state from disk."""
