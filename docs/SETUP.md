@@ -11,7 +11,7 @@
 git clone <repo-url> && cd CryptoApp
 uv sync
 cp .env.example .env  # fill in API keys
-python app.py          # http://localhost:5001
+uv run python app.py   # http://localhost:5001
 ```
 
 ## Required API Keys

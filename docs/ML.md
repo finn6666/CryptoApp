@@ -6,13 +6,13 @@ Five agents coordinated by an orchestrator (`gemini-3.0-flash`):
 
 | Agent | Model | Weight | Role |
 |-------|-------|--------|------|
-| Research | gemini-3-flash-preview | 40% | Fundamentals, team, roadmap |
-| Technical | gemini-3-flash-preview | 40% | Charts, indicators, S/R |
-| Risk | gemini-3-flash-preview | 20% | Position sizing, exits |
-| Sentiment | gemini-3-flash-preview | Integrated | Social sentiment, FUD/FOMO |
-| Trading | gemini-3-flash-preview | Decision | Final buy/sell (conviction ≥75%) |
+| Research | gemini-3-flash-preview | 25–35% | Fundamentals, team, roadmap |
+| Technical | gemini-3-flash-preview | 25–35% | Charts, indicators, S/R |
+| Risk | gemini-3-flash-preview | 10–15% | Position sizing, exits (advisory) |
+| Sentiment | gemini-3-flash-preview | 20–40% | Social sentiment, FUD/FOMO |
+| Trading | gemini-3-flash-preview | Decision | Final buy/sell (conviction ≥55% to BUY) |
 
-Agents run in parallel (max 3 concurrent). Scores combined via weighted voting.
+Weights are dynamic based on market sentiment. See [architecture/agents.md](architecture/agents.md) for the full weighting table.
 
 ### 16 Agent Tools
 
@@ -31,19 +31,6 @@ Research 2h, Technical 30m, Position/Sentiment 1h.
 ### Memory
 
 Short-term: 6h in-memory. Long-term: 30d on disk.
-
-## Gem Detection
-
-`ml/enhanced_gem_detector.py` — Random Forest + Gradient Boosting on market features.
-
-| Score | Label |
-|-------|-------|
-| > 0.7 | Extreme Moonshot |
-| > 0.5 | High Upside |
-| > 0.3 | Growth Play |
-| ≤ 0.3 | Stable |
-
-Gem threshold: `gem_probability > 0.40`. Recommendations: >0.70 STRONG BUY, >0.55 BUY, >0.40 HOLD.
 
 ## Q-Learning RL
 

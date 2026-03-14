@@ -35,18 +35,7 @@ Trading endpoints require `Authorization: Bearer <TRADING_API_KEY>` header.
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
 | GET | `/api/agents/analyze/<symbol>` | No | Multi-agent analysis (Kraken-tradeable only) |
-| GET | `/api/agents/scan` | No | Scan all for opportunities |
 | GET | `/api/agents/metrics` | No | Agent performance |
-
-## Gem Detection
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/gems/scan` | Batch gem scan (Kraken-tradeable only) |
-| GET | `/api/gems/detect/<symbol>` | Single gem detection |
-| GET | `/api/gems/top/<count>` | Top N gems (Kraken-tradeable only) |
-| GET | `/api/gems/status` | Detector status |
-| POST | `/api/gems/train` | Retrain gem models |
 
 ## ML
 
