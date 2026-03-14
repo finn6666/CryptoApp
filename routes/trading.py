@@ -788,11 +788,11 @@ def rl_insights():
         history = ql.get_outcome_history(limit=10)
         insights = []
 
-        episodes = stats.get('episodes', 0)
-        if episodes == 0:
+        closed_trades = stats.get('closed_trades', stats.get('episodes', 0) // 2)
+        if closed_trades == 0:
             insights.append("Still early days — no trades have fully closed yet so there's nothing concrete to learn from. The system will start picking up patterns once positions get sold.")
         else:
-            insights.append(f"Learnt from {episodes} completed trade{'s' if episodes != 1 else ''} so far.")
+            insights.append(f"Learnt from {closed_trades} completed trade{'s' if closed_trades != 1 else ''} so far.")
 
         # Exploration rate
         eps = stats.get('epsilon', 0.3)

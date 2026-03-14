@@ -189,7 +189,6 @@ def get_cached_analysis(symbol: str):
     # Expired or missing
     agent_analysis_cache.pop(symbol, None)
     return None
-    return entry
 
 
 def init_all():

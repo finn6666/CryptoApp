@@ -41,6 +41,7 @@ class TradeProposal:
     quantity: Optional[float] = None
     order_id: Optional[str] = None
     error: Optional[str] = None
+    sell_quantity: Optional[float] = None  # Exact coin qty to sell (bypasses amount→qty reconversion)
 
     def __post_init__(self):
         if not self.created_at:
@@ -243,6 +244,7 @@ class TradingEngine:
         confidence: int,
         recommendation: str,
         coin_name: str = "",
+        sell_quantity: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -332,6 +334,7 @@ class TradingEngine:
             confidence=confidence,
             agent_recommendation=recommendation,
             coin_name=coin_name,
+            sell_quantity=sell_quantity,
         )
 
         self.proposals[proposal.id] = proposal
@@ -380,6 +383,7 @@ class TradingEngine:
         confidence: int,
         recommendation: str,
         coin_name: str = "",
+        sell_quantity: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -397,6 +401,7 @@ class TradingEngine:
             confidence=confidence,
             recommendation=recommendation,
             coin_name=coin_name,
+            sell_quantity=sell_quantity,
         )
 
         if not result.get("success"):
@@ -530,21 +535,27 @@ class TradingEngine:
                     amount_in_quote = proposal.amount_gbp * fx_rate
                     logger.info(f"Legacy FX: £{proposal.amount_gbp:.4f} → {amount_in_quote:.4f} {quote_currency} (rate {fx_rate})")
 
-                quantity = amount_in_quote / current_price
+                if proposal.side == "sell" and proposal.sell_quantity:
+                    # For sells: use the explicit coin qty to avoid price-drift errors
+                    quantity = proposal.sell_quantity
+                    logger.info(f"Legacy sell: using explicit quantity {quantity:.8f} {proposal.symbol}")
+                else:
+                    quantity = amount_in_quote / current_price
 
-                # Enforce exchange minimum order quantity
-                try:
-                    market = exchange.market(symbol_pair)
-                    min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
-                    min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
-                    if min_qty and quantity < min_qty:
-                        quantity = min_qty * 1.02  # 2% buffer
-                        logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
-                    if min_cost and (quantity * current_price) < min_cost:
-                        quantity = (min_cost * 1.02) / current_price
-                        logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
-                except Exception as e:
-                    logger.debug(f"Could not check min order for {symbol_pair}: {e}")
+                # Enforce exchange minimum order quantity (buy-side only)
+                if proposal.side != "sell":
+                    try:
+                        market = exchange.market(symbol_pair)
+                        min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+                        min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                        if min_qty and quantity < min_qty:
+                            quantity = min_qty * 1.02  # 2% buffer
+                            logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
+                        if min_cost and (quantity * current_price) < min_cost:
+                            quantity = (min_cost * 1.02) / current_price
+                            logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
+                    except Exception as e:
+                        logger.debug(f"Could not check min order for {symbol_pair}: {e}")
 
                 if proposal.side == "buy":
                     order = exchange.create_market_buy_order(symbol_pair, quantity)
@@ -675,6 +686,7 @@ class TradingEngine:
                 side=proposal.side,
                 amount_gbp=proposal.amount_gbp,
                 max_amount_gbp=remaining,
+                quantity=proposal.sell_quantity,
             )
             if result.get("success"):
                 return result

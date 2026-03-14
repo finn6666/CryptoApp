@@ -269,6 +269,7 @@ class ExchangeManager:
         side: str,
         amount_gbp: float,
         max_amount_gbp: float = None,
+        quantity: float = None,
     ) -> Dict[str, Any]:
         """
         Execute an order on the best available exchange.
@@ -280,6 +281,10 @@ class ExchangeManager:
             max_amount_gbp: Hard ceiling (e.g. remaining daily budget).
                             If meeting the exchange minimum would exceed
                             this, the order is rejected instead of placed.
+            quantity: For sells, the exact coin quantity to sell. Bypasses
+                      amount_gbp→quantity reconversion and min-order bumping,
+                      preventing failures when the GBP value and live exchange
+                      price have diverged since the proposal was created.
         """
         result = self.find_best_pair(symbol)
         if not result:
@@ -317,49 +322,56 @@ class ExchangeManager:
                         "error": f"Cannot convert GBP to {quote_currency} — no FX rate available",
                     }
 
-            # amount in quote currency, then divide by price to get quantity
-            amount_in_quote = amount_gbp * fx_rate
-            quantity = amount_in_quote / current_price
+            if side == "sell" and quantity is not None:
+                # For sells with explicit coin qty: use it directly.
+                # Do NOT apply amount→qty reconversion or min-order bumping —
+                # those use the approximate GBP value which can diverge from the
+                # live exchange price and overshoot what we actually hold.
+                amount_in_quote = quantity * current_price
+            else:
+                # For buys (or legacy sells without explicit qty): derive from GBP.
+                amount_in_quote = amount_gbp * fx_rate
+                quantity = amount_in_quote / current_price
 
-            # Enforce exchange-specific minimum order sizes
-            min_qty = self._get_min_order_quantity(exchange, pair)
-            min_cost = self._get_min_order_cost(exchange, pair)
+                # Enforce exchange-specific minimum order sizes (buy-side only)
+                min_qty = self._get_min_order_quantity(exchange, pair)
+                min_cost = self._get_min_order_cost(exchange, pair)
 
-            # Bump quantity up to minimum if needed (and recalculate amount_gbp)
-            if min_qty and quantity < min_qty:
-                old_qty = quantity
-                quantity = min_qty * 1.02  # 2% buffer above minimum
-                new_amount_in_quote = quantity * current_price
-                new_amount_gbp = new_amount_in_quote / fx_rate
-                logger.info(
-                    f"Bumped order from {old_qty:.8f} to {quantity:.8f} "
-                    f"(min={min_qty:.8f}) — £{amount_gbp:.4f} → £{new_amount_gbp:.4f}"
-                )
-                amount_gbp = new_amount_gbp
+                # Bump quantity up to minimum if needed (and recalculate amount_gbp)
+                if min_qty and quantity < min_qty:
+                    old_qty = quantity
+                    quantity = min_qty * 1.02  # 2% buffer above minimum
+                    new_amount_in_quote = quantity * current_price
+                    new_amount_gbp = new_amount_in_quote / fx_rate
+                    logger.info(
+                        f"Bumped order from {old_qty:.8f} to {quantity:.8f} "
+                        f"(min={min_qty:.8f}) — £{amount_gbp:.4f} → £{new_amount_gbp:.4f}"
+                    )
+                    amount_gbp = new_amount_gbp
 
-            # Also check cost minimum (in quote currency)
-            if min_cost and (quantity * current_price) < min_cost:
-                quantity = (min_cost * 1.02) / current_price  # 2% buffer
-                new_amount_gbp = (quantity * current_price) / fx_rate
-                logger.info(
-                    f"Bumped order to meet cost minimum {min_cost:.4f} {quote_currency} "
-                    f"— £{amount_gbp:.4f} → £{new_amount_gbp:.4f}"
-                )
-                amount_gbp = new_amount_gbp
+                # Also check cost minimum (in quote currency)
+                if min_cost and (quantity * current_price) < min_cost:
+                    quantity = (min_cost * 1.02) / current_price  # 2% buffer
+                    new_amount_gbp = (quantity * current_price) / fx_rate
+                    logger.info(
+                        f"Bumped order to meet cost minimum {min_cost:.4f} {quote_currency} "
+                        f"— £{amount_gbp:.4f} → £{new_amount_gbp:.4f}"
+                    )
+                    amount_gbp = new_amount_gbp
 
-            # Recalculate amount_in_quote after any quantity bumps so the
-            # balance check uses the *actual* order cost, not the original.
-            amount_in_quote = quantity * current_price
+                # Recalculate amount_in_quote after any quantity bumps so the
+                # balance check uses the *actual* order cost, not the original.
+                amount_in_quote = quantity * current_price
 
-            # Reject if bumped amount exceeds the daily-budget ceiling
-            if max_amount_gbp is not None and amount_gbp > max_amount_gbp:
-                return {
-                    "success": False,
-                    "error": (
-                        f"Exchange minimum order for {pair} is £{amount_gbp:.4f} "
-                        f"but only £{max_amount_gbp:.4f} budget remaining"
-                    ),
-                }
+                # Reject if bumped amount exceeds the daily-budget ceiling
+                if max_amount_gbp is not None and amount_gbp > max_amount_gbp:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Exchange minimum order for {pair} is £{amount_gbp:.4f} "
+                            f"but only £{max_amount_gbp:.4f} budget remaining"
+                        ),
+                    }
 
             # Verify exchange balance before placing order
             balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
@@ -368,6 +380,9 @@ class ExchangeManager:
                     "success": False,
                     "error": balance_check["error"],
                 }
+            # Apply any balance-capped quantity adjustment (sells only, for minor rounding)
+            if "adjusted_quantity" in balance_check:
+                quantity = balance_check["adjusted_quantity"]
 
             # Place market order (with retry)
             order = self._place_order_with_retry(
@@ -412,6 +427,7 @@ class ExchangeManager:
                     fb_result = self._try_order_on_exchange(
                         fallback_id, symbol, side, amount_gbp,
                         max_amount_gbp=max_amount_gbp,
+                        quantity=quantity,
                     )
                     if fb_result.get("success"):
                         return fb_result
@@ -439,6 +455,7 @@ class ExchangeManager:
     def _try_order_on_exchange(
         self, exchange_id: str, symbol: str, side: str, amount_gbp: float,
         max_amount_gbp: float = None,
+        quantity: float = None,
     ) -> Dict[str, Any]:
         """Try to execute an order on a specific exchange (with FX conversion)."""
         exchange = self.get_exchange(exchange_id)
@@ -462,34 +479,40 @@ class ExchangeManager:
                     if not fx_rate:  # None or 0
                         continue  # Skip this quote, try next
 
-                amount_in_quote = amount_gbp * fx_rate
-                quantity = amount_in_quote / current_price
+                if side == "sell" and quantity is not None:
+                    # Use explicit coin qty for sells (same reasoning as execute_order)
+                    amount_in_quote = quantity * current_price
+                else:
+                    amount_in_quote = amount_gbp * fx_rate
+                    quantity = amount_in_quote / current_price
 
-                # Enforce exchange minimums on fallback too
-                min_qty = self._get_min_order_quantity(exchange, pair)
-                min_cost = self._get_min_order_cost(exchange, pair)
-                if min_qty and quantity < min_qty:
-                    quantity = min_qty * 1.02
-                    amount_gbp = (quantity * current_price) / fx_rate
-                if min_cost and (quantity * current_price) < min_cost:
-                    quantity = (min_cost * 1.02) / current_price
-                    amount_gbp = (quantity * current_price) / fx_rate
+                    # Enforce exchange minimums on fallback too (buy-side only)
+                    min_qty = self._get_min_order_quantity(exchange, pair)
+                    min_cost = self._get_min_order_cost(exchange, pair)
+                    if min_qty and quantity < min_qty:
+                        quantity = min_qty * 1.02
+                        amount_gbp = (quantity * current_price) / fx_rate
+                    if min_cost and (quantity * current_price) < min_cost:
+                        quantity = (min_cost * 1.02) / current_price
+                        amount_gbp = (quantity * current_price) / fx_rate
 
-                # Recalculate after any bumps
-                amount_in_quote = quantity * current_price
+                    # Recalculate after any bumps
+                    amount_in_quote = quantity * current_price
 
-                # Reject if bumped amount exceeds daily-budget ceiling
-                if max_amount_gbp is not None and amount_gbp > max_amount_gbp:
-                    logger.info(
-                        f"Skipping {pair} on {exchange_id}: min order £{amount_gbp:.4f} "
-                        f"exceeds budget remaining £{max_amount_gbp:.4f}"
-                    )
-                    continue
+                    # Reject if bumped amount exceeds daily-budget ceiling
+                    if max_amount_gbp is not None and amount_gbp > max_amount_gbp:
+                        logger.info(
+                            f"Skipping {pair} on {exchange_id}: min order £{amount_gbp:.4f} "
+                            f"exceeds budget remaining £{max_amount_gbp:.4f}"
+                        )
+                        continue
 
                 # Balance check
                 balance_check = self._check_balance(exchange, exchange_id, side, pair, quantity, amount_in_quote)
                 if not balance_check["ok"]:
                     continue
+                if "adjusted_quantity" in balance_check:
+                    quantity = balance_check["adjusted_quantity"]
 
                 order = self._place_order_with_retry(
                     exchange, pair, side, quantity
@@ -608,6 +631,14 @@ class ExchangeManager:
                 # Need enough base currency to sell
                 available = balance.get(base, {}).get("free", 0) or 0
                 if available < quantity:
+                    # Within 1%: cap to available — handles minor tracker/exchange
+                    # divergence (e.g. fees reducing free balance by a tiny amount)
+                    if quantity <= available * 1.01:
+                        logger.info(
+                            f"Sell: adjusting {base} qty {quantity:.8f} → {available:.8f} "
+                            f"(free balance on {exchange_id})"
+                        )
+                        return {"ok": True, "adjusted_quantity": available}
                     msg = (
                         f"Insufficient {base} balance on {exchange_id}: "
                         f"have {available:.8f}, need {quantity:.8f}"

@@ -138,8 +138,10 @@ class QLearningTrader:
         )
         # Track symbols that have lost money and how many times
         self.loss_memory: Dict[str, int] = {}
-        # Total episodes processed
+        # Total update steps (increments twice per closed trade: buy + skip update)
         self.episodes = 0
+        # Actual completed trade count — what the UI should display
+        self.closed_trades = 0
 
         self._load()
 
@@ -303,6 +305,10 @@ class QLearningTrader:
         skip_reward = -reward * 0.3  # Weaker inverse signal
         self.update(state, "skip", skip_reward, next_state=None)
 
+        # Count this as one completed trade (episodes incremented twice above,
+        # once per update call, so closed_trades is the accurate UI metric)
+        self.closed_trades += 1
+
         # Log outcome
         outcome = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -372,6 +378,7 @@ class QLearningTrader:
             "alpha": self.alpha,
             "gamma": self.gamma,
             "episodes": self.episodes,
+            "closed_trades": self.closed_trades,
             "total_states": total_states,
             "visited_states": visited_states,
             "total_visits": total_visits,
@@ -414,6 +421,7 @@ class QLearningTrader:
                 "loss_memory": self.loss_memory,
                 "epsilon": self.epsilon,
                 "episodes": self.episodes,
+                "closed_trades": self.closed_trades,
             }
             with open(Q_TABLE_FILE, "w") as f:
                 json.dump(data, f, indent=2)
@@ -435,10 +443,11 @@ class QLearningTrader:
             self.loss_memory = data.get("loss_memory", {})
             self.epsilon = data.get("epsilon", self.epsilon)
             self.episodes = data.get("episodes", 0)
+            self.closed_trades = data.get("closed_trades", self.episodes // 2)
 
             logger.info(
                 f"Loaded Q-table: {len(self.q_table)} states, "
-                f"{self.episodes} episodes, ε={self.epsilon:.3f}"
+                f"{self.closed_trades} closed trades, ε={self.epsilon:.3f}"
             )
         except Exception as e:
             logger.error(f"Failed to load Q-table: {e}")

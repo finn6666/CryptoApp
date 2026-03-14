@@ -440,11 +440,10 @@ class ScanLoop:
         if engine.kill_switch:
             return {"outcome": "skipped", "reason": "Kill switch active", "proposed": False}
 
-        # Run orchestrator analysis (with fallback to gem detector)
+        # Run ADK orchestrator analysis (Gemini)
         analysis = None
         analysis_source = None
 
-        # Try 1: Official ADK orchestrator (Gemini)
         if state.official_adk_available and state.analyze_crypto_adk:
             try:
                 analysis = state.run_async(
@@ -452,44 +451,19 @@ class ScanLoop:
                 )
                 if analysis and analysis.get("success"):
                     analysis_source = "adk_orchestrator"
+                else:
+                    analysis = None
             except Exception as e:
                 logger.warning(f"ADK analysis failed for {symbol}: {e}")
                 analysis = None
-                # Alert if it looks like a quota/rate limit issue
                 err_str = str(e).lower()
                 if "quota" in err_str or "rate" in err_str or "429" in err_str:
                     alert_api_quota("Gemini ADK", str(e))
 
-        # Try 2: Gem Detector fallback (no API call — local ML)
-        if (not analysis or not analysis.get("success")) and state.GEM_DETECTOR_AVAILABLE and state.gem_detector:
-            try:
-                gem_result = state.gem_detector.predict_hidden_gem(coin_data)
-                if gem_result:
-                    gem_prob = gem_result.get("gem_probability", 0)
-                    gem_score = gem_result.get("gem_score", 0)
-                    recommendation = "BUY" if gem_prob > 0.6 else "HOLD" if gem_prob > 0.3 else "AVOID"
-                    strengths = gem_result.get("key_strengths", [])
-                    analysis = {
-                        "success": True,
-                        "symbol": symbol,
-                        "recommendation": recommendation,
-                        "confidence": int(gem_prob * 100),
-                        "analysis": (
-                            f"Gem detector: {gem_prob*100:.0f}% gem probability, "
-                            f"score {gem_score:.1f}/100. "
-                            f"Strengths: {', '.join(strengths[:3]) if strengths else 'None identified'}."
-                        ),
-                        "orchestrator": "gem_detector_fallback",
-                    }
-                    analysis_source = "gem_detector"
-                    logger.info(f"Using gem detector fallback for {symbol} (ADK unavailable)")
-            except Exception as e:
-                logger.warning(f"Gem detector fallback also failed for {symbol}: {e}")
-
-        if not analysis or not analysis.get("success"):
+        if not analysis:
             return {
                 "outcome": "skipped",
-                "reason": "All analysis methods failed (ADK + gem detector)",
+                "reason": "ADK analysis failed or unavailable",
                 "proposed": False,
             }
 
