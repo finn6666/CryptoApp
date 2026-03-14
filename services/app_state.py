@@ -23,9 +23,6 @@ ml_pipeline = None
 ml_service = None
 ML_AVAILABLE = False
 
-gem_detector = None
-GEM_DETECTOR_AVAILABLE = False
-
 data_pipeline = None
 SYMBOLS_AVAILABLE = False
 
@@ -33,7 +30,7 @@ official_adk_available = False
 analyze_crypto_adk = None
 
 agent_analysis_cache = {}
-CACHE_EXPIRY_SECONDS = 14400  # 4 hours
+CACHE_EXPIRY_SECONDS = 43200  # 12 hours
 CACHE_FILE = os.path.join(project_root, "data", "agent_analysis_cache.json")
 
 analyzer = None  # set during init_app()
@@ -110,25 +107,6 @@ def initialize_data_pipeline():
         return False
 
 
-def initialize_gem_detector():
-    global gem_detector, GEM_DETECTOR_AVAILABLE
-    logger.info("Attempting to initialize Enhanced Hidden Gem Detector...")
-    try:
-        from ml.enhanced_gem_detector import HiddenGemDetector
-        gem_detector = HiddenGemDetector()
-        if gem_detector.load_model():
-            logger.info("Hidden Gem Detector model loaded successfully")
-        else:
-            logger.info("No existing model found, will train on first use...")
-        GEM_DETECTOR_AVAILABLE = True
-        logger.info("Enhanced Hidden Gem Detector initialized successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Hidden Gem Detector not available: {e}")
-        GEM_DETECTOR_AVAILABLE = False
-        return False
-
-
 def load_analysis_cache():
     """Load agent analysis cache from disk."""
     global agent_analysis_cache
@@ -197,7 +175,7 @@ def init_all():
     from src.core.crypto_analyzer import CryptoAnalyzer
     logger.info("Starting CryptoApp...")
 
-    for fn in (initialize_ml, initialize_data_pipeline, initialize_gem_detector, initialize_official_adk):
+    for fn in (initialize_ml, initialize_data_pipeline, initialize_official_adk):
         try:
             fn()
         except Exception as e:
@@ -221,8 +199,8 @@ def init_all():
 
     analyzer = CryptoAnalyzer(data_file=data_file)
     logger.info(
-        f"System ready - ML: {ML_AVAILABLE}, Gem Detector: {GEM_DETECTOR_AVAILABLE}, "
-        f"ADK: {official_adk_available}, Coins: {len(analyzer.coins)}"
+        f"System ready - ML: {ML_AVAILABLE}, ADK: {official_adk_available}, "
+        f"Coins: {len(analyzer.coins)}"
     )
 
 

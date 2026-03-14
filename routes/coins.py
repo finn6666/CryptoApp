@@ -10,7 +10,7 @@ from extensions import limiter
 from routes.trading import require_trading_auth
 from services.app_state import (
     analyzer, run_async,
-    _build_gem_analysis, _sanitize_ai_text, parse_market_cap, parse_volume,
+    parse_market_cap, parse_volume,
     fetch_and_add_new_symbol_data,
 )
 import services.app_state as state
@@ -34,24 +34,6 @@ def _prepare_coin_dict(coin):
         'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
         'market_cap_rank': coin.market_cap_rank,
     }
-
-
-def _run_gem_analysis(coin_data_dict, coin_data_out):
-    """Run gem detector analysis and update coin_data_out in-place."""
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return False
-    try:
-        gem_result = state.gem_detector.predict_hidden_gem(coin_data_dict)
-        analysis, ai_sentiment, enhanced = _build_gem_analysis(gem_result)
-        if analysis:
-            coin_data_out['ai_analysis'] = analysis
-            if ai_sentiment:
-                coin_data_out['ai_sentiment'] = ai_sentiment
-            coin_data_out['enhanced_score'] = enhanced
-            return True
-    except Exception as e:
-        logger.warning(f"Gem detection failed for {coin_data_dict.get('symbol')}: {e}")
-    return False
 
 
 def _run_ml_fallback(coin, coin_data_out):
@@ -83,42 +65,6 @@ def _run_ml_fallback(coin, coin_data_out):
         logger.warning(f"ML prediction failed for {coin.symbol}: {e}")
     return False
 
-
-def _run_agent_analysis(coin, coin_data_out):
-    """Run multi-agent analysis on a single coin (uses cache)."""
-    symbol = coin_data_out['symbol']
-    cache_key = f"agent_{symbol}"
-
-    cached = state.get_cached_analysis(cache_key)
-    if cached:
-        coin_data_out['agent_analysis'] = cached.get("result", cached)
-        logger.info(f"Using cached agent analysis for {symbol}")
-        return
-
-    mc = parse_market_cap(getattr(coin, 'market_cap', 0))
-    vol = parse_volume(getattr(coin, 'total_volume', 0))
-
-    agent_coin_data = {
-        'symbol': coin.symbol,
-        'name': coin.name,
-        'price': coin.price or 0,
-        'price_change_24h': coin.price_change_24h or 0,
-        'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
-        'market_cap_rank': coin.market_cap_rank or 999,
-        'market_cap': mc,
-        'volume_24h': vol,
-        'attractiveness_score': coin.attractiveness_score or 5.0,
-        'status': getattr(coin, 'status', 'current'),
-    }
-
-    try:
-        result = run_async(state.gem_detector.analyze_with_agents(agent_coin_data))
-        if result:
-            coin_data_out['agent_analysis'] = result
-            state.cache_analysis(cache_key, {"result": result})
-            logger.info(f"Multi-agent analysis completed for {symbol}: {result.get('gem_score')}%")
-    except Exception as e:
-        logger.warning(f"Multi-agent analysis failed for {symbol}: {e}")
 
 
 # ─── Routes ───────────────────────────────────────────────────

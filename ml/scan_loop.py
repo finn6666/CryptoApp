@@ -330,27 +330,7 @@ class ScanLoop:
             if coin["symbol"] in fav_symbols:
                 candidates.append(coin)
 
-        # Priority 2: High gem scores (if gem detector is available)
-        if state.GEM_DETECTOR_AVAILABLE and state.gem_detector:
-            scored = []
-            for coin in tradeable_coins:
-                if coin["symbol"] in fav_symbols:
-                    continue  # Already included
-                try:
-                    gem_result = state.gem_detector.predict_hidden_gem(coin)
-                    gem_score = gem_result.get("gem_score", 0)
-                    if gem_score >= self.min_gem_score:
-                        coin["gem_score"] = gem_score
-                        coin["gem_probability"] = gem_result.get("gem_probability", 0)
-                        scored.append(coin)
-                except Exception:
-                    pass
-
-            # Sort by gem score descending
-            scored.sort(key=lambda c: c.get("gem_score", 0), reverse=True)
-            candidates.extend(scored)
-
-        # Priority 3: High attractiveness score fallback
+        # Priority 2: High attractiveness score
         if len(candidates) < self.max_coins_per_scan:
             remaining = [
                 c for c in tradeable_coins
@@ -375,7 +355,7 @@ class ScanLoop:
         import services.app_state as state
 
         if not state.official_adk_available:
-            # If ADK isn't available, skip screening — let gem detector handle it
+            # If ADK isn't available, skip screening — pass all candidates through
             return candidates
 
         # Build trade history context once (shared across all screens)

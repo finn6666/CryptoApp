@@ -9,15 +9,14 @@ The scan loop is the automated pipeline that discovers, analyses, and trades coi
 | File | Class | Singleton | Lines |
 |------|-------|-----------|-------|
 | `ml/scan_loop.py` | `ScanLoop` | `get_scan_loop()` | ~692 |
-| `ml/enhanced_gem_detector.py` | `EnhancedGemDetector` | — | ~1408 |
 | `ml/scheduler.py` | `MLScheduler` | `get_ml_scheduler()` | ~192 |
 
 ## Scan Pipeline (5 Steps)
 
 1. **`_refresh_data()`** — Fetches from CoinMarketCap via `live_data_fetcher`, adds pipeline-tracked symbols
 2. **`_get_tradeable_coins()`** — Filters via `ExchangeManager.get_exchanges_for_coin()`, skips stablecoins
-3. **`_select_candidates(tradeable)`** — Priority order: favorites → high gem scores → high attractiveness. Capped to `max_coins_per_scan`
-4. **`_analyse_and_evaluate(coin_data)`** — Runs ADK orchestrator (fallback: gem detector). Extracts trade decision. Calls `TradingEngine.propose_and_auto_execute()` if conviction ≥45% and `should_trade=True`
+3. **`_select_candidates(tradeable)`** — Priority order: favorites → high attractiveness. Capped to `max_coins_per_scan`
+4. **`_analyse_and_evaluate(coin_data)`** — Runs ADK orchestrator. Extracts trade decision. Calls `TradingEngine.propose_and_auto_execute()` if conviction ≥45% and `should_trade=True`
 5. **Sell-side** — Calls `SellAutomation.check_and_propose_sells()` with live prices
 
 ## Key Methods
@@ -37,8 +36,6 @@ The scan loop is the automated pipeline that discovers, analyses, and trades coi
 ```
 ADK Orchestrator (Gemini API)
     ↓ fails (quota, timeout, error)
-Gem Detector (local GradientBoosting ML)
-    ↓ fails
 Skip coin
 ```
 
@@ -46,7 +43,6 @@ Skip coin
 
 - **From ADK:** `trade_decision` dict from orchestrator response
 - **Fallback:** Regex JSON extraction from analysis text
-- **Gem detector:** `recommendation == "BUY" && confidence >= 45%`
 - Scan uses `propose_and_auto_execute()` so trades don't sit waiting overnight
 
 ## Scheduling
@@ -64,13 +60,6 @@ The scheduler runs in a daemon thread, checking every 30 seconds for pending job
 | `weekly_retrain()` | Sunday 2 AM | Retrain ML model + ONNX export |
 | `weekly_report_job()` | Monday 9 AM | Generate and email performance report |
 
-## Gem Detector
-
-- Uses `GradientBoostingClassifier` + `RobustScaler`
-- Fast local ML — no API calls needed
-- `OrchestratorWrapper` bridges ADK to portfolio manager interface
-- Trade history injected into orchestrator prompt for agent learning
-
 ## Environment Variables
 
 | Var | Default | Purpose |
@@ -79,7 +68,6 @@ The scheduler runs in a daemon thread, checking every 30 seconds for pending job
 | `SCAN_TIME` | `12:00` | Daily scan time (legacy mode) |
 | `SCAN_INTERVAL_HOURS` | `12` | Hours between scans (0 = daily) |
 | `SCAN_MAX_COINS` | `10` | Max coins per scan |
-| `SCAN_MIN_GEM_SCORE` | `5.0` | Min gem score for inclusion |
 | `SCAN_MAX_PROPOSALS` | `3` | Max trade proposals per scan |
 | `SCAN_COOLDOWN_HOURS` | `1` | Min hours between scans |
 | `MONITOR_ENABLED` | `true` | Start market monitor between scans |
@@ -92,9 +80,9 @@ Scheduler thread (every 6h)
     → ScanLoop.run_scan()
         → _refresh_data() [CoinMarketCap API]
         → _get_tradeable_coins() [ExchangeManager filter]
-        → _select_candidates() [favorites → gem score → attractiveness]
+        → _select_candidates() [favorites → attractiveness_score]
         → _analyse_and_evaluate() per coin
-            → ADK orchestrator OR GemDetector
+            → ADK orchestrator
             → Extract trade decision
             → TradingEngine.propose_and_auto_execute()
         → SellAutomation.check_and_propose_sells()
@@ -113,6 +101,5 @@ Scheduler thread (every 6h)
 - **Cooldown** prevents rapid re-scans (default 1h) — manual "Scan Now" also respects this
 - ADK quota/rate limit (429) triggers `alert_api_quota()` notification
 - Conviction threshold in scan is **≥45%** (lower than trading agent's stated ≥55%)
-- Gem detector fallback: conviction = `gem_probability * 100`, allocation = `min(80, conf - 10)`
 - Scan uses `propose_and_auto_execute()` — buys auto-execute during scheduled scans
 - `_select_candidates()` prioritises favorites over gem-scored coins

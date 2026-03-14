@@ -123,6 +123,28 @@ cp ~/CryptoApp/.env ~/backups/
 cp ~/CryptoApp/data/portfolio.json ~/backups/ 2>/dev/null
 ```
 
+## Remote Access (SSH via Tailscale)
+
+Tailscale gives the Pi a stable private IP that works from any network — no port forwarding or dynamic DNS needed.
+
+**On the Pi (one-time):**
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+tailscale ip -4   # note this IP
+```
+
+**On your dev machine / phone:** Install the Tailscale app and sign in with the same account.
+
+**SSH from anywhere:**
+```bash
+ssh finnbryant@<tailscale-ip>
+```
+
+The Tailscale IP is stable across reboots. Find it any time at https://login.tailscale.com/admin/machines or by running `tailscale ip -4` on the Pi.
+
+Tailscale is free for personal use (up to 3 users / 100 devices).
+
 ## SSL (Optional)
 
 On Raspberry Pi OS (Debian), install certbot:

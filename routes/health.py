@@ -114,7 +114,6 @@ def api_health():
         'components': {
             'analyzer': state.analyzer is not None,
             'ml_pipeline': state.ML_AVAILABLE,
-            'gem_detector': state.GEM_DETECTOR_AVAILABLE,
             'adk_orchestrator': state.official_adk_available,
             'trading_engine': trading_status,
             'scan_loop': scan_status,
@@ -142,7 +141,6 @@ def api_metrics():
         'application': {
             'total_coins': len(state.analyzer.coins) if state.analyzer else 0,
             'ml_available': state.ML_AVAILABLE,
-            'gem_detector_available': state.GEM_DETECTOR_AVAILABLE,
             'rl_detector_available': False
         }
     }), 200

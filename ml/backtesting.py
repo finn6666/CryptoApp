@@ -97,7 +97,6 @@ class BacktestEngine:
         historical_data: List[Dict[str, Any]],
         strategy_name: str = "default",
         min_confidence: int = 75,
-        use_gem_detector: bool = True,
     ) -> BacktestResult:
         """
         Run a backtest against historical price data.
@@ -108,7 +107,6 @@ class BacktestEngine:
                 - coins: List of {symbol, price, volume_24h, market_cap, ...}
             strategy_name: Label for this backtest run
             min_confidence: Minimum confidence to enter a trade
-            use_gem_detector: Whether to use gem detector for scoring
 
         Returns:
             BacktestResult with full performance metrics
@@ -185,7 +183,7 @@ class BacktestEngine:
             if budget_remaining <= 0:
                 pass
             else:
-                scored_coins = self._score_coins(coins, use_gem_detector)
+                scored_coins = self._score_coins(coins)
 
                 for scored in scored_coins:
                     if budget_remaining <= 0:
@@ -292,11 +290,9 @@ class BacktestEngine:
     def _score_coins(
         self,
         coins: List[Dict],
-        use_gem_detector: bool,
     ) -> List[Dict[str, Any]]:
         """
-        Score coins for buying potential. Uses gem detector if available,
-        otherwise falls back to heuristic scoring.
+        Score coins for buying potential using heuristic scoring.
         """
         scored = []
 
@@ -305,22 +301,8 @@ class BacktestEngine:
             if price <= 0 or price > 1.25:
                 continue  # Only low-cap coins
 
-            confidence = 0
-            reason = ""
-
-            if use_gem_detector:
-                try:
-                    from ml.enhanced_gem_detector import HiddenGemDetector
-                    detector = HiddenGemDetector()
-                    result = detector._heuristic_gem_score(coin)
-                    confidence = int(result.get("gem_probability", 0) * 100)
-                    reason = f"Gem score: {result.get('gem_score', 0):.1f}"
-                except Exception:
-                    confidence = self._heuristic_score(coin)
-                    reason = "Heuristic scoring"
-            else:
-                confidence = self._heuristic_score(coin)
-                reason = "Heuristic scoring"
+            confidence = self._heuristic_score(coin)
+            reason = "Heuristic scoring"
 
             scored.append({
                 "symbol": coin["symbol"],

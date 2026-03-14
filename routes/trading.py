@@ -949,7 +949,6 @@ def backtest_run():
             historical_data=historical_data,
             strategy_name=body.get('strategy_name', 'api_backtest'),
             min_confidence=body.get('min_confidence', 75),
-            use_gem_detector=body.get('use_gem_detector', False),
         )
         summary = {k: v for k, v in asdict(result).items() if k not in ('trades', 'equity_curve')}
         summary['trade_count'] = len(result.trades)

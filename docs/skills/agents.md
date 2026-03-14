@@ -98,8 +98,16 @@ analyze_crypto(symbol, coin_data)
     → Each agent calls its tools (mostly placeholders)
     → trading_specialist receives synthesized analysis
     → Produces TradeDecision JSON
-    → orchestrator.py extracts via regex JSON parsing
-    → Returns to caller (ScanLoop or API endpoint)
+```
+
+## OrchestratorWrapper
+
+`ml/orchestrator_wrapper.py` — thin adapter used by `PortfolioManager` for batch coin analysis.
+
+```python
+wrapper = get_orchestrator_wrapper()          # module-level singleton
+result = await wrapper.analyze_coin(symbol, coin_data)
+metrics = wrapper.get_metrics()
 ```
 
 ## Gotchas
@@ -108,5 +116,5 @@ analyze_crypto(symbol, coin_data)
 - Memory is **off by default** — pass `use_memory=True` for cross-session context
 - The `trading_specialist` has **no tools** — pure LLM decision agent
 - JSON extraction from agent output uses **regex** (`\{...\}` matching) — can fail on malformed output
-- `OrchestratorWrapper` in `ml/enhanced_gem_detector.py` bridges ADK to the PortfolioManager interface
+- `OrchestratorWrapper` in `ml/orchestrator_wrapper.py` bridges ADK to the PortfolioManager interface
 - Gemini API costs ~£2/month at typical scan rates
