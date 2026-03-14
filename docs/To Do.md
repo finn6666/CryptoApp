@@ -57,6 +57,7 @@ Already in `.gitignore` (line 51). Nothing to do.
 - Would like a new dir for architecture docs — so everything can be explained in isolation and together
 - SSH issues while away from Pi?
 - Skills and instructions — ensure existing skills/instructions work with the new VS Code agent customisation functionality
+- Would like to find ways to reduce api costs but dont loose functionality/perfromance
 
 ### Remove Enhanced Gem Detector — replace with ADK agent
 Remove `ml/enhanced_gem_detector.py` (~1400 lines) and replace its three roles with ADK-native alternatives:
