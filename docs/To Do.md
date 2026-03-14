@@ -1,16 +1,11 @@
-## Completed (14 March 2026)
+## Cur work
+- Investigate coinmarketcap error were getting - Error fetching trending coins: 403 f
+- **Tailscale installed** — needs browser auth to complete: visit the URL shown by `sudo tailscale status`, then `ssh finnbryant@$(tailscale ip -4)` works from anywhere
 
-- **Architecture docs directory** — created `docs/architecture/` with overview, agents, scanning, trading, data-model, and infrastructure pages.
-- **SSH / remote access docs** — added Tailscale SSH section to `docs/DEPLOYMENT.md`; also covered in `docs/architecture/infrastructure.md`.
-- **VS Code instructions** — created `.github/copilot-instructions.md` (workspace rules) and five `.github/instructions/*.instructions.md` files (agents, scanning, trading, frontend, deployment) replacing the old skills format.
-- **Reduce API costs** — increased analysis cache TTL from 4h to 12h (`CACHE_EXPIRY_SECONDS = 43200` in `services/app_state.py`). No functional change.
-- **Remove Enhanced Gem Detector** — deleted `ml/enhanced_gem_detector.py` (~1400 lines). Replaced its three roles:
-  - Candidate ranking: `_select_candidates()` now uses `attractiveness_score` fallback
-  - Monitor quick scan: `_run_quick_scan` in `market_monitor.py` uses `attractiveness_score`
-  - Portfolio analysis: extracted `OrchestratorWrapper` into `ml/orchestrator_wrapper.py`
-  - Removed `gem_detector` / `GEM_DETECTOR_AVAILABLE` globals from `app_state.py`
-  - Removed 5 `/api/gems/detect|scan|train|status|top` endpoints from `ml_routes.py`
-  - Updated `scan_loop.py`, `backtesting.py`, `scheduler.py`, `routes/coins.py`, `routes/health.py`, `routes/trading.py`
+## Recently Fixed (14 Mar 2026)
+- **UP sell failing** — portfolio had wrong quantity (52.46 theoretical vs 50.1061 actual Kraken balance). Corrected `portfolio.json` and widened sell balance tolerance 1%→10% in `exchange_manager.py`
+- **NoneType format crash** — `portfolio_tracker.py:129` crashed with `unsupported format string passed to NoneType.__format__` when `price` was None after a failed post-order update. Fixed with `(price or 0):.6f`. Also guarded the upstream `price=... or 0` in `trading_engine.py`
+
 
 ## Future Work
 

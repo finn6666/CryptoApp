@@ -631,12 +631,15 @@ class ExchangeManager:
                 # Need enough base currency to sell
                 available = balance.get(base, {}).get("free", 0) or 0
                 if available < quantity:
-                    # Within 1%: cap to available — handles minor tracker/exchange
-                    # divergence (e.g. fees reducing free balance by a tiny amount)
-                    if quantity <= available * 1.01:
+                    # Within 10%: cap to available — handles divergence between
+                    # portfolio tracker and exchange (e.g. fees deducted from
+                    # received coins, post-order processing errors that recorded
+                    # theoretical qty instead of actual filled qty).
+                    if quantity <= available * 1.10:
                         logger.info(
                             f"Sell: adjusting {base} qty {quantity:.8f} → {available:.8f} "
-                            f"(free balance on {exchange_id})"
+                            f"(free balance on {exchange_id}, delta "
+                            f"{((quantity - available) / quantity * 100):.1f}%)"
                         )
                         return {"ok": True, "adjusted_quantity": available}
                     msg = (

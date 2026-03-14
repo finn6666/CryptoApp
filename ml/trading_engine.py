@@ -711,7 +711,7 @@ class TradingEngine:
                 symbol=proposal.symbol,
                 side=proposal.side,
                 quantity=proposal.quantity or 0,
-                price=proposal.execution_price or proposal.price_at_proposal,
+                price=proposal.execution_price or proposal.price_at_proposal or 0,
                 amount_gbp=proposal.amount_gbp,
                 exchange=exchange,
                 order_id=proposal.order_id or "",
