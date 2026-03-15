@@ -2,16 +2,17 @@
 Sell-Side Automation
 Monitors holdings for exit triggers and automatically proposes sell trades.
 
-Exit triggers:
-- Profit target hit (configurable, default 75%)
-- Stop-loss triggered (configurable, default -80%) — dead-coin protection only;
-  agent recheck fires every 12h and will recommend SELL on fundamentals long before -80%
-- Trailing stop (configurable, default 45% from peak)
-- Agent re-analysis recommends SELL/AVOID every 12h per held coin
-- Minimum hold period (default 0h = disabled) — set SELL_MIN_HOLD_HOURS env var to re-enable
+Exit triggers (in priority order):
+1. Stop-loss (-80% default) — dead-coin safety net, fires immediately regardless of hold period.
+2. Partial sell on massive gain (default +300%) — sells a fraction (default 50%) of the position
+   once per holding to lock in some profit; the remainder rides on trailing stop + agent recheck.
+3. Trailing stop (45% drop from peak, default) — primary lock-in mechanism for normal runs.
+4. Agent re-analysis every 12h — fundamental/sentiment check; SELL/AVOID recommendation exits.
+5. Hard profit ceiling (SELL_PROFIT_TARGET_PCT, default 9999% = effectively disabled) — last resort.
 
-Thresholds are intentionally wide — crypto routinely swings 30-50%/day.
-The agent recheck is the primary exit signal; the numeric triggers are safety nets.
+The flat profit target is intentionally set near-infinite so the system never bails out of a
+strong uptrend early. The trailing stop captures most of each run; the partial sell on massive
+gains locks in some profit without fully closing a rocket position.
 """
 
 import os
@@ -35,9 +36,16 @@ class SellAutomation:
     """
 
     def __init__(self):
-        # Exit thresholds — intentionally wide for crypto volatility.
-        # Small-cap coins routinely swing 20-30%/day; tight stops cause premature exits.
-        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "75.0"))
+        # Hard profit ceiling — set near-infinite so the system never bails early.
+        # Primary exits are trailing stop + agent recheck; this is a last-resort cap only.
+        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "9999.0"))
+
+        # Partial sell on massive gains — locks in profit without fully closing a rocket.
+        # Sells SELL_PARTIAL_FRACTION of the position once per holding when gain hits this %.
+        # The remainder rides on trailing stop + agent recheck.
+        self.partial_sell_threshold_pct = float(os.getenv("SELL_PARTIAL_THRESHOLD_PCT", "300.0"))
+        self.partial_sell_fraction = float(os.getenv("SELL_PARTIAL_FRACTION", "0.5"))
+
         # -80% default: stop loss is a last resort for genuinely dead coins only.
         # Crypto routinely swings 30-50%; tight stops cause premature full exits.
         # The agent recheck (every 12h) handles deteriorating fundamentals before
@@ -57,11 +65,15 @@ class SellAutomation:
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
         self._last_recheck: Dict[str, str] = {}  # symbol → ISO timestamp
+        # Symbols that have already had a partial sell — prevents double-firing
+        self._partial_sells_done: set = set()
 
         self._load_state()
 
         logger.info(
-            f"Sell automation: profit_target={self.profit_target_pct}%, "
+            f"Sell automation: profit_target={self.profit_target_pct}% (effectively disabled), "
+            f"partial_sell={self.partial_sell_threshold_pct}% "
+            f"({self.partial_sell_fraction*100:.0f}% of position), "
             f"stop_loss={self.stop_loss_pct}%, trailing_stop={self.trailing_stop_pct}%, "
             f"min_hold={self.min_hold_hours}h (0=disabled), "
             f"agent_recheck={self.enable_agent_recheck}"
@@ -181,7 +193,20 @@ class SellAutomation:
                 except Exception as e:
                     logger.debug(f"Q-learning outcome recording failed: {e}")
 
-                amount_gbp = current_price * quantity
+                # Partial sell: only sell the configured fraction of the position.
+                # Mark done so this fires only once per holding.
+                if trigger["type"] == "partial_profit":
+                    sell_quantity = quantity * self.partial_sell_fraction
+                    self._partial_sells_done.add(symbol)
+                    logger.info(
+                        f"Partial sell triggered for {symbol}: "
+                        f"selling {self.partial_sell_fraction*100:.0f}% "
+                        f"({sell_quantity:.6f} of {quantity:.6f}) at +{pnl_pct:.1f}%"
+                    )
+                else:
+                    sell_quantity = quantity
+
+                amount_gbp = current_price * sell_quantity
                 result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side="sell",
@@ -190,7 +215,7 @@ class SellAutomation:
                     reason=trigger["reason"],
                     confidence=trigger["confidence"],
                     recommendation="SELL",
-                    sell_quantity=quantity,
+                    sell_quantity=sell_quantity,
                 )
                 outcome = "auto-executed" if result.get("auto_approved") else "proposed"
                 proposals.append({
@@ -243,13 +268,31 @@ class SellAutomation:
         if within_hold_period:
             return None
 
-        # 2. Profit target
+        # 2. Partial sell on massive gains — fires once per holding to lock in profit.
+        # The remaining position continues to ride on trailing stop + agent recheck.
+        if (
+            symbol not in self._partial_sells_done
+            and pnl_pct >= self.partial_sell_threshold_pct
+        ):
+            return {
+                "type": "partial_profit",
+                "reason": (
+                    f"Massive gain: {pnl_pct:.1f}% — partial exit "
+                    f"({self.partial_sell_fraction * 100:.0f}% of position). "
+                    f"Remaining {100 - self.partial_sell_fraction * 100:.0f}% rides on "
+                    f"trailing stop + agent recheck. "
+                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
+                ),
+                "confidence": 85,
+            }
+
+        # 3. Hard profit ceiling (default 9999% — effectively disabled)
         if pnl_pct >= self.profit_target_pct:
             return {
                 "type": "profit_target",
                 "reason": (
-                    f"Profit target reached: {pnl_pct:.1f}% gain "
-                    f"(target: {self.profit_target_pct}%). "
+                    f"Hard profit ceiling reached: {pnl_pct:.1f}% gain "
+                    f"(ceiling: {self.profit_target_pct}%). "
                     f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
                 ),
                 "confidence": 85,
@@ -342,6 +385,9 @@ class SellAutomation:
         """Return current sell automation status."""
         return {
             "profit_target_pct": self.profit_target_pct,
+            "partial_sell_threshold_pct": self.partial_sell_threshold_pct,
+            "partial_sell_fraction": self.partial_sell_fraction,
+            "partial_sells_done": list(self._partial_sells_done),
             "stop_loss_pct": self.stop_loss_pct,
             "trailing_stop_pct": self.trailing_stop_pct,
             "min_hold_hours": self.min_hold_hours,
@@ -361,6 +407,7 @@ class SellAutomation:
             state = {
                 "peak_prices": self._peak_prices,
                 "last_recheck": self._last_recheck,
+                "partial_sells_done": list(self._partial_sells_done),
             }
             tmp = SELL_STATE_FILE.with_suffix(".tmp")
             with open(tmp, "w") as f:
@@ -381,6 +428,7 @@ class SellAutomation:
                 state = json.load(f)
             self._peak_prices = state.get("peak_prices", {})
             self._last_recheck = state.get("last_recheck", {})
+            self._partial_sells_done = set(state.get("partial_sells_done", []))
         except Exception as e:
             logger.error(f"Failed to load sell state: {e}")
 
