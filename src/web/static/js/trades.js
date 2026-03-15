@@ -614,15 +614,73 @@ async function loadTradeLog() {
 
 // ─── Activity Log ────────────────────────────────────
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
+// escapeHtml is defined in utils.js
 
 function truncate(str, max) {
     if (!str || str.length <= max) return str;
     return str.slice(0, max) + '…';
+}
+
+async function loadMonthlyReview() {
+    try {
+        const response = await fetch('/api/portfolio/monthly-review', { headers: authHeaders() });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const months = data.months || [];
+        const container = document.getElementById('monthlyReview');
+        if (!container) return;
+
+        if (months.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trade history yet — monthly stats will appear here once trades are recorded.</p>';
+            return;
+        }
+
+        const rows = months.map(m => {
+            const label = new Date(m.month + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+            const pnl = m.realised_pnl_gbp;
+            const pnlColor = pnl > 0 ? '#48bb78' : pnl < 0 ? '#fc8181' : 'var(--text-secondary)';
+            const pnlSign = pnl > 0 ? '+' : '';
+            const winRate = m.win_rate_pct !== null ? m.win_rate_pct.toFixed(1) + '%' : '—';
+            const winRateColor = m.win_rate_pct !== null ? (m.win_rate_pct >= 50 ? '#48bb78' : '#fc8181') : 'var(--text-secondary)';
+            const best = m.best_trade ? `<span style="color:#48bb78">${escapeHtml(m.best_trade.symbol)} +£${m.best_trade.pnl_gbp.toFixed(2)}</span>` : '—';
+            const worst = m.worst_trade ? `<span style="color:#fc8181">${escapeHtml(m.worst_trade.symbol)} £${m.worst_trade.pnl_gbp.toFixed(2)}</span>` : '—';
+            return `<tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px;">
+                <td style="padding: 10px 8px; font-weight: 600; color: var(--text-primary); white-space: nowrap;">${label}</td>
+                <td style="padding: 10px 8px; text-align: center; color: var(--text-secondary);">${m.buys}</td>
+                <td style="padding: 10px 8px; text-align: center; color: var(--text-secondary);">${m.sells}</td>
+                <td style="padding: 10px 8px; text-align: right; color: var(--text-secondary);">£${m.invested_gbp.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-weight: 700; color: ${pnlColor};">${pnlSign}£${pnl.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: center; font-weight: 600; color: ${winRateColor};">${winRate}</td>
+                <td style="padding: 10px 8px; text-align: center; color: var(--text-secondary);">${m.unique_coins}</td>
+                <td style="padding: 10px 8px; text-align: center;">${best}</td>
+                <td style="padding: 10px 8px; text-align: center;">${worst}</td>
+            </tr>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                        <th style="padding: 8px; text-align: left; font-weight: 600;">Month</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Buys</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Sells</th>
+                        <th style="padding: 8px; text-align: right; font-weight: 600;">Invested</th>
+                        <th style="padding: 8px; text-align: right; font-weight: 600;">Realised P&L</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Win Rate</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Coins</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Best Trade</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Worst Trade</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`;
+    } catch (e) {
+        console.error('Error loading monthly review:', e);
+        const container = document.getElementById('monthlyReview');
+        if (container) container.innerHTML = '<p style="color: #fc8181; text-align: center; padding: 20px; font-size: 13px;">Failed to load monthly review.</p>';
+    }
 }
 
 async function loadActivityLog() {
@@ -720,6 +778,7 @@ function initTradingSections() {
     loadMarketState();
     loadClosedPositions();
     loadRlInsights();
+    loadMonthlyReview();
     loadActivityLog();
 
     // Periodic refresh

@@ -92,12 +92,12 @@ function generatePortfolioHTML(data) {
                     ${data.top_opportunities.map(opp => `
                         <div class="opportunity-card">
                             <div class="opp-header">
-                                <span class="opp-symbol">${opp.symbol}</span>
-                                <span class="opp-score">${opp.gem_score}%</span>
+                                <span class="opp-symbol">${escapeHtml(opp.symbol)}</span>
+                                <span class="opp-score">${Number(opp.gem_score)}%</span>
                             </div>
-                            <div class="opp-name">${opp.name}</div>
-                            <div class="opp-reason">${opp.reason}</div>
-                            <div class="opp-confidence">Confidence: ${opp.confidence}%</div>
+                            <div class="opp-name">${escapeHtml(opp.name)}</div>
+                            <div class="opp-reason">${escapeHtml(opp.reason)}</div>
+                            <div class="opp-confidence">Confidence: ${Number(opp.confidence)}%</div>
                         </div>
                     `).join('')}
                 </div>
@@ -114,11 +114,11 @@ function generatePortfolioHTML(data) {
                     ${Object.entries(data.allocation_strategy).map(([symbol, pct]) => `
                         <div class="allocation-item">
                             <div class="allocation-bar-container">
-                                <div class="allocation-bar" style="width: ${pct}%"></div>
+                                <div class="allocation-bar" style="width: ${Number(pct)}%"></div>
                             </div>
                             <div class="allocation-label">
-                                <span class="allocation-symbol">${symbol}</span>
-                                <span class="allocation-pct">${pct}%</span>
+                                <span class="allocation-symbol">${escapeHtml(symbol)}</span>
+                                <span class="allocation-pct">${Number(pct)}%</span>
                             </div>
                         </div>
                     `).join('')}
@@ -134,7 +134,7 @@ function generatePortfolioHTML(data) {
                 <h3>📋 Market Notes</h3>
                 <div class="market-notes">
                     ${data.risk_warnings.map(warning => `
-                        <div class="market-note">📌 ${warning}</div>
+                        <div class="market-note">📌 ${escapeHtml(warning)}</div>
                     `).join('')}
                 </div>
             </div>
@@ -150,16 +150,16 @@ function generatePortfolioHTML(data) {
                     ${recs.buy.slice(0, 5).map(rec => `
                         <div class="rec-item buy">
                             <div class="rec-header">
-                                <span class="rec-symbol">${rec.symbol}</span>
-                                <span class="rec-score">${rec.gem_score}%</span>
+                                <span class="rec-symbol">${escapeHtml(rec.symbol)}</span>
+                                <span class="rec-score">${Number(rec.gem_score)}%</span>
                             </div>
                             <div class="rec-details">
-                                <span class="rec-confidence">Confidence: ${rec.confidence}%</span>
-                                <span class="rec-opportunity ${rec.risk_level.toLowerCase()}">${rec.risk_level === 'High' || rec.risk_level === 'Very High' ? 'High Upside' : rec.risk_level === 'Low' ? 'Stable' : 'Balanced'}</span>
+                                <span class="rec-confidence">Confidence: ${Number(rec.confidence)}%</span>
+                                <span class="rec-opportunity ${escapeHtml(rec.risk_level.toLowerCase())}">${rec.risk_level === 'High' || rec.risk_level === 'Very High' ? 'High Upside' : rec.risk_level === 'Low' ? 'Stable' : 'Balanced'}</span>
                             </div>
                             ${rec.key_strengths && rec.key_strengths.length > 0 ? `
                                 <div class="rec-strengths">
-                                    ${rec.key_strengths.map(s => `<div>✓ ${s}</div>`).join('')}
+                                    ${rec.key_strengths.map(s => `<div>✓ ${escapeHtml(s)}</div>`).join('')}
                                 </div>
                             ` : ''}
                         </div>
@@ -180,12 +180,12 @@ function generatePortfolioHTML(data) {
                     ${recs.hold.slice(0, 5).map(rec => `
                         <div class="rec-item hold">
                             <div class="rec-header">
-                                <span class="rec-symbol">${rec.symbol}</span>
-                                <span class="rec-score">${rec.gem_score}%</span>
+                                <span class="rec-symbol">${escapeHtml(rec.symbol)}</span>
+                                <span class="rec-score">${Number(rec.gem_score)}%</span>
                             </div>
                             <div class="rec-details">
-                                <span class="rec-confidence">Confidence: ${rec.confidence}%</span>
-                                <span class="rec-opportunity ${rec.risk_level.toLowerCase()}">${rec.risk_level === 'High' || rec.risk_level === 'Very High' ? 'High Upside' : rec.risk_level === 'Low' ? 'Stable' : 'Balanced'}</span>
+                                <span class="rec-confidence">Confidence: ${Number(rec.confidence)}%</span>
+                                <span class="rec-opportunity ${escapeHtml(rec.risk_level.toLowerCase())}">${rec.risk_level === 'High' || rec.risk_level === 'Very High' ? 'High Upside' : rec.risk_level === 'Low' ? 'Stable' : 'Balanced'}</span>
                             </div>
                         </div>
                     `).join('')}
