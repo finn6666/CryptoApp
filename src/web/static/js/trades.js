@@ -84,6 +84,16 @@ function formatPrice(price) {
     return `£${Number(price).toFixed(6)}`;
 }
 
+// Smart GBP formatter — uses extra decimal places for sub-penny values
+function smartGbp(value) {
+    const n = Number(value) || 0;
+    const abs = Math.abs(n);
+    if (abs === 0) return '£0.00';
+    if (abs >= 0.01) return `£${n.toFixed(2)}`;
+    if (abs >= 0.0001) return `£${n.toFixed(4)}`;
+    return `£${n.toFixed(6)}`;
+}
+
 async function loadExecutedTrades() {
     try {
         const hdrs = { headers: authHeaders() };
@@ -410,10 +420,11 @@ async function loadTradesPortfolio() {
                         <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(h.symbol)}</span>
                         <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
                     </div>
-                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(2)}</div>
+                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">${smartGbp(h.current_value_gbp || 0)}</div>
                     <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary);">
-                        <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>£${(h.total_cost_gbp || 0).toFixed(2)}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(2)}</span></div>
+                        ${h.current_price ? `<div style="display: flex; justify-content: space-between;"><span>Price</span><span>${formatPrice(h.current_price)}</span></div>` : ''}
+                        <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>${smartGbp(h.total_cost_gbp || 0)}</span></div>
+                        <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}${smartGbp(Math.abs(pnlGbp))}</span></div>
                         <div style="display: flex; justify-content: space-between;"><span>Qty</span><span>${h.quantity?.toFixed(4) || 0}</span></div>
                         <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${escapeHtml(h.exchange || '—')}</span></div>
                     </div>
