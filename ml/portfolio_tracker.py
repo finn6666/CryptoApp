@@ -145,9 +145,12 @@ class PortfolioTracker:
 
             holding = {**h}
 
+            # Cost of the currently held quantity (not total historical spend)
+            avg_entry = h.get("avg_entry_price", 0)
+            holding["position_cost_gbp"] = round(avg_entry * h["quantity"], 8)
+
             if live_prices and sym in live_prices:
                 current_price = live_prices[sym]
-                avg_entry = h.get("avg_entry_price", 0)
                 holding["current_price"] = current_price
                 holding["current_value_gbp"] = current_price * h["quantity"]
                 holding["unrealised_pnl_gbp"] = (
@@ -158,6 +161,9 @@ class PortfolioTracker:
                     if avg_entry > 0
                     else 0
                 )
+                # Round P&L values to avoid floating-point noise in display
+                holding["unrealised_pnl_gbp"] = round(holding["unrealised_pnl_gbp"], 8)
+                holding["unrealised_pnl_pct"] = round(holding["unrealised_pnl_pct"], 4)
 
             result.append(holding)
 

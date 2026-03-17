@@ -638,6 +638,7 @@ def portfolio_holdings():
                 if coin:
                     h["price_change_24h"] = coin.price_change_24h
                     h["price_change_7d"] = coin.price_change_7d
+                    h["coin_name"] = coin.name
 
         return jsonify({
             "holdings": holdings,

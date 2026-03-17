@@ -383,6 +383,7 @@ async function loadTradesPortfolio() {
         const response = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
         const data = await response.json();
         const holdings = data.holdings || [];
+        holdings.sort((a, b) => (b.unrealised_pnl_gbp ?? 0) - (a.unrealised_pnl_gbp ?? 0));
         const summary = data.summary || {};
 
         document.getElementById('tpValue').textContent = `£${(summary.total_value_gbp || 0).toFixed(2)}`;
@@ -395,18 +396,18 @@ async function loadTradesPortfolio() {
 
         const pnlEl = document.getElementById('tpPnl');
         const unrealisedPnl = summary.unrealised_pnl_gbp || 0;
-        pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : ''}£${unrealisedPnl.toFixed(2)}`;
+        pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : '-'}£${Math.abs(unrealisedPnl).toFixed(2)}`;
         pnlEl.style.color = unrealisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
 
         const realisedEl = document.getElementById('tpRealisedPnl');
         const realisedPnl = summary.realised_pnl_gbp || 0;
-        realisedEl.textContent = `${realisedPnl >= 0 ? '+' : ''}£${realisedPnl.toFixed(2)}`;
+        realisedEl.textContent = `${realisedPnl >= 0 ? '+' : '-'}£${Math.abs(realisedPnl).toFixed(2)}`;
         realisedEl.style.color = realisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
 
         const container = document.getElementById('holdingsList');
 
         if (holdings.length > 0) {
-            container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">` + holdings.map(h => {
+            container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">` + holdings.map(h => {
                 const pnlPct = h.unrealised_pnl_pct || 0;
                 const pnlGbp = h.unrealised_pnl_gbp || 0;
                 const isUp = pnlGbp >= 0;
@@ -414,19 +415,56 @@ async function loadTradesPortfolio() {
                 const pnlBg = isUp ? 'rgba(72,187,120,0.1)' : 'rgba(252,129,129,0.1)';
                 const borderAccent = isUp ? 'rgba(72,187,120,0.3)' : 'rgba(252,129,129,0.3)';
                 const arrow = isUp ? '▲' : '▼';
+                const barFill = Math.min(Math.abs(pnlPct), 50) / 50 * 50; // max 50% each side
+                const barLeft  = isUp ? 50 : (50 - barFill);
+                const barRight = isUp ? (50 + barFill) : 50;
+                const barWidthPct = (barRight - barLeft).toFixed(1);
+                const barOffsetPct = barLeft.toFixed(1);
                 return `
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-top: 3px solid ${borderAccent}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(h.symbol)}</span>
-                        <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-top: 3px solid ${borderAccent}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 0;">
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div>
+                                <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(h.symbol)}</span>
+                                ${h.coin_name && h.coin_name !== h.symbol ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 1px;">${escapeHtml(h.coin_name)}</div>` : ''}
+                            </div>
+                            <span style="font-size: 10px; color: var(--text-secondary); background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;">${escapeHtml(h.exchange || '—')}</span>
+                        </div>
+                        <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${Math.abs(pnlPct).toFixed(1)}%</span>
                     </div>
-                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">${smartGbp(h.current_value_gbp || 0)}</div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary);">
-                        ${h.current_price ? `<div style="display: flex; justify-content: space-between;"><span>Price</span><span>${formatPrice(h.current_price)}</span></div>` : ''}
-                        <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>${smartGbp(h.total_cost_gbp || 0)}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}${smartGbp(Math.abs(pnlGbp))}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>Qty</span><span>${h.quantity?.toFixed(4) || 0}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${escapeHtml(h.exchange || '—')}</span></div>
+                    <!-- Value + P&L on same line -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                        <span style="font-size: 20px; font-weight: 700; color: var(--text-primary);">${smartGbp(h.current_value_gbp || 0)}</span>
+                        <span style="font-size: 14px; font-weight: 700; color: ${pnlColor};">${pnlGbp >= 0 ? '+' : '-'}${smartGbp(Math.abs(pnlGbp))}</span>
+                    </div>
+                    <!-- Centred gain/loss bar -->
+                    <div style="position: relative; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 4px;">
+                        <div style="position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(255,255,255,0.2);"></div>
+                        <div style="position: absolute; left: ${barOffsetPct}%; top: 0; height: 100%; width: ${barWidthPct}%; background: ${pnlColor}; border-radius: 2px;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-secondary); margin-bottom: 12px;"><span>loss</span><span>break-even</span><span>gain</span></div>
+                    <!-- Avg buy vs live price -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Avg Buy</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${formatPrice(h.avg_entry_price)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Live Price</div>
+                            <div style="font-size: 13px; font-weight: 600; color: ${h.current_price ? pnlColor : 'var(--text-primary)'};">${h.current_price ? formatPrice(h.current_price) : '—'}</div>
+                        </div>
+                    </div>
+                    <!-- Invested + Holdings -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Invested</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${smartGbp(h.position_cost_gbp ?? h.total_cost_gbp ?? 0)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Holdings</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${(h.quantity || 0).toFixed(4)}</div>
+                        </div>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
