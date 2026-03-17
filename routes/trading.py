@@ -630,7 +630,7 @@ def portfolio_holdings():
         holdings = tracker.get_holdings(live_prices)
         summary = tracker.get_total_value(live_prices)
 
-        # Enrich holdings with 24h/7d price changes from analyzer data
+        # Enrich holdings with name + 24h/7d price changes from analyzer data
         if state.analyzer:
             coin_lookup = {c.symbol.upper(): c for c in state.analyzer.coins}
             for h in holdings:
@@ -638,7 +638,9 @@ def portfolio_holdings():
                 if coin:
                     h["price_change_24h"] = coin.price_change_24h
                     h["price_change_7d"] = coin.price_change_7d
-                    h["coin_name"] = coin.name
+                    if not h.get("coin_name"):
+                        h["coin_name"] = coin.name
+        # coin_name already stored in holdings for any trades recorded after this fix
 
         return jsonify({
             "holdings": holdings,

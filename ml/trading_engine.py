@@ -719,6 +719,7 @@ class TradingEngine:
                 confidence=proposal.confidence,
                 proposal_id=proposal.id,
                 fee_gbp=fee_gbp,
+                coin_name=proposal.coin_name or "",
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")

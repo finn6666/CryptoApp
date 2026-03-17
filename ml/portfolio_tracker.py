@@ -50,6 +50,7 @@ class PortfolioTracker:
         confidence: int = 0,
         proposal_id: str = "",
         fee_gbp: float = 0.0,
+        coin_name: str = "",
     ) -> Dict[str, Any]:
         """
         Record a trade execution and update holdings.
@@ -91,6 +92,8 @@ class PortfolioTracker:
                 h["last_buy_at"] = trade["timestamp"]
                 h["trades"] += 1
                 h["total_fees_gbp"] = h.get("total_fees_gbp", 0) + fee_gbp
+                if coin_name and not h.get("coin_name"):
+                    h["coin_name"] = coin_name
             else:
                 self.holdings[sym] = {
                     "symbol": sym,
@@ -103,6 +106,7 @@ class PortfolioTracker:
                     "exchange": exchange,
                     "trades": 1,
                     "total_fees_gbp": fee_gbp,
+                    "coin_name": coin_name,
                 }
         elif side.lower() == "sell":
             if sym in self.holdings:
