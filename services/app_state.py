@@ -335,44 +335,71 @@ def fetch_and_add_new_symbol_data(symbol: str):
     """Fetch data for a newly added symbol and add it to the live data."""
     import requests
 
-    cmc_api_key = os.getenv('COINMARKETCAP_API_KEY')
+    cg_api_key = os.getenv('COINGECKO_API_KEY', '')
     logger.info(f"Fetching data for new symbol: {symbol}")
 
     if not data_pipeline:
         raise Exception("Data pipeline not available")
 
-    cmc_url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest"
-    headers = {'X-CMC_PRO_API_KEY': cmc_api_key}
-    params = {'symbol': symbol.upper(), 'convert': 'USD'}
+    headers = {'Accept': 'application/json'}
+    if cg_api_key:
+        headers['x-cg-demo-api-key'] = cg_api_key
 
-    response = requests.get(cmc_url, headers=headers, params=params, timeout=10)
-    response.raise_for_status()
-    data = response.json()
+    cg_base = "https://api.coingecko.com/api/v3"
 
-    coin_data = data.get('data', {}).get(symbol.upper())
-    if not coin_data:
-        raise Exception(f"Symbol {symbol} not found on CoinMarketCap")
+    # Resolve symbol → CoinGecko ID
+    search_resp = requests.get(
+        f"{cg_base}/search", headers=headers, params={'query': symbol.upper()}, timeout=10
+    )
+    search_resp.raise_for_status()
+    coin_id = None
+    for c in search_resp.json().get('coins', []):
+        if c.get('symbol', '').upper() == symbol.upper():
+            coin_id = c.get('id')
+            break
 
-    quote = coin_data.get('quote', {}).get('USD', {})
-    price = quote.get('price', 0)
+    if not coin_id:
+        raise Exception(f"Symbol {symbol} not found on CoinGecko")
+
+    # Fetch market data
+    market_resp = requests.get(
+        f"{cg_base}/coins/markets",
+        headers=headers,
+        params={
+            'vs_currency': 'usd',
+            'ids': coin_id,
+            'sparkline': 'false',
+            'price_change_percentage': '24h',
+        },
+        timeout=10,
+    )
+    market_resp.raise_for_status()
+    market_data = market_resp.json()
+    if not market_data:
+        raise Exception(f"No market data returned for {symbol} (id={coin_id})")
+
+    coin_data = market_data[0]
+    price = coin_data.get('current_price', 0)
+    market_cap = coin_data.get('market_cap', 0)
+    volume = coin_data.get('total_volume', 0)
 
     new_coin_data = {
         "item": {
-            "id": str(coin_data.get('id')),
+            "id": coin_id,
             "name": coin_data.get('name', symbol),
             "symbol": symbol.upper(),
             "status": "current",
             "attractiveness_score": 6.0,
             "investment_highlights": ["Recently added symbol"],
             "risk_level": "medium",
-            "market_cap_rank": coin_data.get('cmc_rank'),
+            "market_cap_rank": coin_data.get('market_cap_rank'),
             "data": {
                 "price": price,
-                "price_change_percentage_24h": {"usd": quote.get('percent_change_24h', 0)},
-                "market_cap": f"${quote.get('market_cap', 0):,}" if quote.get('market_cap') else "N/A",
-                "total_volume": f"${quote.get('volume_24h', 0):,}" if quote.get('volume_24h') else "N/A",
+                "price_change_percentage_24h": {"usd": coin_data.get('price_change_percentage_24h', 0)},
+                "market_cap": f"${market_cap:,}" if market_cap else "N/A",
+                "total_volume": f"${volume:,}" if volume else "N/A",
                 "content": None,
-                "source": "coinmarketcap",
+                "source": "coingecko",
             },
         }
     }
@@ -382,7 +409,7 @@ def fetch_and_add_new_symbol_data(symbol: str):
         with open(live_data_file, 'r') as f:
             live_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        live_data = {"last_updated": datetime.now().isoformat(), "sources": ["coinmarketcap"], "coins": []}
+        live_data = {"last_updated": datetime.now().isoformat(), "sources": ["coingecko"], "coins": []}
 
     existing_symbols = [coin["item"]["symbol"] for coin in live_data.get("coins", [])]
     if symbol.upper() not in existing_symbols:
