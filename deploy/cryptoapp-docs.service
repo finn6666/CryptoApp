@@ -1,0 +1,29 @@
+# CryptoApp weekly documentation updater
+# Setup (on Pi):
+#   sudo cp ~/CryptoApp/deploy/cryptoapp-docs.service /etc/systemd/system/
+#   sudo cp ~/CryptoApp/deploy/cryptoapp-docs.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cryptoapp-docs.timer
+#
+# Run manually: sudo systemctl start cryptoapp-docs.service
+# View logs:    journalctl -u cryptoapp-docs.service -n 50
+
+[Unit]
+Description=CryptoApp Weekly Documentation Updater
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/CryptoApp
+EnvironmentFile=/home/pi/CryptoApp/.env
+ExecStart=/usr/bin/env bash -lc 'cd /home/pi/CryptoApp && uv run python -m ml.doc_updater'
+StandardOutput=journal
+StandardError=journal
+
+# Memory cap — Gemini call + Python runtime, well under 200MB
+MemoryMax=200M
+
+[Install]
+WantedBy=multi-user.target
