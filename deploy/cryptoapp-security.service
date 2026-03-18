@@ -1,0 +1,26 @@
+# CryptoApp systemd service — runs the security check script
+# Setup:
+#   sudo cp ~/CryptoApp/deploy/cryptoapp-security.service /etc/systemd/system/
+#   sudo cp ~/CryptoApp/deploy/cryptoapp-security.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cryptoapp-security.timer
+#
+# Run manually: sudo systemctl start cryptoapp-security.service
+# View logs:    journalctl -u cryptoapp-security.service -n 50
+
+[Unit]
+Description=CryptoApp Weekly Security Check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+WorkingDirectory=/home/pi/CryptoApp
+EnvironmentFile=/home/pi/CryptoApp/.env
+ExecStart=/usr/bin/env bash /home/pi/CryptoApp/deploy/security-check.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
