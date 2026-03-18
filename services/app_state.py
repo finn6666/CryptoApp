@@ -234,6 +234,7 @@ def coin_to_dict(coin, include_highlights=False):
         'price_change_24h': coin.price_change_24h or 0,
         'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
         'market_cap_rank': coin.market_cap_rank,
+        'attractiveness_score': safe_float(getattr(coin, 'attractiveness_score', 0)),
     }
     if include_highlights:
         highlights = coin.investment_highlights

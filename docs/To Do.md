@@ -1,25 +1,9 @@
-## Security setup (one-time, run on Pi)
+## Cur Work
 
-```bash
-# Install pre-commit secret scanner
-bash deploy/install-hooks.sh
 
-# Install systemd weekly security check timer
-sudo cp deploy/cryptoapp-security.service /etc/systemd/system/
-sudo cp deploy/cryptoapp-security.timer   /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now cryptoapp-security.timer
 
-# Verify timer is scheduled
-systemctl list-timers cryptoapp-security.timer
 
-# Run manually any time
-sudo systemctl start cryptoapp-security.service
-# or: bash deploy/security-check.sh
-```
 
-## Cur work
-- Just looked at activity log on dashboard, can you explain this concerning the Q learning "skip STG — Q-learning recommends SKIP for state low|low|neutral|mid (Q_buy=0.000, Q_skip=0.000, visits=0, ε=0.158)"
 
 ## Future Work
 
