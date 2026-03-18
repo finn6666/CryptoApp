@@ -1,6 +1,6 @@
 ## Cur Work
 
-
+- Sort the one warning (gem_detector attribute missing in retraining scheduler) is pre-existing and unrelated to today's changes.
 
 
 
