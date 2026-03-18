@@ -12,7 +12,7 @@
 
 AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 5-agent Google ADK (Gemini) architecture to discover undervalued coins, analyse them, and execute live trades on Kraken. Runs headlessly on a Raspberry Pi 4 for ~£2.50/month.
 
-**Key flow:** CoinMarketCap data → 5 AI agents analyse → trading engine proposes → auto-approve or email → Kraken execution → portfolio tracking → sell automation monitors exits.
+**Key flow:** CoinGecko data → 5 AI agents analyse → trading engine proposes → auto-approve or email → Kraken execution → portfolio tracking → sell automation monitors exits.
 
 ## Tech Stack
 
@@ -52,7 +52,7 @@ ml/                 — All ML, trading, and agent logic
 
 routes/             — Flask Blueprints (coins, health, ml, symbols, trading)
 services/           — Shared app state + optional Redis cache
-src/core/           — Config, CryptoAnalyzer model, CoinMarketCap fetcher
+src/core/           — Config, CryptoAnalyzer model, CoinGecko fetcher
 src/web/            — Jinja2 templates + static JS/CSS
 data/               — Runtime JSON state (gitignored)
 deploy/             — systemd unit, nginx config, SSL script
@@ -92,7 +92,7 @@ docs/               — Markdown documentation
 ## Environment Variables
 
 See `.env.example` for the full list. Key groups:
-- **Required:** `COINMARKETCAP_API_KEY`, `GOOGLE_API_KEY`
+- **Required:** `GOOGLE_API_KEY` (Gemini); `COINGECKO_API_KEY` optional (free tier works without it)
 - **Trading:** `KRAKEN_API_KEY`, `KRAKEN_PRIVATE_KEY`, `TRADING_API_KEY`, `DAILY_TRADE_BUDGET_GBP`
 - **Approval:** `BUY_AUTO_APPROVE`, `SELL_REQUIRE_APPROVAL`, `TRADE_NOTIFICATION_EMAIL`, SMTP settings
 - **Scan:** `SCAN_ENABLED`, `SCAN_INTERVAL_HOURS`, `SCAN_MAX_COINS`

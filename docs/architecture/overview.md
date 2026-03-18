@@ -1,13 +1,13 @@
 # Architecture Overview
 
-CryptoApp is a Raspberry Pi–hosted automated trading system. Data flows from CoinMarketCap through AI analysis to trade execution on Kraken.
+CryptoApp is a Raspberry Pi–hosted automated trading system. Data flows from CoinGecko through AI analysis to trade execution on Kraken.
 
 ## System Diagram
 
 ```
                     ┌─────────────────┐
-                    │  CoinMarketCap  │
-                    │    (prices)     │
+                    │   CoinGecko     │
+                    │  (free tier)    │
                     └────────┬────────┘
                              │
              ┌───────────────┼───────────────┐

@@ -18,7 +18,7 @@ uv run python app.py   # http://localhost:5001
 
 | Provider | URL | Cost |
 |----------|-----|------|
-| CoinMarketCap | https://coinmarketcap.com/api/ | Free (30 calls/day) |
+| CoinGecko | https://www.coingecko.com/en/api | Free (no key required; Demo key optional for higher limits) |
 | Google Gemini | https://aistudio.google.com/apikey | Free (1500 req/day) |
 | Kraken | https://pro.kraken.com/app/settings/api | Free |
 
@@ -32,7 +32,7 @@ All set in `.env`. See `.env.example` for full list with descriptions.
 
 | Variable | Purpose |
 |----------|---------|
-| `COINMARKETCAP_API_KEY` | Market data |
+| `COINGECKO_API_KEY` | Market data (optional — free tier works without it) |
 | `GOOGLE_API_KEY` | Gemini agents |
 | `SECRET_KEY` | Flask session signing |
 | `TRADING_API_KEY` | Bearer auth for trading endpoints |

@@ -93,6 +93,11 @@ else
     log "  ⚠️  nginx config not found at $NGINX_CONF (skip if running locally)"
 fi
 
+# ── 8. Update changelog ──────────────────────────────────────────────────────
+log "→ Updating docs/CHANGELOG.md from git log..."
+cd "$APP_DIR"
+uv run python -m ml.doc_updater 2>&1 | tee -a "$LOG_FILE" || log "  ⚠️  changelog update failed (non-fatal)"
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 log "========================================"
 if [[ "$FAIL" -eq 0 ]]; then

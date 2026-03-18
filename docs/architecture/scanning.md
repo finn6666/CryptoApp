@@ -6,7 +6,7 @@ How coins are discovered, filtered, and fed into the analysis pipeline.
 
 ```
 1. _refresh_data()
-   └─ CoinMarketCap API → all tracked coins with price/volume/rank
+   └─ CoinGecko API (free tier) → all tracked coins with price/volume/rank
 
 2. _get_tradeable_coins()
    └─ ExchangeManager.filter_tradeable_coins() — removes stablecoins, checks Kraken pairs

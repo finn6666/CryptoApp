@@ -2,25 +2,6 @@
 
 - Sort the one warning (gem_detector attribute missing in retraining scheduler) is pre-existing and unrelated to today's changes.
 
-## Setup: weekly docs updater (one-time, run on Pi)
-
-```bash
-sudo cp deploy/cryptoapp-docs.service /etc/systemd/system/
-sudo cp deploy/cryptoapp-docs.timer   /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now cryptoapp-docs.timer
-
-# Verify
-systemctl list-timers cryptoapp-docs.timer
-
-# Run manually
-sudo systemctl start cryptoapp-docs.service
-# or: uv run python -m ml.doc_updater
-```
-
-Outputs: `docs/CHANGELOG.md` and updates to `docs/ARCHITECTURE.md` after each weekly run.
-
-
 
 
 ## Future Work

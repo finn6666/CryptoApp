@@ -2,20 +2,20 @@
 
 Key data structures, state globals, and file formats.
 
-## Coin Object (CoinMarketCap data)
+## Coin Object (CoinGecko data)
 
 Coins flowing through the pipeline have these key fields:
 
 | Field | Type | Source |
 |-------|------|--------|
-| `symbol` | str | CoinMarketCap |
-| `name` | str | CoinMarketCap |
-| `price` | float | CoinMarketCap |
-| `volume_24h` | float | CoinMarketCap |
-| `percent_change_24h` | float | CoinMarketCap |
-| `percent_change_7d` | float | CoinMarketCap |
-| `market_cap` | float | CoinMarketCap |
-| `cmc_rank` | int | CoinMarketCap |
+| `symbol` | str | CoinGecko |
+| `name` | str | CoinGecko |
+| `price` | float | CoinGecko |
+| `volume_24h` | float | CoinGecko |
+| `percent_change_24h` | float | CoinGecko |
+| `percent_change_7d` | float | CoinGecko |
+| `market_cap` | float | CoinGecko |
+| `cmc_rank` | int | CoinGecko (market_cap_rank) |
 | `attractiveness_score` | float | Computed (0–10 scale) |
 
 ## TradeProposal (dataclass)
