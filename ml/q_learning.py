@@ -5,10 +5,11 @@ Learns from trade outcomes to adjust future buy/skip decisions.
 Uses a discretised state space with epsilon-greedy exploration.
 
 State features (discretised):
-- gem_score_tier: low / medium / high
-- volume_mcap_ratio: low / medium / high
-- weekly_change: bearish / neutral / bullish
+- gem_score_tier: low / medium / high  (attractiveness_score × 10)
+- volume_mcap_ratio: low / medium / high  (24h_volume / market_cap)
+- weekly_change: bearish / neutral / bullish  (price_change_7d)
 - market_cap_tier: micro / small / mid / large
+- screen_confidence_tier: low / medium / high  (quick-screen confidence %)
 
 Actions: BUY, SKIP
 
@@ -24,6 +25,7 @@ raw confidence score before the scan loop's trade decision threshold.
 import json
 import logging
 import math
+import os
 import random
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -312,17 +314,26 @@ class QLearningTrader:
         """
         Consult Q-table for a direct BUY/SKIP recommendation.
         Returns (should_skip, reason).
+
+        Only recommends SKIP if the state has been visited at least once —
+        avoids blocking trades based on random epsilon-greedy exploration
+        on unseen states (which caused spurious SKIPs in the activity log).
         """
         state = discretise_state(coin_data)
         # Also cache state here in case confidence_adjustment wasn't called
         symbol = coin_data.get("symbol")
         if symbol:
             self._symbol_state_cache[symbol] = state
+
+        visits = sum(self.visit_counts[state].values())
+        # No data on this state yet — don't block the trade
+        if visits == 0:
+            return False, ""
+
         action = self.get_action(state)
 
         if action == "skip":
             q_vals = self.q_table[state]
-            visits = sum(self.visit_counts[state].values())
             reason = (
                 f"Q-learning recommends SKIP for state {state} "
                 f"(Q_buy={q_vals['buy']:.3f}, Q_skip={q_vals['skip']:.3f}, "
@@ -544,8 +555,6 @@ class QLearningTrader:
 
 
 # ─── Singleton ────────────────────────────────────────────────
-
-import os
 
 _instance: Optional[QLearningTrader] = None
 
