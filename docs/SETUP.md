@@ -43,7 +43,7 @@ All set in `.env`. See `.env.example` for full list with descriptions.
 |----------|---------|---------|
 | `KRAKEN_API_KEY` | — | Kraken credentials |
 | `KRAKEN_PRIVATE_KEY` | — | Kraken credentials |
-| `DAILY_TRADE_BUDGET_GBP` | `3.00` | Max daily buy spend (£) |
+| `DAILY_TRADE_BUDGET_GBP` | `5.00` | Max daily buy spend (£) |
 | `MAX_TRADE_PCT` | `50` | Max single trade as % of budget |
 | `TRADE_COOLDOWN_MIN` | `60` | Minutes between proposals per side |
 | `TRADE_SERVER_URL` | `http://localhost:5001` | Base URL for email links |

@@ -592,9 +592,16 @@ async function loadRlInsights() {
         const container = document.getElementById('rlInsights');
 
         if (insights.length > 0) {
-            container.innerHTML = `<ul style="list-style: none; padding: 0; margin: 0;">${insights.map(text =>
-                `<li style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; color: var(--text-secondary); line-height: 1.5;"><span style="color: var(--text-secondary); margin-right: 8px;">&#8226;</span>${escapeHtml(text)}</li>`
-            ).join('')}</ul>`;
+            container.innerHTML = insights.map(text => {
+                const lower = text.toLowerCase();
+                let accent = 'var(--accent-primary)';
+                if (/loss|losses|underperform|red|worst|penalty|avoid|mistake/.test(lower)) {
+                    accent = 'var(--warning)';
+                } else if (/winner|winning|wins|promis|nice|lean toward|worked/.test(lower)) {
+                    accent = 'var(--success)';
+                }
+                return `<div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-left: 3px solid ${accent}; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; font-size: 13px; color: var(--text-primary); line-height: 1.6;">${escapeHtml(text)}</div>`;
+            }).join('');
         } else {
             container.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px; padding: 12px 0;">Nothing to report yet.</p>';
         }

@@ -75,7 +75,7 @@ docs/               — Markdown documentation
 | Mechanism | Default |
 |-----------|---------|
 | Kill switch | Halts all trading instantly |
-| Daily budget | `DAILY_TRADE_BUDGET_GBP` (£3 default) |
+| Daily budget | `DAILY_TRADE_BUDGET_GBP` (£5 default) |
 | Per-trade max | 50% of daily budget |
 | Proposal expiry | 1 hour |
 | Trade cooldown | 60 min between proposals |

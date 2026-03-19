@@ -50,7 +50,7 @@ Sells **always** require email approval regardless of `BUY_AUTO_APPROVE`.
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `DAILY_TRADE_BUDGET_GBP` | `3.00` | Max daily buy spend |
+| `DAILY_TRADE_BUDGET_GBP` | `5.00` | Max daily buy spend |
 | `MAX_TRADE_PCT` | `50` | Max single trade as % of daily budget |
 | `TRADE_COOLDOWN_MIN` | `60` | Minutes between proposals per side |
 | `BUY_AUTO_APPROVE` | `true` | Buys auto-execute without email |
