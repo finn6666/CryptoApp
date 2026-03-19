@@ -12,4 +12,8 @@ Track per-coin allocation performance. Tune the trading agent's budget allocatio
 
 Currently coins bought on KuCoin/MEXC sit on those exchanges. Consider auto-withdrawing to a single hardware wallet (e.g. Ledger) after buy. App already tracks holdings via `data/portfolio.json` so P&L and sell decisions don't depend on which exchange holds the coin — withdrawal would just reduce exchange counterparty risk. Needs: per-exchange withdrawal API calls, minimum withdrawal threshold to avoid fee bleed.
 
+### Learning Insights section (revisit in future)
+
+Current section on the Trades page surfaces Q-learning stats (epsilon, win/loss pattern, best/worst states). It works but feels thin — the displayed text is generic and not very actionable. Options to consider: richer per-coin pattern breakdowns, trend over time charts, confidence intervals, or surfacing the actual state strings more readably. Section currently renamed from "RL Insights" to "Learning Insights" since Q-learning is technically RL but the label was confusing.
+
 ### Weekly Report (revisit in future)

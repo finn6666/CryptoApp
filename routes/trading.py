@@ -847,7 +847,7 @@ def check_symbol_tradeable(symbol):
 
 
 # ========================================
-# RL Insights
+# Learning Insights
 # ========================================
 
 @trading_bp.route('/api/rl/insights')
