@@ -55,10 +55,10 @@ def api_health():
         if engine:
             eng_status = engine.get_status()
             trading_status = {
-                'active': eng_status.get('trading_active', False),
+                'active': eng_status.get('active', False),
                 'kill_switch': eng_status.get('kill_switch', False),
-                'budget_remaining': eng_status.get('remaining_budget', 0),
-                'trades_today': eng_status.get('todays_trades', 0),
+                'budget_remaining': eng_status.get('remaining_today_gbp', 0),
+                'trades_today': eng_status.get('trades_today', 0),
                 'pending_proposals': eng_status.get('pending_proposals', 0),
             }
     except Exception:
