@@ -96,6 +96,12 @@ class ExchangeManager:
             secret = os.getenv("KRAKEN_PRIVATE_KEY", "")
             if key and secret:
                 return {"apiKey": key, "secret": secret}
+        elif exchange_id == "kucoin":
+            key = os.getenv("KUCOIN_API_KEY", "")
+            secret = os.getenv("KUCOIN_API_SECRET", "")
+            passphrase = os.getenv("KUCOIN_PASSPHRASE", "")
+            if key and secret and passphrase:
+                return {"apiKey": key, "secret": secret, "password": passphrase}
         else:
             # Generic fallback: EXCHANGE_API_KEY / EXCHANGE_API_SECRET
             prefix = exchange_id.upper()
