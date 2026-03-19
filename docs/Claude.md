@@ -12,7 +12,7 @@
 
 AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 5-agent Google ADK (Gemini) architecture to discover undervalued coins, analyse them, and execute live trades on Kraken. Runs headlessly on a Raspberry Pi 4 for ~£2.50/month.
 
-**Key flow:** CoinMarketCap data → gem detection → 5 AI agents analyse → trading engine proposes → auto-approve or email → Kraken execution → portfolio tracking → sell automation monitors exits.
+**Key flow:** CoinGecko data → 5 AI agents analyse → trading engine proposes → auto-approve or email → Kraken execution → portfolio tracking → sell automation monitors exits.
 
 ## Tech Stack
 
@@ -32,7 +32,6 @@ AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 
 
 ```
 app.py              — Flask app factory, extension init, scheduler starts
-main.py             — CLI dev server entry point
 wsgi.py             — Gunicorn WSGI entry (wsgi:app)
 gunicorn.conf.py    — Pi-optimised config (1 worker, 120s timeout)
 extensions.py       — Flask-Limiter, Flask-CORS (avoids circular imports)
@@ -44,7 +43,7 @@ ml/                 — All ML, trading, and agent logic
   sell_automation.py  — Exit triggers (profit/stop-loss/trailing/agent)
   q_learning.py        — Q-learning RL (buy/skip, reward shaping, ε-greedy)
   portfolio_tracker.py — Holdings, cost basis, unrealised P&L
-  enhanced_gem_detector.py — GradientBoosting gem scoring (local ML)
+  orchestrator_wrapper.py — Thin ADK adapter for portfolio batch analysis
   training_pipeline.py — RandomForest → ONNX export
   onnx_inference.py    — ONNX Runtime inference
   agent_memory.py      — Short/long-term agent context
@@ -53,7 +52,7 @@ ml/                 — All ML, trading, and agent logic
 
 routes/             — Flask Blueprints (coins, health, ml, symbols, trading)
 services/           — Shared app state + optional Redis cache
-src/core/           — Config, CryptoAnalyzer model, CoinMarketCap fetcher
+src/core/           — Config, CryptoAnalyzer model, CoinGecko fetcher
 src/web/            — Jinja2 templates + static JS/CSS
 data/               — Runtime JSON state (gitignored)
 deploy/             — systemd unit, nginx config, SSL script
@@ -76,13 +75,13 @@ docs/               — Markdown documentation
 | Mechanism | Default |
 |-----------|---------|
 | Kill switch | Halts all trading instantly |
-| Daily budget | `DAILY_TRADE_BUDGET_GBP` (£3 default) |
+| Daily budget | `DAILY_TRADE_BUDGET_GBP` (£5 default) |
 | Per-trade max | 50% of daily budget |
 | Proposal expiry | 1 hour |
 | Trade cooldown | 60 min between proposals |
 | Scan cooldown | 1 hour between scans |
 | Max proposals/scan | 3 |
-| Conviction threshold | ≥55% (agent) / ≥75% (scan loop) |
+| Conviction threshold | ≥55% (agent) / ≥45% (scan loop) |
 | Min hold period | 48h before profit/trailing triggers |
 | Balance check | Kraken balance verified before every order |
 | Email approval | HMAC-signed links; sells always require manual approval |
@@ -93,17 +92,19 @@ docs/               — Markdown documentation
 ## Environment Variables
 
 See `.env.example` for the full list. Key groups:
-- **Required:** `COINMARKETCAP_API_KEY`, `GOOGLE_API_KEY`
+- **Required:** `GOOGLE_API_KEY` (Gemini); `COINGECKO_API_KEY` optional (free tier works without it)
 - **Trading:** `KRAKEN_API_KEY`, `KRAKEN_PRIVATE_KEY`, `TRADING_API_KEY`, `DAILY_TRADE_BUDGET_GBP`
 - **Approval:** `BUY_AUTO_APPROVE`, `SELL_REQUIRE_APPROVAL`, `TRADE_NOTIFICATION_EMAIL`, SMTP settings
-- **Scan:** `SCAN_ENABLED`, `SCAN_INTERVAL_HOURS`, `SCAN_MAX_COINS`, `SCAN_MIN_GEM_SCORE`
+- **Scan:** `SCAN_ENABLED`, `SCAN_INTERVAL_HOURS`, `SCAN_MAX_COINS`
 - **Sell:** `SELL_PROFIT_TARGET_PCT`, `SELL_STOP_LOSS_PCT`, `SELL_TRAILING_STOP_PCT`, `SELL_MIN_HOLD_HOURS`
 
 ## Skills Reference
 
-See `docs/skills/` for detailed guides on specific subsystems:
-- `trading.md` — Trading engine, proposals, approval flow, execution
-- `agents.md` — ADK agent architecture, orchestrator, sub-agents
-- `scanning.md` — Scan loop, gem detection, scheduling
-- `deployment.md` — Pi setup, systemd, nginx, SSL, monitoring
-- `frontend.md` — Templates, JS modules, API endpoints, dashboard
+See `.github/instructions/` for domain-specific instruction files (loaded automatically by VS Code Copilot):
+- `trading.instructions.md` — Trading engine, proposals, approval flow, execution
+- `agents.instructions.md` — ADK agent architecture, orchestrator, sub-agents
+- `scanning.instructions.md` — Scan loop, market monitor, scheduling
+- `deployment.instructions.md` — Pi setup, systemd, nginx, Tailscale SSH
+- `frontend.instructions.md` — Templates, JS modules, API endpoints, dashboard
+
+Broader architecture context: `docs/architecture/`.

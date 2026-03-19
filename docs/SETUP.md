@@ -11,14 +11,14 @@
 git clone <repo-url> && cd CryptoApp
 uv sync
 cp .env.example .env  # fill in API keys
-python app.py          # http://localhost:5001
+uv run python app.py   # http://localhost:5001
 ```
 
 ## Required API Keys
 
 | Provider | URL | Cost |
 |----------|-----|------|
-| CoinMarketCap | https://coinmarketcap.com/api/ | Free (30 calls/day) |
+| CoinGecko | https://www.coingecko.com/en/api | Free (no key required; Demo key optional for higher limits) |
 | Google Gemini | https://aistudio.google.com/apikey | Free (1500 req/day) |
 | Kraken | https://pro.kraken.com/app/settings/api | Free |
 
@@ -32,7 +32,7 @@ All set in `.env`. See `.env.example` for full list with descriptions.
 
 | Variable | Purpose |
 |----------|---------|
-| `COINMARKETCAP_API_KEY` | Market data |
+| `COINGECKO_API_KEY` | Market data (optional — free tier works without it) |
 | `GOOGLE_API_KEY` | Gemini agents |
 | `SECRET_KEY` | Flask session signing |
 | `TRADING_API_KEY` | Bearer auth for trading endpoints |
@@ -43,7 +43,7 @@ All set in `.env`. See `.env.example` for full list with descriptions.
 |----------|---------|---------|
 | `KRAKEN_API_KEY` | — | Kraken credentials |
 | `KRAKEN_PRIVATE_KEY` | — | Kraken credentials |
-| `DAILY_TRADE_BUDGET_GBP` | `3.00` | Max daily buy spend (£) |
+| `DAILY_TRADE_BUDGET_GBP` | `5.00` | Max daily buy spend (£) |
 | `MAX_TRADE_PCT` | `50` | Max single trade as % of budget |
 | `TRADE_COOLDOWN_MIN` | `60` | Minutes between proposals per side |
 | `TRADE_SERVER_URL` | `http://localhost:5001` | Base URL for email links |

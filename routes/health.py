@@ -55,10 +55,10 @@ def api_health():
         if engine:
             eng_status = engine.get_status()
             trading_status = {
-                'active': eng_status.get('trading_active', False),
+                'active': eng_status.get('active', False),
                 'kill_switch': eng_status.get('kill_switch', False),
-                'budget_remaining': eng_status.get('remaining_budget', 0),
-                'trades_today': eng_status.get('todays_trades', 0),
+                'budget_remaining': eng_status.get('remaining_today_gbp', 0),
+                'trades_today': eng_status.get('trades_today', 0),
                 'pending_proposals': eng_status.get('pending_proposals', 0),
             }
     except Exception:
@@ -114,7 +114,6 @@ def api_health():
         'components': {
             'analyzer': state.analyzer is not None,
             'ml_pipeline': state.ML_AVAILABLE,
-            'gem_detector': state.GEM_DETECTOR_AVAILABLE,
             'adk_orchestrator': state.official_adk_available,
             'trading_engine': trading_status,
             'scan_loop': scan_status,
@@ -142,7 +141,6 @@ def api_metrics():
         'application': {
             'total_coins': len(state.analyzer.coins) if state.analyzer else 0,
             'ml_available': state.ML_AVAILABLE,
-            'gem_detector_available': state.GEM_DETECTOR_AVAILABLE,
             'rl_detector_available': False
         }
     }), 200

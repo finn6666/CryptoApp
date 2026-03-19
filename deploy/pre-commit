@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Pre-commit hook: blocks commits containing likely secrets
+# Install: cp deploy/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+#       or run: bash deploy/install-hooks.sh
+
+set -euo pipefail
+
+# Patterns that look like real secrets (value is 8+ non-whitespace chars)
+SECRET_PATTERN='(KRAKEN_API_SECRET|KRAKEN_API_KEY|SECRET_KEY|HMAC_SECRET|GATEIO_API_SECRET|KUCOIN_API_SECRET|KUCOIN_PASSPHRASE|GEMINI_API_KEY)\s*=\s*[A-Za-z0-9+/=_\-]{8,}'
+
+STAGED=$(git diff --cached --name-only)
+FAIL=0
+
+for file in $STAGED; do
+    # Skip .env files — they should never be committed, but the pattern itself
+    # being in an .env.example is fine
+    [[ "$file" == *.env ]] && continue
+    [[ "$file" == *example* ]] && continue
+
+    if git show ":$file" 2>/dev/null | grep -iE "$SECRET_PATTERN" >/dev/null 2>&1; then
+        echo "❌ Possible secret detected in staged file: $file"
+        echo "   Pattern matched: $SECRET_PATTERN"
+        echo "   Use 'git diff --cached $file' to review, then add to .gitignore or remove the value."
+        FAIL=1
+    fi
+done
+
+if [[ "$FAIL" -eq 1 ]]; then
+    echo ""
+    echo "Commit blocked. Remove secrets before committing."
+    echo "If this is a false positive, bypass with: git commit --no-verify"
+    exit 1
+fi
+
+exit 0

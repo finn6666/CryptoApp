@@ -38,9 +38,11 @@ class ScanLoop:
         # Interval-based scanning: run every N hours (0 = once-daily at scan_time only)
         # 12h balances Gemini API cost (~$0.84/day) with discovery frequency
         self.scan_interval_hours = float(os.getenv("SCAN_INTERVAL_HOURS", "12"))
-        self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "25"))
+        self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "10"))
         self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "6.0"))
         self.quick_screen_min_confidence = int(os.getenv("SCAN_QUICK_SCREEN_MIN", "60"))
+        # Max coins that proceed to the expensive 6-call full analysis per scan
+        self.max_full_analysis = int(os.getenv("SCAN_MAX_FULL_ANALYSIS", "5"))
         self.scan_running = False
         self._scheduler_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
@@ -61,6 +63,7 @@ class ScanLoop:
             f"Scan loop initialised — schedule={interval_desc}, "
             f"max_coins={self.max_coins_per_scan}, "
             f"quick_screen_min={self.quick_screen_min_confidence}%, "
+            f"max_full_analysis={self.max_full_analysis}, "
             f"max_proposals={self.max_proposals_per_scan}"
         )
 
@@ -137,12 +140,16 @@ class ScanLoop:
             )
 
             # ── Step 5: Full multi-agent analysis (Tier 2 — 6 Gemini calls each) ──
-            logger.info(f"[Scan {scan_id}] Step 5: Full analysis on {len(screened_candidates)} coins...")
+            logger.info(f"[Scan {scan_id}] Step 5: Full analysis on {len(screened_candidates)} coins (cap={self.max_full_analysis})...")
             proposals_made = 0
+            full_analyses_run = 0
 
             for coin_data in screened_candidates:
                 if proposals_made >= self.max_proposals_per_scan:
                     logger.info(f"[Scan {scan_id}] Hit max proposals ({self.max_proposals_per_scan})")
+                    break
+                if full_analyses_run >= self.max_full_analysis:
+                    logger.info(f"[Scan {scan_id}] Hit max full analyses ({self.max_full_analysis})")
                     break
 
                 # Check budget before each coin to avoid wasting API calls
@@ -160,6 +167,7 @@ class ScanLoop:
                     pass
 
                 symbol = coin_data["symbol"]
+                full_analyses_run += 1
                 try:
                     result = self._analyse_and_evaluate(coin_data)
                     scan_result["analyses"].append({
@@ -330,31 +338,12 @@ class ScanLoop:
             if coin["symbol"] in fav_symbols:
                 candidates.append(coin)
 
-        # Priority 2: High gem scores (if gem detector is available)
-        if state.GEM_DETECTOR_AVAILABLE and state.gem_detector:
-            scored = []
-            for coin in tradeable_coins:
-                if coin["symbol"] in fav_symbols:
-                    continue  # Already included
-                try:
-                    gem_result = state.gem_detector.predict_hidden_gem(coin)
-                    gem_score = gem_result.get("gem_score", 0)
-                    if gem_score >= self.min_gem_score:
-                        coin["gem_score"] = gem_score
-                        coin["gem_probability"] = gem_result.get("gem_probability", 0)
-                        scored.append(coin)
-                except Exception:
-                    pass
-
-            # Sort by gem score descending
-            scored.sort(key=lambda c: c.get("gem_score", 0), reverse=True)
-            candidates.extend(scored)
-
-        # Priority 3: High attractiveness score fallback
+        # Priority 2: High attractiveness score, filtered by min_gem_score
         if len(candidates) < self.max_coins_per_scan:
             remaining = [
                 c for c in tradeable_coins
                 if c["symbol"] not in {x["symbol"] for x in candidates}
+                and c.get("attractiveness_score", 0) >= self.min_gem_score
             ]
             remaining.sort(
                 key=lambda c: c.get("attractiveness_score", 0), reverse=True
@@ -375,7 +364,7 @@ class ScanLoop:
         import services.app_state as state
 
         if not state.official_adk_available:
-            # If ADK isn't available, skip screening — let gem detector handle it
+            # If ADK isn't available, skip screening — pass all candidates through
             return candidates
 
         # Build trade history context once (shared across all screens)
@@ -440,11 +429,10 @@ class ScanLoop:
         if engine.kill_switch:
             return {"outcome": "skipped", "reason": "Kill switch active", "proposed": False}
 
-        # Run orchestrator analysis (with fallback to gem detector)
+        # Run ADK orchestrator analysis (Gemini)
         analysis = None
         analysis_source = None
 
-        # Try 1: Official ADK orchestrator (Gemini)
         if state.official_adk_available and state.analyze_crypto_adk:
             try:
                 analysis = state.run_async(
@@ -452,44 +440,19 @@ class ScanLoop:
                 )
                 if analysis and analysis.get("success"):
                     analysis_source = "adk_orchestrator"
+                else:
+                    analysis = None
             except Exception as e:
                 logger.warning(f"ADK analysis failed for {symbol}: {e}")
                 analysis = None
-                # Alert if it looks like a quota/rate limit issue
                 err_str = str(e).lower()
                 if "quota" in err_str or "rate" in err_str or "429" in err_str:
                     alert_api_quota("Gemini ADK", str(e))
 
-        # Try 2: Gem Detector fallback (no API call — local ML)
-        if (not analysis or not analysis.get("success")) and state.GEM_DETECTOR_AVAILABLE and state.gem_detector:
-            try:
-                gem_result = state.gem_detector.predict_hidden_gem(coin_data)
-                if gem_result:
-                    gem_prob = gem_result.get("gem_probability", 0)
-                    gem_score = gem_result.get("gem_score", 0)
-                    recommendation = "BUY" if gem_prob > 0.6 else "HOLD" if gem_prob > 0.3 else "AVOID"
-                    strengths = gem_result.get("key_strengths", [])
-                    analysis = {
-                        "success": True,
-                        "symbol": symbol,
-                        "recommendation": recommendation,
-                        "confidence": int(gem_prob * 100),
-                        "analysis": (
-                            f"Gem detector: {gem_prob*100:.0f}% gem probability, "
-                            f"score {gem_score:.1f}/100. "
-                            f"Strengths: {', '.join(strengths[:3]) if strengths else 'None identified'}."
-                        ),
-                        "orchestrator": "gem_detector_fallback",
-                    }
-                    analysis_source = "gem_detector"
-                    logger.info(f"Using gem detector fallback for {symbol} (ADK unavailable)")
-            except Exception as e:
-                logger.warning(f"Gem detector fallback also failed for {symbol}: {e}")
-
-        if not analysis or not analysis.get("success"):
+        if not analysis:
             return {
                 "outcome": "skipped",
-                "reason": "All analysis methods failed (ADK + gem detector)",
+                "reason": "ADK analysis failed or unavailable",
                 "proposed": False,
             }
 
@@ -758,6 +721,7 @@ class ScanLoop:
                 and self._scheduler_thread.is_alive()
             ),
             "max_coins_per_scan": self.max_coins_per_scan,
+            "max_full_analysis": self.max_full_analysis,
             "max_proposals_per_scan": self.max_proposals_per_scan,
             "last_scan": (
                 self._last_scan_time.isoformat() if self._last_scan_time else None

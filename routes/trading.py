@@ -356,6 +356,7 @@ def propose_trade_api():
 
 @trading_bp.route('/api/trades/kill-switch', methods=['POST'])
 @limiter.limit('5 per minute')
+@require_trading_auth
 def toggle_kill_switch():
     """Activate or deactivate the trading kill switch"""
     try:
@@ -629,7 +630,7 @@ def portfolio_holdings():
         holdings = tracker.get_holdings(live_prices)
         summary = tracker.get_total_value(live_prices)
 
-        # Enrich holdings with 24h/7d price changes from analyzer data
+        # Enrich holdings with name + 24h/7d price changes from analyzer data
         if state.analyzer:
             coin_lookup = {c.symbol.upper(): c for c in state.analyzer.coins}
             for h in holdings:
@@ -637,6 +638,9 @@ def portfolio_holdings():
                 if coin:
                     h["price_change_24h"] = coin.price_change_24h
                     h["price_change_7d"] = coin.price_change_7d
+                    if not h.get("coin_name"):
+                        h["coin_name"] = coin.name
+        # coin_name already stored in holdings for any trades recorded after this fix
 
         return jsonify({
             "holdings": holdings,
@@ -703,6 +707,74 @@ def portfolio_closed():
     except Exception as e:
         logger.error(f"Portfolio closed positions error: {e}")
         return jsonify({"error": "Failed to get closed positions"}), 500
+
+
+@trading_bp.route('/api/portfolio/monthly-review')
+def monthly_review():
+    """Month-by-month trading performance breakdown."""
+    try:
+        from collections import defaultdict
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+
+        months = defaultdict(lambda: {
+            'buys': 0, 'sells': 0, 'invested_gbp': 0.0,
+            'realised_pnl_gbp': 0.0, 'fees_gbp': 0.0,
+            'winning_sells': 0, 'losing_sells': 0,
+            'best_trade': None, 'worst_trade': None,
+            'coins': set(),
+        })
+
+        for t in tracker.trade_log:
+            month_key = (t.get('timestamp') or '')[:7]  # "2026-03"
+            if not month_key or len(month_key) != 7:
+                continue
+            m = months[month_key]
+            side = t.get('side', '')
+            sym = t.get('symbol', '')
+            if sym:
+                m['coins'].add(sym)
+            m['fees_gbp'] += t.get('fee_gbp', 0) or 0
+            if side == 'buy':
+                m['buys'] += 1
+                m['invested_gbp'] += t.get('amount_gbp', 0) or 0
+            elif side == 'sell':
+                m['sells'] += 1
+                pnl = t.get('realised_pnl_gbp')
+                if pnl is not None:
+                    m['realised_pnl_gbp'] += pnl
+                    if pnl > 0:
+                        m['winning_sells'] += 1
+                        if m['best_trade'] is None or pnl > m['best_trade']['pnl_gbp']:
+                            m['best_trade'] = {'symbol': sym, 'pnl_gbp': round(pnl, 2)}
+                    else:
+                        m['losing_sells'] += 1
+                        if m['worst_trade'] is None or pnl < m['worst_trade']['pnl_gbp']:
+                            m['worst_trade'] = {'symbol': sym, 'pnl_gbp': round(pnl, 2)}
+
+        result = []
+        for month_key in sorted(months.keys(), reverse=True):
+            m = months[month_key]
+            total_closed = m['winning_sells'] + m['losing_sells']
+            result.append({
+                'month': month_key,
+                'buys': m['buys'],
+                'sells': m['sells'],
+                'invested_gbp': round(m['invested_gbp'], 2),
+                'realised_pnl_gbp': round(m['realised_pnl_gbp'], 2),
+                'fees_gbp': round(m['fees_gbp'], 4),
+                'win_rate_pct': round(m['winning_sells'] / total_closed * 100, 1) if total_closed else None,
+                'winning_sells': m['winning_sells'],
+                'losing_sells': m['losing_sells'],
+                'best_trade': m['best_trade'],
+                'worst_trade': m['worst_trade'],
+                'unique_coins': len(m['coins']),
+            })
+
+        return jsonify({'months': result}), 200
+    except Exception as e:
+        logger.error(f"Monthly review error: {e}")
+        return jsonify({"error": "Failed to build monthly review"}), 500
 
 
 # ========================================
@@ -788,11 +860,11 @@ def rl_insights():
         history = ql.get_outcome_history(limit=10)
         insights = []
 
-        episodes = stats.get('episodes', 0)
-        if episodes == 0:
+        closed_trades = stats.get('closed_trades', stats.get('episodes', 0) // 2)
+        if closed_trades == 0:
             insights.append("Still early days — no trades have fully closed yet so there's nothing concrete to learn from. The system will start picking up patterns once positions get sold.")
         else:
-            insights.append(f"Learnt from {episodes} completed trade{'s' if episodes != 1 else ''} so far.")
+            insights.append(f"Learnt from {closed_trades} completed trade{'s' if closed_trades != 1 else ''} so far.")
 
         # Exploration rate
         eps = stats.get('epsilon', 0.3)
@@ -949,7 +1021,6 @@ def backtest_run():
             historical_data=historical_data,
             strategy_name=body.get('strategy_name', 'api_backtest'),
             min_confidence=body.get('min_confidence', 75),
-            use_gem_detector=body.get('use_gem_detector', False),
         )
         summary = {k: v for k, v in asdict(result).items() if k not in ('trades', 'equity_curve')}
         summary['trade_count'] = len(result.trades)

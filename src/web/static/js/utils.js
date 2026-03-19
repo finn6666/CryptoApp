@@ -1,5 +1,14 @@
 // Utility Functions
 
+// ─── HTML Escaping ─────────────────────────────────────────
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(String(str)));
+    return div.innerHTML;
+}
+
 // ─── Auth ──────────────────────────────────────────────────
 
 /** Return stored API key (no prompt — key only needed for agent trade proposals). */

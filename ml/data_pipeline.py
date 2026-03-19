@@ -15,9 +15,11 @@ class CryptoDataPipeline:
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.data_dir = os.path.join(project_root, 'data')
         self.supported_symbols = ["BTC", "ETH", "ADA", "SOL", "MATIC", "DOT", "BOSS"]
-        self.cmc_base = "https://pro-api.coinmarketcap.com/v1"
-        self.api_key = os.getenv('COINMARKETCAP_API_KEY')
+        self.cg_base = "https://api.coingecko.com/api/v3"
+        self.api_key = os.getenv('COINGECKO_API_KEY', '')
         self._symbol_to_id = None
+        # Symbol → CoinGecko ID cache (populated lazily)
+        self._cg_id_cache: dict = {}
     
     async def collect_training_data(self, days: int = 90) -> str:
         """Collect comprehensive training data for all supported symbols"""
@@ -62,39 +64,54 @@ class CryptoDataPipeline:
             raise Exception("No data collected for training")
     
     async def _fetch_symbol_data(self, session: aiohttp.ClientSession, symbol: str, days: int) -> List[Dict]:
-        """Fetch historical data for a single symbol from CoinMarketCap"""
+        """Fetch current snapshot for a single symbol from CoinGecko."""
         try:
-            # Use CMC quotes endpoint
-            url = f"{self.cmc_base}/cryptocurrency/quotes/latest"
-            headers = {'X-CMC_PRO_API_KEY': self.api_key}
+            # Resolve symbol → CoinGecko ID
+            coin_id = self._cg_id_cache.get(symbol.upper())
+            if not coin_id:
+                search_url = f"{self.cg_base}/search"
+                headers = {'x-cg-demo-api-key': self.api_key} if self.api_key else {}
+                async with session.get(search_url, headers=headers, params={'query': symbol}) as resp:
+                    if resp.status != 200:
+                        return []
+                    search_data = await resp.json()
+                    for c in search_data.get('coins', []):
+                        if c.get('symbol', '').upper() == symbol.upper():
+                            coin_id = c.get('id')
+                            self._cg_id_cache[symbol.upper()] = coin_id
+                            break
+
+            if not coin_id:
+                logging.warning(f"CoinGecko ID not found for {symbol}")
+                return []
+
+            url = f"{self.cg_base}/coins/markets"
+            headers = {'x-cg-demo-api-key': self.api_key} if self.api_key else {}
             params = {
-                'symbol': symbol,
-                'convert': 'USD'
+                'vs_currency': 'usd',
+                'ids': coin_id,
+                'sparkline': 'false',
+                'price_change_percentage': '24h',
             }
-            
+
             async with session.get(url, headers=headers, params=params) as response:
                 if response.status != 200:
-                    logging.warning(f"API error for {symbol}: {response.status}")
+                    logging.warning(f"CoinGecko API error for {symbol}: {response.status}")
                     return []
-                    
+
                 data = await response.json()
-                coin_data = data.get('data', {}).get(symbol)
-                
-                if not coin_data:
+                if not data:
                     return []
-                
-                quote = coin_data.get('quote', {}).get('USD', {})
-                
-                # CMC doesn't provide historical hourly data in basic plan
-                # Store current snapshot (you'd need CMC Pro for historical)
+
+                coin_data = data[0]
                 return [{
                     'timestamp': datetime.now(),
-                    'price': quote.get('price', 0),
-                    'volume': quote.get('volume_24h', 0),
-                    'market_cap': quote.get('market_cap', 0),
-                    'percent_change_24h': quote.get('percent_change_24h', 0)
+                    'price': coin_data.get('current_price', 0),
+                    'volume': coin_data.get('total_volume', 0),
+                    'market_cap': coin_data.get('market_cap', 0),
+                    'percent_change_24h': coin_data.get('price_change_percentage_24h', 0),
                 }]
-                
+
         except Exception as e:
             logging.error(f"Error fetching {symbol}: {e}")
             return []
@@ -150,38 +167,27 @@ class CryptoDataPipeline:
             }
     
     async def search_symbols(self, query: str, limit: int = 10) -> List[Dict[str, str]]:
-        """Search for symbols matching a query"""
-        # For CMC, we'll search directly via API
+        """Search for symbols matching a query via CoinGecko /search."""
         try:
-            headers = {'X-CMC_PRO_API_KEY': self.api_key}
-            url = f"{self.cmc_base}/cryptocurrency/map"
-            params = {'limit': 5000}
-            
+            headers = {'x-cg-demo-api-key': self.api_key} if self.api_key else {}
+            url = f"{self.cg_base}/search"
+            params = {'query': query}
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, headers=headers, params=params) as response:
                     if response.status == 200:
                         data = await response.json()
-                        coins = data.get('data', [])
-                        
-                        query_lower = query.lower()
                         matches = []
-                        
-                        for coin in coins:
-                            if (query_lower in coin['symbol'].lower() or 
-                                query_lower in coin['name'].lower()):
-                                matches.append({
-                                    'symbol': coin['symbol'].upper(),
-                                    'name': coin['name'],
-                                    'cmc_id': coin['id']
-                                })
-                                
-                                if len(matches) >= limit:
-                                    break
-                        
+                        for coin in data.get('coins', [])[:limit]:
+                            matches.append({
+                                'symbol': (coin.get('symbol') or '').upper(),
+                                'name': coin.get('name', ''),
+                                'coingecko_id': coin.get('id', ''),
+                            })
                         return matches
         except Exception as e:
             logging.error(f"Error searching symbols: {e}")
-            return []
+        return []
     
     def get_latest_training_file(self) -> str:
         """Get the most recent training data file"""

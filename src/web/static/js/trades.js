@@ -84,6 +84,16 @@ function formatPrice(price) {
     return `£${Number(price).toFixed(6)}`;
 }
 
+// Smart GBP formatter — uses extra decimal places for sub-penny values
+function smartGbp(value) {
+    const n = Number(value) || 0;
+    const abs = Math.abs(n);
+    if (abs === 0) return '£0.00';
+    if (abs >= 0.01) return `£${n.toFixed(2)}`;
+    if (abs >= 0.0001) return `£${n.toFixed(4)}`;
+    return `£${n.toFixed(6)}`;
+}
+
 async function loadExecutedTrades() {
     try {
         const hdrs = { headers: authHeaders() };
@@ -373,6 +383,7 @@ async function loadTradesPortfolio() {
         const response = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
         const data = await response.json();
         const holdings = data.holdings || [];
+        holdings.sort((a, b) => (b.unrealised_pnl_gbp ?? 0) - (a.unrealised_pnl_gbp ?? 0));
         const summary = data.summary || {};
 
         document.getElementById('tpValue').textContent = `£${(summary.total_value_gbp || 0).toFixed(2)}`;
@@ -385,18 +396,18 @@ async function loadTradesPortfolio() {
 
         const pnlEl = document.getElementById('tpPnl');
         const unrealisedPnl = summary.unrealised_pnl_gbp || 0;
-        pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : ''}£${unrealisedPnl.toFixed(2)}`;
+        pnlEl.textContent = `${unrealisedPnl >= 0 ? '+' : '-'}£${Math.abs(unrealisedPnl).toFixed(2)}`;
         pnlEl.style.color = unrealisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
 
         const realisedEl = document.getElementById('tpRealisedPnl');
         const realisedPnl = summary.realised_pnl_gbp || 0;
-        realisedEl.textContent = `${realisedPnl >= 0 ? '+' : ''}£${realisedPnl.toFixed(2)}`;
+        realisedEl.textContent = `${realisedPnl >= 0 ? '+' : '-'}£${Math.abs(realisedPnl).toFixed(2)}`;
         realisedEl.style.color = realisedPnl >= 0 ? 'var(--success)' : 'var(--error)';
 
         const container = document.getElementById('holdingsList');
 
         if (holdings.length > 0) {
-            container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;">` + holdings.map(h => {
+            container.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">` + holdings.map(h => {
                 const pnlPct = h.unrealised_pnl_pct || 0;
                 const pnlGbp = h.unrealised_pnl_gbp || 0;
                 const isUp = pnlGbp >= 0;
@@ -404,18 +415,56 @@ async function loadTradesPortfolio() {
                 const pnlBg = isUp ? 'rgba(72,187,120,0.1)' : 'rgba(252,129,129,0.1)';
                 const borderAccent = isUp ? 'rgba(72,187,120,0.3)' : 'rgba(252,129,129,0.3)';
                 const arrow = isUp ? '▲' : '▼';
+                const barFill = Math.min(Math.abs(pnlPct), 50) / 50 * 50; // max 50% each side
+                const barLeft  = isUp ? 50 : (50 - barFill);
+                const barRight = isUp ? (50 + barFill) : 50;
+                const barWidthPct = (barRight - barLeft).toFixed(1);
+                const barOffsetPct = barLeft.toFixed(1);
                 return `
-                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-top: 3px solid ${borderAccent}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(h.symbol)}</span>
-                        <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%</span>
+                <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-top: 3px solid ${borderAccent}; border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 0;">
+                    <!-- Header -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div>
+                                <span style="font-size: 18px; font-weight: 700; color: var(--text-primary);">${escapeHtml(h.symbol)}</span>
+                                ${h.coin_name && h.coin_name !== h.symbol ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 1px;">${escapeHtml(h.coin_name)}</div>` : ''}
+                            </div>
+                            <span style="font-size: 10px; color: var(--text-secondary); background: rgba(255,255,255,0.06); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px;">${escapeHtml(h.exchange || '—')}</span>
+                        </div>
+                        <span style="font-size: 12px; font-weight: 600; color: ${pnlColor}; background: ${pnlBg}; padding: 3px 10px; border-radius: 6px;">${arrow} ${Math.abs(pnlPct).toFixed(1)}%</span>
                     </div>
-                    <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);">£${(h.current_value_gbp || 0).toFixed(2)}</div>
-                    <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-secondary);">
-                        <div style="display: flex; justify-content: space-between;"><span>Cost</span><span>£${(h.total_cost_gbp || 0).toFixed(2)}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>P&L</span><span style="color: ${pnlColor}; font-weight: 600;">${pnlGbp >= 0 ? '+' : ''}£${pnlGbp.toFixed(2)}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>Qty</span><span>${h.quantity?.toFixed(4) || 0}</span></div>
-                        <div style="display: flex; justify-content: space-between;"><span>Exchange</span><span>${escapeHtml(h.exchange || '—')}</span></div>
+                    <!-- Value + P&L on same line -->
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+                        <span style="font-size: 20px; font-weight: 700; color: var(--text-primary);">${smartGbp(h.current_value_gbp || 0)}</span>
+                        <span style="font-size: 14px; font-weight: 700; color: ${pnlColor};">${pnlGbp >= 0 ? '+' : '-'}${smartGbp(Math.abs(pnlGbp))}</span>
+                    </div>
+                    <!-- Centred gain/loss bar -->
+                    <div style="position: relative; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; margin-bottom: 4px;">
+                        <div style="position: absolute; left: 50%; top: 0; width: 1px; height: 100%; background: rgba(255,255,255,0.2);"></div>
+                        <div style="position: absolute; left: ${barOffsetPct}%; top: 0; height: 100%; width: ${barWidthPct}%; background: ${pnlColor}; border-radius: 2px;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-secondary); margin-bottom: 12px;"><span>loss</span><span>break-even</span><span>gain</span></div>
+                    <!-- Avg buy vs live price -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Avg Buy</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${formatPrice(h.avg_entry_price)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Live Price</div>
+                            <div style="font-size: 13px; font-weight: 600; color: ${h.current_price ? pnlColor : 'var(--text-primary)'};">${h.current_price ? formatPrice(h.current_price) : '—'}</div>
+                        </div>
+                    </div>
+                    <!-- Invested + Holdings -->
+                    <div style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Invested</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${smartGbp(h.position_cost_gbp ?? h.total_cost_gbp ?? 0)}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Holdings</div>
+                            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${(h.quantity || 0).toFixed(4)}</div>
+                        </div>
                     </div>
                 </div>`;
             }).join('') + `</div>`;
@@ -543,9 +592,16 @@ async function loadRlInsights() {
         const container = document.getElementById('rlInsights');
 
         if (insights.length > 0) {
-            container.innerHTML = `<ul style="list-style: none; padding: 0; margin: 0;">${insights.map(text =>
-                `<li style="padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; color: var(--text-secondary); line-height: 1.5;"><span style="color: var(--text-secondary); margin-right: 8px;">&#8226;</span>${escapeHtml(text)}</li>`
-            ).join('')}</ul>`;
+            container.innerHTML = insights.map(text => {
+                const lower = text.toLowerCase();
+                let accent = 'var(--accent-primary)';
+                if (/loss|losses|underperform|red|worst|penalty|avoid|mistake/.test(lower)) {
+                    accent = 'var(--warning)';
+                } else if (/winner|winning|wins|promis|nice|lean toward|worked/.test(lower)) {
+                    accent = 'var(--success)';
+                }
+                return `<div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-left: 3px solid ${accent}; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; font-size: 13px; color: var(--text-primary); line-height: 1.6;">${escapeHtml(text)}</div>`;
+            }).join('');
         } else {
             container.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px; padding: 12px 0;">Nothing to report yet.</p>';
         }
@@ -603,15 +659,73 @@ async function loadTradeLog() {
 
 // ─── Activity Log ────────────────────────────────────
 
-function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
+// escapeHtml is defined in utils.js
 
 function truncate(str, max) {
     if (!str || str.length <= max) return str;
     return str.slice(0, max) + '…';
+}
+
+async function loadMonthlyReview() {
+    try {
+        const response = await fetch('/api/portfolio/monthly-review', { headers: authHeaders() });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const months = data.months || [];
+        const container = document.getElementById('monthlyReview');
+        if (!container) return;
+
+        if (months.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No trade history yet — monthly stats will appear here once trades are recorded.</p>';
+            return;
+        }
+
+        const rows = months.map(m => {
+            const label = new Date(m.month + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+            const pnl = m.realised_pnl_gbp;
+            const pnlColor = pnl > 0 ? '#48bb78' : pnl < 0 ? '#fc8181' : 'var(--text-secondary)';
+            const pnlSign = pnl > 0 ? '+' : '';
+            const winRate = m.win_rate_pct !== null ? m.win_rate_pct.toFixed(1) + '%' : '—';
+            const winRateColor = m.win_rate_pct !== null ? (m.win_rate_pct >= 50 ? '#48bb78' : '#fc8181') : 'var(--text-secondary)';
+            const best = m.best_trade ? `<span style="color:#48bb78">${escapeHtml(m.best_trade.symbol)} +£${m.best_trade.pnl_gbp.toFixed(2)}</span>` : '—';
+            const worst = m.worst_trade ? `<span style="color:#fc8181">${escapeHtml(m.worst_trade.symbol)} £${m.worst_trade.pnl_gbp.toFixed(2)}</span>` : '—';
+            return `<tr style="border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px;">
+                <td style="padding: 10px 8px; font-weight: 600; color: var(--text-primary); white-space: nowrap;">${label}</td>
+                <td style="padding: 10px 8px; text-align: center; color: var(--text-secondary);">${m.buys}</td>
+                <td style="padding: 10px 8px; text-align: center; color: var(--text-secondary);">${m.sells}</td>
+                <td style="padding: 10px 8px; text-align: right; color: var(--text-secondary);">£${m.invested_gbp.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: right; font-weight: 700; color: ${pnlColor};">${pnlSign}£${pnl.toFixed(2)}</td>
+                <td style="padding: 10px 8px; text-align: center; font-weight: 600; color: ${winRateColor};">${winRate}</td>
+                <td style="padding: 10px 8px; text-align: center; color: var(--text-secondary);">${m.unique_coins}</td>
+                <td style="padding: 10px 8px; text-align: center;">${best}</td>
+                <td style="padding: 10px 8px; text-align: center;">${worst}</td>
+            </tr>`;
+        }).join('');
+
+        container.innerHTML = `
+            <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); border-bottom: 1px solid rgba(255,255,255,0.08);">
+                        <th style="padding: 8px; text-align: left; font-weight: 600;">Month</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Buys</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Sells</th>
+                        <th style="padding: 8px; text-align: right; font-weight: 600;">Invested</th>
+                        <th style="padding: 8px; text-align: right; font-weight: 600;">Realised P&L</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Win Rate</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Coins</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Best Trade</th>
+                        <th style="padding: 8px; text-align: center; font-weight: 600;">Worst Trade</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            </div>`;
+    } catch (e) {
+        console.error('Error loading monthly review:', e);
+        const container = document.getElementById('monthlyReview');
+        if (container) container.innerHTML = '<p style="color: #fc8181; text-align: center; padding: 20px; font-size: 13px;">Failed to load monthly review.</p>';
+    }
 }
 
 async function loadActivityLog() {
@@ -709,6 +823,7 @@ function initTradingSections() {
     loadMarketState();
     loadClosedPositions();
     loadRlInsights();
+    loadMonthlyReview();
     loadActivityLog();
 
     // Periodic refresh

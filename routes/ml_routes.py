@@ -28,7 +28,6 @@ def get_ml_status():
                 'ML_AVAILABLE': state.ML_AVAILABLE,
                 'ml_pipeline_exists': state.ml_pipeline is not None,
                 'suggestion': 'Click "Train ML Model" to initialize and train the model',
-                'gem_detector_available': state.GEM_DETECTOR_AVAILABLE,
                 'rl_detector_available': False,
             }
             try:
@@ -132,11 +131,6 @@ def debug_ml_system():
                 'training_status': state.ml_pipeline.training_status if state.ml_pipeline else 'N/A',
                 'last_training_time': str(state.ml_pipeline.last_training_time) if state.ml_pipeline and state.ml_pipeline.last_training_time else None,
             },
-            'gem_detector': {
-                'GEM_DETECTOR_AVAILABLE': state.GEM_DETECTOR_AVAILABLE,
-                'gem_detector_exists': state.gem_detector is not None,
-                'rl_integrated': True,
-            },
             'model_files': {
                 'models_dir_exists': os.path.exists(models_dir),
                 'crypto_model_pkl': os.path.exists(os.path.join(models_dir, 'crypto_model.pkl')),
@@ -152,201 +146,14 @@ def debug_ml_system():
         return jsonify({'error': 'Debug info unavailable'}), 500
 
 
-# ─── Gem Detection ────────────────────────────────────────────
 
-@ml_bp.route('/api/gems/detect/<symbol>')
-def detect_hidden_gem(symbol):
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Hidden Gem Detector not available'}), 503
-    try:
-        coin = next((c for c in state.analyzer.coins if c.symbol.upper() == symbol.upper()), None)
-        if not coin:
-            return jsonify({'error': f'Coin {symbol} not found'}), 404
-        coin_data = {
-            'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-            'price_change_24h': {'usd': getattr(coin, 'price_change_24h', 0)},
-            'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
-            'market_cap': getattr(coin, 'market_cap', 'N/A'),
-            'total_volume': getattr(coin, 'total_volume', 'N/A'),
-            'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
-            'status': getattr(coin, 'status', 'current'),
-        }
-        prediction = state.gem_detector.predict_hidden_gem(coin_data)
-        if prediction is None:
-            return jsonify({'error': 'Prediction failed'}), 500
-        prediction['coin'] = {'symbol': coin.symbol, 'name': coin.name, 'price': coin.price, 'market_cap_rank': coin_data['market_cap_rank'], 'attractiveness_score': coin_data['attractiveness_score']}
-        return jsonify(prediction)
-    except Exception as e:
-        logger.error(f"Gem detection error for {symbol}: {e}")
-        return jsonify({'error': 'Gem detection failed'}), 500
-
-
-@ml_bp.route('/api/gems/scan')
-def scan_for_hidden_gems():
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Hidden Gem Detector not available'}), 503
-    try:
-        from ml.exchange_manager import get_exchange_manager
-        exchange_mgr = get_exchange_manager()
-        limit = int(request.args.get('limit', 20))
-        min_prob = float(request.args.get('min_probability', 0.6))
-        gems, processed = [], 0
-        for coin in state.analyzer.coins[:100]:
-            # Only scan coins tradeable on Kraken
-            if not exchange_mgr.is_tradeable(coin.symbol):
-                continue
-            try:
-                processed += 1
-                cd = {
-                    'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                    'price_change_24h': {'usd': getattr(coin, 'price_change_24h', 0)},
-                    'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
-                    'market_cap': getattr(coin, 'market_cap', 'N/A'),
-                    'total_volume': getattr(coin, 'total_volume', 'N/A'),
-                    'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
-                    'status': getattr(coin, 'status', 'current'),
-                }
-                pred = state.gem_detector.predict_hidden_gem(cd)
-                if pred and pred['gem_probability'] >= min_prob:
-                    gems.append({
-                        'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                        'market_cap_rank': cd['market_cap_rank'], 'attractiveness_score': cd['attractiveness_score'],
-                        'gem_probability': pred['gem_probability'], 'gem_score': pred['gem_score'],
-                        'confidence': pred['confidence'], 'risk_level': pred['risk_level'],
-                        'recommendation': pred['recommendation'],
-                        'key_strengths': pred['key_strengths'][:3], 'top_features': pred['top_features'][:3],
-                    })
-            except Exception as e:
-                logger.warning(f"Error scanning {coin.symbol}: {e}")
-        gems.sort(key=lambda x: x['gem_probability'], reverse=True)
-        return jsonify({
-            'hidden_gems': gems[:limit], 'total_scanned': processed, 'gems_found': len(gems),
-            'min_probability_threshold': min_prob,
-            'scan_summary': {
-                'ultra_high_potential': len([g for g in gems if g['gem_probability'] > 0.8]),
-                'high_potential': len([g for g in gems if 0.7 <= g['gem_probability'] <= 0.8]),
-                'moderate_potential': len([g for g in gems if 0.6 <= g['gem_probability'] < 0.7]),
-            },
-        })
-    except Exception as e:
-        logger.error(f"Gem scan error: {e}")
-        return jsonify({'error': 'Gem scan failed'}), 500
-
-
-@ml_bp.route('/api/gems/train', methods=['POST'])
-@limiter.limit('2 per hour')
-@require_trading_auth
-def train_gem_detector():
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Hidden Gem Detector not available'}), 503
-    try:
-        coins_data = []
-        for coin in state.analyzer.coins:
-            coins_data.append({
-                'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                'price_change_24h': {'usd': getattr(coin, 'price_change_24h', 0)},
-                'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
-                'market_cap': getattr(coin, 'market_cap', 'N/A'),
-                'total_volume': getattr(coin, 'total_volume', 'N/A'),
-                'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
-                'status': getattr(coin, 'status', 'current'),
-            })
-        training_df, labels = state.gem_detector.create_training_dataset(coins_data)
-        result = state.gem_detector.train_model(training_df, labels)
-        if result:
-            state.gem_detector.save_model()
-            return jsonify({
-                'success': True,
-                'training_result': {
-                    'accuracy': result['accuracy'], 'auc_score': result['auc_score'],
-                    'cv_mean': result['cv_mean'], 'cv_std': result['cv_std'],
-                    'total_coins_trained': len(coins_data),
-                    'hidden_gems_identified': result['hidden_gems_found'],
-                    'model_type': result['model_type'],
-                    'top_features': sorted(result['feature_importance'].items(), key=lambda x: x[1], reverse=True)[:10],
-                },
-            })
-        return jsonify({'success': False, 'error': 'Training failed'}), 500
-    except Exception as e:
-        logger.error(f"Gem training error: {e}")
-        return jsonify({'success': False, 'error': 'Training failed'}), 500
-
-
-@ml_bp.route('/api/gems/status')
-def get_gem_detector_status():
-    status = {
-        'available': state.GEM_DETECTOR_AVAILABLE,
-        'model_loaded': state.gem_detector.model_loaded if state.gem_detector else False,
-        'service_status': 'available' if state.GEM_DETECTOR_AVAILABLE else 'unavailable',
-    }
-    if state.gem_detector and state.GEM_DETECTOR_AVAILABLE:
-        status.update(state.gem_detector.get_model_info())
-        status['multi_agent_enabled'] = state.gem_detector.multi_agent_enabled
-        if state.gem_detector.multi_agent_enabled:
-            status['agent_count'] = len(state.gem_detector.orchestrator.agents)
-    return jsonify(status)
-
-
-@ml_bp.route('/api/gems/top/<int:count>')
-def get_top_hidden_gems(count):
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Hidden Gem Detector not available'}), 503
-    try:
-        from ml.exchange_manager import get_exchange_manager
-        exchange_mgr = get_exchange_manager()
-        count = min(count, 50)
-        analyzed = []
-        for coin in state.analyzer.coins[:count * 3]:
-            # Only include coins tradeable on Kraken
-            if not exchange_mgr.is_tradeable(coin.symbol):
-                continue
-            try:
-                cd = {
-                    'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                    'price_change_24h': {'usd': getattr(coin, 'price_change_24h', 0)},
-                    'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
-                    'market_cap': getattr(coin, 'market_cap', 'N/A'),
-                    'total_volume': getattr(coin, 'total_volume', 'N/A'),
-                    'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
-                    'status': getattr(coin, 'status', 'current'),
-                }
-                pred = state.gem_detector.predict_hidden_gem(cd)
-                if pred and pred['gem_probability'] > 0.5:
-                    analyzed.append({
-                        'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                        'market_cap_rank': cd['market_cap_rank'],
-                        'gem_probability': pred['gem_probability'], 'gem_score': pred['gem_score'],
-                        'confidence': pred['confidence'], 'risk_level': pred['risk_level'],
-                        'risk_score': pred['risk_score'], 'recommendation': pred['recommendation'],
-                        'key_strengths': pred['key_strengths'], 'key_weaknesses': pred['key_weaknesses'],
-                        'top_features': pred['top_features'], 'feature_breakdown': pred['feature_breakdown'],
-                    })
-            except Exception as e:
-                logger.warning(f"Error analyzing {coin.symbol}: {e}")
-        analyzed.sort(key=lambda x: x['gem_score'], reverse=True)
-        top = analyzed[:count]
-        return jsonify({
-            'top_hidden_gems': top, 'requested_count': count, 'found_count': len(top),
-            'analysis_summary': {
-                'average_gem_score': sum(g['gem_score'] for g in top) / len(top) if top else 0,
-                'risk_distribution': {lvl: len([g for g in top if g['risk_level'] == lvl]) for lvl in ['Low', 'Medium', 'High', 'Very High']},
-            },
-        })
-    except Exception as e:
-        logger.error(f"Top gems error: {e}")
-        return jsonify({'error': 'Failed to get top gems'}), 500
-
-
-# ─── Agent Analysis ───────────────────────────────────────────
+# ─── Agent Analysis ───────────────────────────────────────────────
 
 @ml_bp.route('/api/agents/analyze/<symbol>')
 def analyze_with_agents(symbol):
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Gem Detector not available'}), 503
-    if not state.gem_detector.multi_agent_enabled:
-        return jsonify({'error': 'Multi-agent system not available'}), 503
+    if not state.official_adk_available:
+        return jsonify({'error': 'ADK not available'}), 503
     try:
-        # Verify coin is tradeable on Kraken
         from ml.exchange_manager import get_exchange_manager
         exchange_mgr = get_exchange_manager()
         if not exchange_mgr.is_tradeable(symbol):
@@ -364,84 +171,42 @@ def analyze_with_agents(symbol):
             'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
             'status': getattr(coin, 'status', 'current'),
         }
-        analysis = run_async(state.gem_detector.analyze_with_agents(coin_data))
+        analysis = run_async(state.analyze_crypto_adk(
+            symbol=symbol, coin_data=coin_data, session_id=f"api_{symbol}"
+        ))
         if analysis is None:
             return jsonify({'error': 'Analysis failed'}), 500
-        analysis['coin'] = {'symbol': coin.symbol, 'name': coin.name, 'price': coin.price, 'market_cap_rank': coin_data['market_cap_rank'], 'attractiveness_score': coin_data['attractiveness_score']}
+        analysis['coin'] = {'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
+                            'market_cap_rank': coin_data['market_cap_rank'],
+                            'attractiveness_score': coin_data['attractiveness_score']}
+        state.cache_analysis(f"agent_{symbol}", analysis)
         return jsonify(analysis)
     except Exception as e:
         logger.error(f"Agent analysis error for {symbol}: {e}", exc_info=True)
         return jsonify({'error': 'Agent analysis failed'}), 500
 
 
-@ml_bp.route('/api/agents/scan')
-def scan_with_agents():
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Gem Detector not available'}), 503
-    if not state.gem_detector.multi_agent_enabled:
-        return jsonify({'error': 'Multi-agent system not available'}), 503
-    try:
-        limit = int(request.args.get('limit', 10))
-        min_score = float(request.args.get('min_score', 0.6))
-        agent_gems, processed = [], 0
-        for coin in state.analyzer.coins[:min(50, len(state.analyzer.coins))]:
-            try:
-                processed += 1
-                cd = {
-                    'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                    'price_change_24h': getattr(coin, 'price_change_24h', 0), 'price_change_7d': 0,
-                    'market_cap_rank': getattr(coin, 'market_cap_rank', 999),
-                    'market_cap': parse_market_cap(getattr(coin, 'market_cap', 0)),
-                    'volume_24h': parse_volume(getattr(coin, 'total_volume', 0)),
-                    'attractiveness_score': getattr(coin, 'attractiveness_score', 5.0),
-                }
-                analysis = run_async(state.gem_detector.analyze_with_agents(cd))
-                if analysis and analysis.get('gem_score', 0) / 100 >= min_score:
-                    agent_gems.append({
-                        'symbol': coin.symbol, 'name': coin.name, 'price': coin.price,
-                        'market_cap_rank': cd['market_cap_rank'], 'gem_score': analysis['gem_score'],
-                        'gem_probability': analysis['gem_probability'], 'confidence': analysis['confidence'],
-                        'risk_level': analysis['risk_level'], 'recommendation': analysis['recommendation'],
-                        'key_strengths': analysis['key_strengths'][:3], 'multi_agent': True,
-                    })
-            except Exception as e:
-                logger.error(f"Error scanning {coin.symbol} with agents: {e}")
-        agent_gems.sort(key=lambda x: x['gem_score'], reverse=True)
-        return jsonify({
-            'agent_gems': agent_gems[:limit], 'total_scanned': processed, 'gems_found': len(agent_gems),
-            'min_score_threshold': min_score,
-            'scan_summary': {
-                'ultra_high_potential': len([g for g in agent_gems if g['gem_score'] > 80]),
-                'high_potential': len([g for g in agent_gems if 70 <= g['gem_score'] <= 80]),
-                'moderate_potential': len([g for g in agent_gems if 60 <= g['gem_score'] < 70]),
-            },
-        })
-    except Exception as e:
-        logger.error(f"Agent scan error: {e}", exc_info=True)
-        return jsonify({'error': 'Agent scan failed'}), 500
-
-
 @ml_bp.route('/api/agents/metrics')
 def get_agent_metrics():
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector or not state.gem_detector.multi_agent_enabled:
-        return jsonify({'error': 'Multi-agent system not available'}), 503
+    if not state.official_adk_available:
+        return jsonify({'error': 'ADK not available'}), 503
     try:
-        return jsonify(state.gem_detector.orchestrator.get_metrics())
+        from ml.orchestrator_wrapper import get_orchestrator_wrapper
+        return jsonify(get_orchestrator_wrapper().get_metrics())
     except Exception as e:
         logger.error(f"Agent metrics error: {e}")
         return jsonify({'error': 'Metrics unavailable'}), 500
 
 
-# ─── Portfolio ────────────────────────────────────────────────
+# ─── Portfolio ───────────────────────────────────────────────
 
 @ml_bp.route('/api/portfolio/analyze')
 def analyze_portfolio():
-    if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-        return jsonify({'error': 'Gem Detector not available'}), 503
-    if not state.gem_detector.multi_agent_enabled or not state.gem_detector.orchestrator:
-        return jsonify({'error': 'Multi-agent system not available'}), 503
+    if not state.official_adk_available:
+        return jsonify({'error': 'ADK not available'}), 503
     try:
         from ml.portfolio_manager import PortfolioManager
+        from ml.orchestrator_wrapper import get_orchestrator_wrapper
         max_coins = int(request.args.get('max_coins', 20))
         min_score = float(request.args.get('min_score', 6.0))
         candidates = sorted(state.analyzer.coins, key=lambda x: x.attractiveness_score, reverse=True)[:max_coins]
@@ -459,7 +224,7 @@ def analyze_portfolio():
                 'status': getattr(coin, 'status', 'current'),
             })
 
-        mgr = PortfolioManager(state.gem_detector.orchestrator)
+        mgr = PortfolioManager(get_orchestrator_wrapper())
         rec = run_async(mgr.analyze_portfolio(coins_data, max_coins))
 
         return jsonify({

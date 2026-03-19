@@ -5,10 +5,11 @@ Learns from trade outcomes to adjust future buy/skip decisions.
 Uses a discretised state space with epsilon-greedy exploration.
 
 State features (discretised):
-- gem_score_tier: low / medium / high
-- volume_mcap_ratio: low / medium / high
-- weekly_change: bearish / neutral / bullish
+- gem_score_tier: low / medium / high  (attractiveness_score × 10)
+- volume_mcap_ratio: low / medium / high  (24h_volume / market_cap)
+- weekly_change: bearish / neutral / bullish  (price_change_7d)
 - market_cap_tier: micro / small / mid / large
+- screen_confidence_tier: low / medium / high  (quick-screen confidence %)
 
 Actions: BUY, SKIP
 
@@ -24,6 +25,7 @@ raw confidence score before the scan loop's trade decision threshold.
 import json
 import logging
 import math
+import os
 import random
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -55,11 +57,20 @@ def _volume_mcap_tier(ratio: float) -> str:
 
 
 def _weekly_change_tier(pct: float) -> str:
-    if pct > 10:
+    if pct > 5:
         return "bullish"
-    if pct < -10:
+    if pct < -5:
         return "bearish"
     return "neutral"
+
+
+def _confidence_tier(score: float) -> str:
+    """Tier the agent/screen confidence score at scan time."""
+    if score >= 70:
+        return "high"
+    if score >= 55:
+        return "medium"
+    return "low"
 
 
 def _mcap_tier(mcap_gbp: float) -> str:
@@ -75,15 +86,49 @@ def _mcap_tier(mcap_gbp: float) -> str:
 def discretise_state(coin_data: Dict[str, Any]) -> str:
     """
     Convert raw coin data into a hashable state string.
-    Returns e.g. 'high|medium|bearish|micro'
+    Returns e.g. 'high|medium|bearish|micro|high'
+
+    Supports multiple field name aliases to handle differences between
+    scan-time coin dicts and portfolio holding dicts.  If a pre-computed
+    'ql_state' key is present it is returned directly (used when the
+    state was cached at buy time and passed through to close time).
     """
-    gem = _gem_tier(coin_data.get("gem_score", 0))
+    # Pre-computed state takes full priority (buy-time cache passed through)
+    if coin_data.get("ql_state"):
+        return coin_data["ql_state"]
+
+    # gem_score: quantitative market score (attractiveness_score = 0-10 scale
+    # normalised to 0-100 by ×10; gem_score field is already 0-100)
+    gem_raw = (
+        coin_data.get("gem_score")
+        or coin_data.get("attractiveness_score", 0) * 10
+        or 0
+    )
+    gem = _gem_tier(gem_raw)
+
     vol = _volume_mcap_tier(
         coin_data.get("volume_24h", 0) / max(coin_data.get("market_cap", 1), 1)
     )
-    wk = _weekly_change_tier(coin_data.get("percent_change_7d", 0))
+
+    # weekly change: coin_to_dict uses 'price_change_7d', not 'percent_change_7d'
+    weekly_pct = (
+        coin_data.get("price_change_7d")
+        or coin_data.get("percent_change_7d")
+        or 0
+    )
+    wk = _weekly_change_tier(weekly_pct)
+
     mc = _mcap_tier(coin_data.get("market_cap", 0))
-    return f"{gem}|{vol}|{wk}|{mc}"
+
+    # agent/screen confidence at scan time (differentiates high vs low conviction buys)
+    conf_raw = (
+        coin_data.get("screen_confidence")
+        or coin_data.get("confidence")
+        or 0
+    )
+    conf = _confidence_tier(conf_raw)
+
+    return f"{gem}|{vol}|{wk}|{mc}|{conf}"
 
 
 # ─── Q-Learning Engine ────────────────────────────────────────
@@ -136,10 +181,15 @@ class QLearningTrader:
         self.visit_counts: Dict[str, Dict[str, int]] = defaultdict(
             lambda: {a: 0 for a in ACTIONS}
         )
-        # Track symbols that have lost money and how many times
+        # Track symbols that have lost money and how many times (capped at 5)
         self.loss_memory: Dict[str, int] = {}
-        # Total episodes processed
+        # State recorded at scan/buy time, keyed by symbol; used at close time
+        # so record_outcome uses the real market-context state, not stale holding data
+        self._symbol_state_cache: Dict[str, str] = {}
+        # Total update steps (increments twice per closed trade: buy + skip update)
         self.episodes = 0
+        # Actual completed trade count — what the UI should display
+        self.closed_trades = 0
 
         self._load()
 
@@ -207,11 +257,11 @@ class QLearningTrader:
         if base < 0:
             base *= 1.5
 
-        # 3. Repeat-loser penalty
+        # 3. Repeat-loser penalty (loss count capped at 5 to prevent runaway penalties)
         if pnl_pct < -5:
             times_lost = self.loss_memory.get(symbol, 0)
-            self.loss_memory[symbol] = times_lost + 1
-            # Progressive penalty: -0.1 first loss, -0.2 second, etc.
+            self.loss_memory[symbol] = min(times_lost + 1, 5)
+            # Progressive penalty: -0.1 first loss, -0.2 second, capped at -0.5
             repeat_penalty = -0.1 * (times_lost + 1)
             base += max(repeat_penalty, -0.5)  # Cap at -0.5
         elif pnl_pct > 5:
@@ -235,6 +285,10 @@ class QLearningTrader:
         Negative = Q-learning thinks this state pattern tends to lose.
         """
         state = discretise_state(coin_data)
+        # Cache state so record_outcome can use it at close time
+        symbol = coin_data.get("symbol")
+        if symbol:
+            self._symbol_state_cache[symbol] = state
         q_buy = self.q_table[state]["buy"]
         q_skip = self.q_table[state]["skip"]
         visits = self.visit_counts[state]["buy"]
@@ -260,13 +314,26 @@ class QLearningTrader:
         """
         Consult Q-table for a direct BUY/SKIP recommendation.
         Returns (should_skip, reason).
+
+        Only recommends SKIP if the state has been visited at least once —
+        avoids blocking trades based on random epsilon-greedy exploration
+        on unseen states (which caused spurious SKIPs in the activity log).
         """
         state = discretise_state(coin_data)
+        # Also cache state here in case confidence_adjustment wasn't called
+        symbol = coin_data.get("symbol")
+        if symbol:
+            self._symbol_state_cache[symbol] = state
+
+        visits = sum(self.visit_counts[state].values())
+        # No data on this state yet — don't block the trade
+        if visits == 0:
+            return False, ""
+
         action = self.get_action(state)
 
         if action == "skip":
             q_vals = self.q_table[state]
-            visits = sum(self.visit_counts[state].values())
             reason = (
                 f"Q-learning recommends SKIP for state {state} "
                 f"(Q_buy={q_vals['buy']:.3f}, Q_skip={q_vals['skip']:.3f}, "
@@ -292,7 +359,13 @@ class QLearningTrader:
         Called by sell automation when a position closes, or periodically
         for unrealised P&L checkpoints.
         """
-        state = discretise_state(coin_data)
+        # Prefer the state cached at buy/scan time over recalculating from the
+        # portfolio holding dict (which lacks live market data fields)
+        state = (
+            self._symbol_state_cache.get(symbol)
+            or coin_data.get("ql_state")
+            or discretise_state(coin_data)
+        )
         reward = self.calculate_reward(pnl_pct, symbol, hold_hours)
 
         # Terminal update (position closed)
@@ -302,6 +375,10 @@ class QLearningTrader:
         # skipping would have been correct (and vice versa)
         skip_reward = -reward * 0.3  # Weaker inverse signal
         self.update(state, "skip", skip_reward, next_state=None)
+
+        # Count this as one completed trade (episodes incremented twice above,
+        # once per update call, so closed_trades is the accurate UI metric)
+        self.closed_trades += 1
 
         # Log outcome
         outcome = {
@@ -339,9 +416,18 @@ class QLearningTrader:
         Uses a much smaller learning rate to avoid overreacting to
         unrealised swings, but still nudges Q-values in the right direction.
         """
-        state = discretise_state(coin_data)
-        # Damped reward — only 20% weight compared to realised outcomes
-        reward = self.calculate_reward(pnl_pct, symbol, hold_hours) * 0.2
+        state = (
+            self._symbol_state_cache.get(symbol)
+            or coin_data.get("ql_state")
+            or discretise_state(coin_data)
+        )
+        # Pure base reward — does NOT call calculate_reward() to avoid
+        # mutating loss_memory on every market-monitor tick (which would
+        # inflate loss counts by hundreds per position)
+        base = math.tanh(pnl_pct / 30.0)
+        if base < 0:
+            base *= 1.5
+        reward = round(base, 4) * 0.2
         current_q = self.q_table[state]["buy"]
         self.q_table[state]["buy"] = current_q + self.alpha * 0.3 * (reward - current_q)
         self._save()
@@ -367,13 +453,20 @@ class QLearningTrader:
             self.q_table, key=lambda s: -self.q_table[s]["buy"], default=None
         )
 
+        # State diversity: how many distinct states have been visited
+        # Ideal: visited_states > 2 (means coins are being differentiated)
+        state_diversity = visited_states / max(total_states, 1)
+
         return {
             "epsilon": round(self.epsilon, 4),
             "alpha": self.alpha,
             "gamma": self.gamma,
             "episodes": self.episodes,
+            "closed_trades": self.closed_trades,
             "total_states": total_states,
             "visited_states": visited_states,
+            "state_diversity": round(state_diversity, 2),
+            "state_cache_size": len(self._symbol_state_cache),
             "total_visits": total_visits,
             "loss_memory": dict(self.loss_memory),
             "best_state": {
@@ -412,8 +505,10 @@ class QLearningTrader:
                 "q_table": dict(self.q_table),
                 "visit_counts": dict(self.visit_counts),
                 "loss_memory": self.loss_memory,
+                "symbol_state_cache": self._symbol_state_cache,
                 "epsilon": self.epsilon,
                 "episodes": self.episodes,
+                "closed_trades": self.closed_trades,
             }
             with open(Q_TABLE_FILE, "w") as f:
                 json.dump(data, f, indent=2)
@@ -432,13 +527,20 @@ class QLearningTrader:
                 self.q_table[state] = actions
             for state, counts in data.get("visit_counts", {}).items():
                 self.visit_counts[state] = counts
-            self.loss_memory = data.get("loss_memory", {})
+
+            # Sanitize loss_memory: values inflated by checkpoint calls get capped
+            raw_loss = data.get("loss_memory", {})
+            self.loss_memory = {k: min(v, 5) for k, v in raw_loss.items()}
+
+            self._symbol_state_cache = data.get("symbol_state_cache", {})
             self.epsilon = data.get("epsilon", self.epsilon)
             self.episodes = data.get("episodes", 0)
+            self.closed_trades = data.get("closed_trades", self.episodes // 2)
 
             logger.info(
                 f"Loaded Q-table: {len(self.q_table)} states, "
-                f"{self.episodes} episodes, ε={self.epsilon:.3f}"
+                f"{self.closed_trades} closed trades, ε={self.epsilon:.3f}, "
+                f"state_cache={len(self._symbol_state_cache)} symbols"
             )
         except Exception as e:
             logger.error(f"Failed to load Q-table: {e}")
@@ -453,8 +555,6 @@ class QLearningTrader:
 
 
 # ─── Singleton ────────────────────────────────────────────────
-
-import os
 
 _instance: Optional[QLearningTrader] = None
 

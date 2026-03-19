@@ -50,6 +50,7 @@ class PortfolioTracker:
         confidence: int = 0,
         proposal_id: str = "",
         fee_gbp: float = 0.0,
+        coin_name: str = "",
     ) -> Dict[str, Any]:
         """
         Record a trade execution and update holdings.
@@ -91,6 +92,8 @@ class PortfolioTracker:
                 h["last_buy_at"] = trade["timestamp"]
                 h["trades"] += 1
                 h["total_fees_gbp"] = h.get("total_fees_gbp", 0) + fee_gbp
+                if coin_name and not h.get("coin_name"):
+                    h["coin_name"] = coin_name
             else:
                 self.holdings[sym] = {
                     "symbol": sym,
@@ -103,6 +106,7 @@ class PortfolioTracker:
                     "exchange": exchange,
                     "trades": 1,
                     "total_fees_gbp": fee_gbp,
+                    "coin_name": coin_name,
                 }
         elif side.lower() == "sell":
             if sym in self.holdings:
@@ -126,7 +130,7 @@ class PortfolioTracker:
         self._save()
 
         logger.info(
-            f"📒 Recorded: {side.upper()} {quantity:.8f} {sym} @ £{price:.6f} "
+            f"📒 Recorded: {side.upper()} {quantity:.8f} {sym} @ £{(price or 0):.6f} "
             f"(£{amount_gbp:.4f}) on {exchange}"
         )
         return trade
@@ -145,9 +149,12 @@ class PortfolioTracker:
 
             holding = {**h}
 
+            # Cost of the currently held quantity (not total historical spend)
+            avg_entry = h.get("avg_entry_price", 0)
+            holding["position_cost_gbp"] = round(avg_entry * h["quantity"], 8)
+
             if live_prices and sym in live_prices:
                 current_price = live_prices[sym]
-                avg_entry = h.get("avg_entry_price", 0)
                 holding["current_price"] = current_price
                 holding["current_value_gbp"] = current_price * h["quantity"]
                 holding["unrealised_pnl_gbp"] = (
@@ -158,6 +165,9 @@ class PortfolioTracker:
                     if avg_entry > 0
                     else 0
                 )
+                # Round P&L values to avoid floating-point noise in display
+                holding["unrealised_pnl_gbp"] = round(holding["unrealised_pnl_gbp"], 8)
+                holding["unrealised_pnl_pct"] = round(holding["unrealised_pnl_pct"], 4)
 
             result.append(holding)
 

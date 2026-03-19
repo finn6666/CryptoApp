@@ -39,4 +39,5 @@ dev = [
     "pytest>=6.0.0",
     "black>=22.0.0",
     "flake8>=4.0.0",
+    "pip-audit>=2.7.0",
 ]

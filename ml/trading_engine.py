@@ -7,6 +7,7 @@ and email-based approval workflow.
 import os
 import json
 import uuid
+import math
 import logging
 import smtplib
 import asyncio
@@ -41,6 +42,7 @@ class TradeProposal:
     quantity: Optional[float] = None
     order_id: Optional[str] = None
     error: Optional[str] = None
+    sell_quantity: Optional[float] = None  # Exact coin qty to sell (bypasses amount→qty reconversion)
 
     def __post_init__(self):
         if not self.created_at:
@@ -243,6 +245,7 @@ class TradingEngine:
         confidence: int,
         recommendation: str,
         coin_name: str = "",
+        sell_quantity: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -332,6 +335,7 @@ class TradingEngine:
             confidence=confidence,
             agent_recommendation=recommendation,
             coin_name=coin_name,
+            sell_quantity=sell_quantity,
         )
 
         self.proposals[proposal.id] = proposal
@@ -380,6 +384,7 @@ class TradingEngine:
         confidence: int,
         recommendation: str,
         coin_name: str = "",
+        sell_quantity: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -397,6 +402,7 @@ class TradingEngine:
             confidence=confidence,
             recommendation=recommendation,
             coin_name=coin_name,
+            sell_quantity=sell_quantity,
         )
 
         if not result.get("success"):
@@ -530,21 +536,27 @@ class TradingEngine:
                     amount_in_quote = proposal.amount_gbp * fx_rate
                     logger.info(f"Legacy FX: £{proposal.amount_gbp:.4f} → {amount_in_quote:.4f} {quote_currency} (rate {fx_rate})")
 
-                quantity = amount_in_quote / current_price
+                if proposal.side == "sell" and proposal.sell_quantity:
+                    # For sells: use the explicit coin qty to avoid price-drift errors
+                    quantity = proposal.sell_quantity
+                    logger.info(f"Legacy sell: using explicit quantity {quantity:.8f} {proposal.symbol}")
+                else:
+                    quantity = amount_in_quote / current_price
 
-                # Enforce exchange minimum order quantity
-                try:
-                    market = exchange.market(symbol_pair)
-                    min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
-                    min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
-                    if min_qty and quantity < min_qty:
-                        quantity = min_qty * 1.02  # 2% buffer
-                        logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
-                    if min_cost and (quantity * current_price) < min_cost:
-                        quantity = (min_cost * 1.02) / current_price
-                        logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
-                except Exception as e:
-                    logger.debug(f"Could not check min order for {symbol_pair}: {e}")
+                # Enforce exchange minimum order quantity (buy-side only)
+                if proposal.side != "sell":
+                    try:
+                        market = exchange.market(symbol_pair)
+                        min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+                        min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                        if min_qty and quantity < min_qty:
+                            quantity = min_qty * 1.02  # 2% buffer
+                            logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
+                        if min_cost and (quantity * current_price) < min_cost:
+                            quantity = (min_cost * 1.02) / current_price
+                            logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
+                    except Exception as e:
+                        logger.debug(f"Could not check min order for {symbol_pair}: {e}")
 
                 if proposal.side == "buy":
                     order = exchange.create_market_buy_order(symbol_pair, quantity)
@@ -675,6 +687,7 @@ class TradingEngine:
                 side=proposal.side,
                 amount_gbp=proposal.amount_gbp,
                 max_amount_gbp=remaining,
+                quantity=proposal.sell_quantity,
             )
             if result.get("success"):
                 return result
@@ -699,7 +712,7 @@ class TradingEngine:
                 symbol=proposal.symbol,
                 side=proposal.side,
                 quantity=proposal.quantity or 0,
-                price=proposal.execution_price or proposal.price_at_proposal,
+                price=proposal.execution_price or proposal.price_at_proposal or 0,
                 amount_gbp=proposal.amount_gbp,
                 exchange=exchange,
                 order_id=proposal.order_id or "",
@@ -707,6 +720,7 @@ class TradingEngine:
                 confidence=proposal.confidence,
                 proposal_id=proposal.id,
                 fee_gbp=fee_gbp,
+                coin_name=proposal.coin_name or "",
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")
@@ -793,6 +807,9 @@ class TradingEngine:
         is_sell = proposal.side == "sell"
         header_gradient = "linear-gradient(90deg, #e53e3e, #c53030)" if is_sell else "linear-gradient(90deg, #667eea, #764ba2)"
         display_name = f"{proposal.symbol} ({proposal.coin_name})" if proposal.coin_name else proposal.symbol
+        _p = proposal.price_at_proposal
+        _price_dp = max(6, -int(math.floor(math.log10(_p))) + 3) if _p > 0 else 6
+        price_str = f"{_p:.{_price_dp}f}"
         sell_warning = ""
         if is_sell:
             sell_warning = """
@@ -820,7 +837,7 @@ class TradingEngine:
                         </tr>
                         <tr>
                             <td style="padding: 8px 0; color: #a0aec0;">Price</td>
-                            <td style="padding: 8px 0; text-align: right;">&#163;{proposal.price_at_proposal:.6f}</td>
+                            <td style="padding: 8px 0; text-align: right;">&#163;{price_str}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px 0; color: #a0aec0;">Confidence</td>
@@ -865,6 +882,9 @@ class TradingEngine:
 
         subject = f"Trade Executed: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
         display_name = f"{proposal.symbol} ({proposal.coin_name})" if proposal.coin_name else proposal.symbol
+        _ep = proposal.execution_price or proposal.price_at_proposal or 0
+        _exec_dp = max(6, -int(math.floor(math.log10(_ep))) + 3) if _ep > 0 else 6
+        exec_price_str = f"{_ep:.{_exec_dp}f}"
 
         body = f"""
         <html>        <head><meta charset="utf-8"></head>        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
@@ -875,7 +895,7 @@ class TradingEngine:
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Side</td><td style="text-align: right;">{proposal.side.upper()}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Amount</td><td style="text-align: right;">&#163;{proposal.amount_gbp:.4f}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Quantity</td><td style="text-align: right;">{(proposal.quantity or 0):.8f}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{(proposal.execution_price or proposal.price_at_proposal or 0):.6f}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #a0aec0;">Price</td><td style="text-align: right;">&#163;{exec_price_str}</td></tr>
                     <tr><td style="padding: 6px 0; color: #a0aec0;">Order ID</td><td style="text-align: right; font-size: 11px;">{proposal.order_id}</td></tr>
                 </table>
                 <div style="margin-top: 16px; font-size: 12px; color: #a0aec0;">

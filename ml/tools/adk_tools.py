@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 # Fear & Greed Index cache (avoid hammering the API)
 _fear_greed_cache: Dict[str, Any] = {"data": None, "fetched_at": 0}
 _headlines_cache: Dict[str, Any] = {"data": None, "fetched_at": 0}
+# Per-symbol sentiment cache (30 min TTL — keeps CoinGecko calls well within free-tier limits)
+_sentiment_cache: Dict[str, Dict[str, Any]] = {}
+_SENTIMENT_CACHE_TTL = 1800  # 30 minutes
 
 
 # === Research Tools ===
@@ -469,22 +472,160 @@ def get_market_headlines() -> Dict[str, Any]:
 
 def analyze_social_sentiment(symbol: str, sources: Optional[List[str]] = None) -> Dict[str, Any]:
     """
-    Analyze social media sentiment for a cryptocurrency.
-    
+    Analyze social media sentiment for a cryptocurrency using CoinGecko's free API.
+
+    Fetches community sentiment votes (bullish/bearish %), Twitter follower count,
+    Reddit activity, and price momentum as a proxy for social buzz. No API key required.
+    Caches results for 30 minutes per symbol to respect CoinGecko rate limits.
+
     Args:
-        symbol: Cryptocurrency symbol
-        sources: Social media sources to analyze
-    
+        symbol: Cryptocurrency symbol (e.g. "BTC", "BTC/GBP" — quote currency stripped).
+        sources: Unused parameter kept for API compatibility.
+
     Returns:
-        Social sentiment analysis
+        Dict with sentiment_score (-100 to +100), sentiment_label, volume_signal,
+        community stats, bullish/bearish vote percentages, and price momentum.
     """
-    return {
-        "symbol": symbol,
-        "sources": sources or ["twitter", "reddit"],
-        "overall_sentiment": 0.6,
-        "trend": "POSITIVE",
-        "confidence": 0.75
+    import urllib.request
+    import urllib.parse
+    import json
+
+    # Strip quote currency: "BTC/GBP" → "BTC"
+    base = symbol.split("/")[0].upper().strip()
+
+    # Return cached result if still fresh
+    cached = _sentiment_cache.get(base)
+    if cached and time.time() - cached.get("fetched_at", 0) < _SENTIMENT_CACHE_TTL:
+        return cached["data"]
+
+    headers = {"User-Agent": "CryptoApp/1.0", "Accept": "application/json"}
+
+    # Step 1: resolve ticker → CoinGecko coin ID
+    try:
+        search_url = f"https://api.coingecko.com/api/v3/search?query={urllib.parse.quote(base)}"
+        req = urllib.request.Request(search_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            search_data = json.loads(resp.read().decode())
+        coins = search_data.get("coins", [])
+        # Prefer exact symbol match, fall back to top result
+        coin_id = None
+        for coin in coins:
+            if coin.get("symbol", "").upper() == base:
+                coin_id = coin["id"]
+                break
+        if not coin_id and coins:
+            coin_id = coins[0]["id"]
+    except Exception as e:
+        logger.warning(f"CoinGecko search failed for {base}: {e}")
+        return {
+            "symbol": base,
+            "source": "coingecko",
+            "status": "error",
+            "error": f"Search failed: {e}",
+            "sentiment_score": 0,
+            "sentiment_label": "NEUTRAL",
+            "volume_signal": "UNKNOWN",
+        }
+
+    if not coin_id:
+        return {
+            "symbol": base,
+            "source": "coingecko",
+            "status": "not_found",
+            "sentiment_score": 0,
+            "sentiment_label": "NEUTRAL",
+            "volume_signal": "UNKNOWN",
+        }
+
+    # Step 2: fetch coin detail — sentiment votes + community + market data
+    try:
+        detail_url = (
+            f"https://api.coingecko.com/api/v3/coins/{coin_id}"
+            f"?localization=false&tickers=false&market_data=true"
+            f"&community_data=true&developer_data=false&sparkline=false"
+        )
+        req = urllib.request.Request(detail_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            coin_data = json.loads(resp.read().decode())
+    except Exception as e:
+        logger.warning(f"CoinGecko detail fetch failed for {coin_id}: {e}")
+        return {
+            "symbol": base,
+            "source": "coingecko",
+            "status": "error",
+            "error": f"Detail fetch failed: {e}",
+            "sentiment_score": 0,
+            "sentiment_label": "NEUTRAL",
+            "volume_signal": "UNKNOWN",
+        }
+
+    # Sentiment votes: % of community that voted bullish vs bearish
+    up_pct = coin_data.get("sentiment_votes_up_percentage") or 50.0
+    down_pct = coin_data.get("sentiment_votes_down_percentage") or 50.0
+
+    # Score: 50/50 → 0 (NEUTRAL), 100% up → +100, 0% up → -100
+    sentiment_score = max(-100, min(100, round(up_pct - down_pct)))
+
+    if sentiment_score >= 50:
+        sentiment_label = "VERY_BULLISH"
+    elif sentiment_score >= 20:
+        sentiment_label = "BULLISH"
+    elif sentiment_score <= -50:
+        sentiment_label = "VERY_BEARISH"
+    elif sentiment_score <= -20:
+        sentiment_label = "BEARISH"
+    else:
+        sentiment_label = "NEUTRAL"
+
+    # Community data
+    community = coin_data.get("community_data") or {}
+    twitter_followers = community.get("twitter_followers") or 0
+    reddit_subscribers = community.get("reddit_subscribers") or 0
+    reddit_posts_48h = community.get("reddit_average_posts_48h") or 0
+    reddit_comments_48h = community.get("reddit_average_comments_48h") or 0
+
+    # Price momentum
+    market = coin_data.get("market_data") or {}
+    price_change_24h = market.get("price_change_percentage_24h") or 0.0
+    price_change_7d = market.get("price_change_percentage_7d") or 0.0
+
+    # Volume signal based on community size
+    if twitter_followers > 100_000 or reddit_subscribers > 50_000:
+        volume_signal = "HIGH_BUZZ"
+    elif twitter_followers > 10_000 or reddit_subscribers > 5_000:
+        volume_signal = "MODERATE_BUZZ"
+    else:
+        volume_signal = "LOW_BUZZ"
+
+    result = {
+        "symbol": base,
+        "coin_id": coin_id,
+        "source": "coingecko",
+        "status": "ok",
+        "sentiment_score": sentiment_score,
+        "sentiment_label": sentiment_label,
+        "bullish_votes_pct": round(up_pct, 1),
+        "bearish_votes_pct": round(down_pct, 1),
+        "volume_signal": volume_signal,
+        "community": {
+            "twitter_followers": twitter_followers,
+            "reddit_subscribers": reddit_subscribers,
+            "reddit_posts_48h": reddit_posts_48h,
+            "reddit_comments_48h": reddit_comments_48h,
+        },
+        "price_momentum": {
+            "change_24h_pct": round(price_change_24h, 2),
+            "change_7d_pct": round(price_change_7d, 2),
+        },
     }
+
+    _sentiment_cache[base] = {"data": result, "fetched_at": time.time()}
+    logger.info(
+        f"CoinGecko sentiment [{base}]: {sentiment_label} ({sentiment_score:+d}) "
+        f"\u2191{up_pct:.0f}% \u2193{down_pct:.0f}% \u2014 {volume_signal} "
+        f"({twitter_followers:,} Twitter followers)"
+    )
+    return result
 
 
 def detect_fud_fomo(text: str) -> Dict[str, Any]:

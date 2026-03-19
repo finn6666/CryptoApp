@@ -37,10 +37,10 @@ async function loadPortfolioCard() {
 
         valEl.textContent = `£${Number(totalValue).toFixed(2)}`;
 
-        const sign = totalPnL >= 0 ? '+' : '';
-        let subText = `${sign}£${Number(totalPnL).toFixed(2)}`;
+        const sign = totalPnL >= 0 ? '+' : '-';
+        let subText = `${sign}£${Math.abs(Number(totalPnL)).toFixed(2)}`;
         if (pnlPct !== null) {
-            subText += ` (${sign}${Number(pnlPct).toFixed(1)}%)`;
+            subText += ` (${sign}${Math.abs(Number(pnlPct)).toFixed(1)}%)`;
         }
         subText += ` · ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
         subEl.textContent = subText;

@@ -6,7 +6,7 @@ price data and local ML (no Gemini API calls):
 
   Tier 1 — Price monitor    (every 5 min)   : stop-loss / take-profit / trailing-stop
   Tier 2 — Momentum alerts  (every 15 min)  : volume spikes, rapid price moves
-  Tier 3 — Quick scan       (every 30 min)  : local gem detector on tradeable coins
+  Tier 3 — Attractiveness scan (every 30 min) : score tradeable coins by attractiveness_score
 
 A single lightweight CMC data refresh runs every 15 min (~96 calls/day,
 well within the free-tier limit of 333/day).
@@ -328,21 +328,17 @@ class MarketMonitor:
             logger.warning(f"[Monitor] Momentum check error: {e}")
 
     # ═══════════════════════════════════════════════════════════
-    # Tier 3 — Quick Scan (local gem detector — no API calls)
+    # Tier 3 — Attractiveness Scan (no API calls)
     # ═══════════════════════════════════════════════════════════
 
     def _run_quick_scan(self):
         """
-        Lightweight gem score scan using local ML only.
-        No Gemini/ADK calls — just the local gem detector model.
-        Flags coins that have crossed the gem threshold since the last deep scan.
+        Lightweight scan using the coin's pre-computed attractiveness_score.
+        No Gemini/ADK calls — purely local data from CoinMarketCap.
+        Flags coins above the threshold and feeds them to the opportunistic-buy pipeline.
         """
         try:
             import services.app_state as state
-
-            if not state.GEM_DETECTOR_AVAILABLE or not state.gem_detector:
-                logger.debug("[Monitor] Quick scan skipped — gem detector not available")
-                return
 
             if not state.analyzer or not state.analyzer.coins:
                 return
@@ -363,40 +359,30 @@ class MarketMonitor:
                 if not exchanges:
                     continue
 
-                coin_dict = state.coin_to_dict(coin)
-                try:
-                    gem_result = state.gem_detector.predict_hidden_gem(coin_dict)
-                    gem_score = gem_result.get("gem_score", 0)
-                    gem_prob = gem_result.get("gem_probability", 0)
-                    scored_count += 1
+                score = getattr(coin, "attractiveness_score", 0) or 0
+                scored_count += 1
 
-                    if gem_score >= self.quick_scan_min_gem:
-                        new_gems.append({
-                            "symbol": symbol,
-                            "gem_score": round(gem_score, 2),
-                            "gem_probability": round(gem_prob, 4),
-                            "price": getattr(coin, "price", 0),
-                            "exchanges": exchanges[:2],
-                            "strengths": gem_result.get("key_strengths", [])[:3],
-                        })
+                if score >= self.quick_scan_min_gem:
+                    new_gems.append({
+                        "symbol": symbol,
+                        "gem_score": round(score, 2),
+                        "gem_probability": round(min(1.0, score / 10.0), 4),
+                        "price": getattr(coin, "price", 0),
+                        "exchanges": exchanges[:2],
+                        "strengths": [],  # no gem detector strengths
+                    })
 
-                except Exception:
-                    pass
-
-                # Cap to avoid hogging CPU on the Pi
                 if scored_count >= self.quick_scan_top_n:
                     break
 
-            # Sort by gem score
             new_gems.sort(key=lambda g: g["gem_score"], reverse=True)
 
             if new_gems:
                 logger.info(
-                    f"[Monitor] Quick scan found {len(new_gems)} gems above "
-                    f"{self.quick_scan_min_gem}: "
+                    f"[Monitor] Quick scan found {len(new_gems)} coins above "
+                    f"attractiveness {self.quick_scan_min_gem}: "
                     f"{', '.join(g['symbol'] for g in new_gems[:5])}"
                 )
-                # Record for gem score tracking
                 try:
                     from ml.gem_score_tracker import get_gem_score_tracker
                     tracker = get_gem_score_tracker()
@@ -417,7 +403,7 @@ class MarketMonitor:
                     "top_gems": new_gems[:5],
                 })
 
-                # ── Opportunistic buy: feed high-scoring gems to trading pipeline ──
+                # ── Opportunistic buy: feed high-scoring coins to trading pipeline ──
                 if self.auto_buy_enabled:
                     for gem in new_gems:
                         if gem["gem_score"] >= self.auto_buy_min_gem:

@@ -19,8 +19,6 @@ class MLScheduler:
         self.data_dir = os.path.join(project_root, "data")
         self.model_dir = os.path.join(project_root, "models")
 
-        # Will be set when integrated with the main app
-        self.gem_detector = None
         self.analyzer = None
 
         self._thread = None

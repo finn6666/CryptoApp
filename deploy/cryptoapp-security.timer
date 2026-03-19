@@ -1,0 +1,13 @@
+# CryptoApp weekly security check timer
+# Runs every Monday at 06:00 (Pi local time)
+
+[Unit]
+Description=CryptoApp Weekly Security Check Timer
+
+[Timer]
+OnCalendar=Mon *-*-* 06:00:00
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target
