@@ -102,8 +102,15 @@ class ExchangeManager:
             passphrase = os.getenv("KUCOIN_PASSPHRASE", "")
             if key and secret and passphrase:
                 return {"apiKey": key, "secret": secret, "password": passphrase}
+        elif exchange_id == "mexc":
+            key = os.getenv("MEXC_API_KEY", "")
+            secret = os.getenv("MEXC_API_SECRET", "")
+            if key and secret:
+                # MEXC v3 spot doesn't use a passphrase; pass empty string to
+                # satisfy ccxt's requiredCredentials check without breaking auth.
+                return {"apiKey": key, "secret": secret, "password": ""}
         else:
-            # Generic fallback: EXCHANGE_API_KEY / EXCHANGE_API_SECRET
+            # Generic fallback — uses {EXCHANGE}_API_KEY / {EXCHANGE}_API_SECRET
             prefix = exchange_id.upper()
             key = os.getenv(f"{prefix}_API_KEY", "")
             secret = os.getenv(f"{prefix}_API_SECRET", "")

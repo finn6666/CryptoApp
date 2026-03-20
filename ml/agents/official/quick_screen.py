@@ -4,6 +4,7 @@ Single Gemini call to triage coins before the full multi-agent pipeline.
 Saves ~80% of API calls by filtering out obvious skips early.
 """
 
+import os
 import logging
 from typing import Dict, Any, Optional
 from google.adk import Agent, Runner
@@ -14,6 +15,10 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 _session_service = InMemorySessionService()
+
+# Use a lighter/cheaper model for quick screen — it's a binary triage filter,
+# not a deep analysis. Override via QUICK_SCREEN_MODEL env var if needed.
+_QUICK_SCREEN_MODEL = os.getenv("QUICK_SCREEN_MODEL", "gemini-2.0-flash-lite")
 
 
 class QuickScreenResult(BaseModel):
@@ -26,7 +31,7 @@ class QuickScreenResult(BaseModel):
 quick_screen_agent = Agent(
     name="quick_screener",
     description="Fast single-pass coin screener for triage",
-    model="gemini-3-flash-preview",
+    model=_QUICK_SCREEN_MODEL,
     instruction="""You are a fast crypto screener. Given a coin's market data, decide in ONE call whether it deserves deep multi-agent analysis.
 
 Return JSON with exactly 3 fields:
