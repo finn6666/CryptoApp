@@ -181,14 +181,11 @@ function generateUnifiedAIAnalysis(coin, coinId) {
 // Format price in GBP
 function formatPrice(price) {
     if (!price || price === 0) return 'N/A';
-    
-    // Price is already in GBP from the API
-    const priceInGbp = price;
-    
-    if (priceInGbp < 0.01) {
-        return `£${priceInGbp.toPrecision(2)}`;
-    }
-    return `£${priceInGbp.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
+    const n = Number(price);
+    if (n >= 0.01)         return `£${n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
+    if (n >= 0.000001)     return `£${n.toFixed(6)}`;
+    if (n >= 0.00000001)   return `£${n.toFixed(10)}`;
+    return `£${n.toExponential(3)}`;
 }
 
 // Get score class and label

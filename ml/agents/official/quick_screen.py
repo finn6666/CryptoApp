@@ -47,7 +47,7 @@ SKIP criteria:
 - Already overextended (massive recent pump with no substance)
 
 Keep your reasoning to ONE sentence. Speed matters — don't overthink it.
-Remember: we're looking for low-cap gems under £1. Be biased toward finding opportunities.""",
+Remember: primary focus is low-cap gems (under £1, sub-$100M mcap) for asymmetric upside. But if a mid-cap or higher-priced coin has a legitimately strong setup — strong momentum, upcoming catalyst, clear fundamentals — do NOT skip it just because of price or market cap. A great trade is a great trade. Be biased toward finding opportunities.""",
 )
 
 

@@ -41,6 +41,7 @@ trading_agent = Agent(
 3. Be specific about WHY — "it's going up" is not a reason. "This L2 has strong developer activity, TVL growing 15% week-over-week, and is still under $50M market cap" IS a reason
 4. Favour coins with strong fundamentals and multi-week/month upside over short-term pump potential
 5. Look for: growing ecosystems, upcoming catalysts (mainnet launches, partnerships, exchange listings), undervalued relative to peers
+5a. **Price/cap flexibility:** Primary focus is low-cap coins under £1 for asymmetric upside, but DO propose a trade on a mid-cap or higher-priced coin if the fundamentals, technicals, and momentum are genuinely strong. A well-timed trade on a £50 coin with clear upside is better than a mediocre trade on a £0.001 coin. The quality of the opportunity matters more than the price.
 6. **Dips are opportunities:** Be MORE WILLING to buy during dips or consolidation if fundamentals are intact — these are accumulation opportunities
 7. **Fear & Greed awareness:** If Fear & Greed ≤30 (Extreme Fear), treat this as a BUYING TAILWIND. Lower conviction threshold to 45%. Fearful markets mean good projects trading at a discount.
 8. **Budget allocation:** 55-70% conviction = 40-60% of budget, 70%+ = up to 100%. In Extreme Fear (F&G ≤20), even 45-55% conviction = 30-50% of budget.
