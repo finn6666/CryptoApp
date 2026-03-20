@@ -1,8 +1,11 @@
+## Questions
+- Does the Q-learning only learn from buying or selling or can it learn from unrealised results as well?
+
+- Is there a cheaper way to do the API gemeni costs, will be around £20 a month which is quite a bit, want to see if frequency of scans could be increased though?
+
+
+
 ## Future Work
-
-### Multi-agent teams
-
-Run multiple agent teams with different strategies (e.g., conservative vs aggressive) analyzing the same coins. Teams vote or compete — highest-conviction consensus triggers trades. Needs: team-scoped orchestrator configs, per-team Q-learning state, ensemble voting logic in trading engine.
 
 ### Trade sizing / allocation tuning
 
@@ -17,3 +20,7 @@ Currently coins bought on KuCoin/MEXC sit on those exchanges. Consider auto-with
 Current section on the Trades page surfaces Q-learning stats (epsilon, win/loss pattern, best/worst states). It works but feels thin — the displayed text is generic and not very actionable. Options to consider: richer per-coin pattern breakdowns, trend over time charts, confidence intervals, or surfacing the actual state strings more readably. Section currently renamed from "RL Insights" to "Learning Insights" since Q-learning is technically RL but the label was confusing.
 
 ### Weekly Report (revisit in future)
+
+### Multi-agent teams (revisit in future)
+
+Run multiple agent teams with different strategies (e.g., conservative vs aggressive) analyzing the same coins. Teams vote or compete — highest-conviction consensus triggers trades. Needs: team-scoped orchestrator configs, per-team Q-learning state, ensemble voting logic in trading engine.
