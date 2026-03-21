@@ -1098,6 +1098,84 @@ class TradingEngine:
             logger.error(f"Failed to load trading state: {e}")
 
 
+# ─── Allocation Helper ────────────────────────────────────────
+
+def compute_allocation_pct(
+    conviction: int,
+    agent_suggested_pct: float,
+    coin_data: Dict[str, Any],
+) -> float:
+    """
+    Compute the % of remaining budget to allocate to a trade.
+
+    Layers applied in order:
+    1. Base — agent's suggested % if non-zero, otherwise conviction-derived tiers
+    2. Market cap tier — scale down slightly for micro-caps, up for large-caps
+    3. Q-learning state — nudge size based on observed win/loss for this pattern
+    4. Portfolio concentration — reduce add-ons when already meaningfully exposed
+
+    Returns a float in [15.0, 100.0].
+    """
+    # 1. Base percentage
+    if agent_suggested_pct > 0:
+        base_pct = float(max(15.0, min(100.0, agent_suggested_pct)))
+    else:
+        # Deterministic fallback when agent returned 0
+        if conviction >= 85:
+            base_pct = 85.0
+        elif conviction >= 70:
+            base_pct = 65.0
+        elif conviction >= 55:
+            base_pct = 45.0
+        else:  # 45-54 (fear-mode threshold)
+            base_pct = 30.0
+
+    # 2. Market cap tier scaling
+    mcap = coin_data.get("market_cap", 0) or 0
+    if mcap > 0:
+        if mcap < 5_000_000:        # micro-cap: higher uncertainty, smaller size
+            base_pct *= 0.85
+        elif mcap >= 500_000_000:   # large/mid-cap: more liquid, allow larger position
+            base_pct *= 1.15
+
+    # 3. Q-learning state performance scaling
+    # Only fires when the state has been visited enough times to be reliable
+    try:
+        from ml.q_learning import get_q_learner, discretise_state
+        ql = get_q_learner()
+        ql_state = discretise_state(coin_data)
+        total_visits = sum(ql.visit_counts[ql_state].values())
+        if total_visits >= ql.min_visits_to_act * 2:
+            q_buy = ql.q_table[ql_state]["buy"]
+            if q_buy > 0.15:
+                base_pct *= 1.2    # proven winning pattern — size up
+            elif q_buy < -0.15:
+                base_pct *= 0.75   # proven losing pattern — size down
+    except Exception:
+        pass
+
+    # 4. Portfolio concentration cap
+    # When we already have a meaningful holding, reduce the add-on size
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        sym = coin_data.get("symbol", "").upper()
+        tracker = get_portfolio_tracker()
+        holding = tracker.holdings.get(sym)
+        if holding and holding.get("quantity", 0) > 0:
+            existing_cost = holding.get("total_cost_gbp", 0)
+            if existing_cost >= 2.0:
+                base_pct *= 0.5   # meaningful position already — halve the add-on
+    except Exception:
+        pass
+
+    result = max(15.0, min(100.0, round(base_pct, 1)))
+    logger.debug(
+        f"[Allocation] conviction={conviction} agent={agent_suggested_pct:.0f}% "
+        f"mcap={mcap:.0f} → {result:.1f}%"
+    )
+    return result
+
+
 # ─── Singleton ────────────────────────────────────────────────
 
 _engine: Optional[TradingEngine] = None

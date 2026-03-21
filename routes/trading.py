@@ -461,7 +461,9 @@ def auto_evaluate_trade():
                     pass
 
         if should_trade and conviction >= 75:
-            amount = remaining * (allocation_pct / 100)
+            from ml.trading_engine import compute_allocation_pct
+            sized_pct = compute_allocation_pct(conviction, allocation_pct, coin_data)
+            amount = remaining * (sized_pct / 100)
             amount = min(amount, remaining)
 
             proposal = engine.propose_trade(

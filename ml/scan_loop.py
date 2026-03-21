@@ -548,17 +548,25 @@ class ScanLoop:
                 if remaining < engine.min_useful_budget_gbp:
                     return {"outcome": "skipped", "proposed": False, "reason": "Daily budget exhausted"}
 
-                # Check exchange minimum before wasting an API proposal
+                # Check exchange minimum before wasting an API proposal.
+                # Compare against remaining budget (not max_trade_pct cap) because
+                # propose_trade already has bump-to-minimum logic that can exceed the
+                # per-trade % cap when the exchange floor requires it.
                 min_order = engine._get_min_order_gbp(symbol)
-                max_trade = min(remaining, engine.daily_budget_gbp * engine.max_trade_pct)
-                if min_order > 0 and min_order > max_trade:
+                if min_order > 0 and min_order > remaining:
                     return {
                         "outcome": "skipped", "proposed": False,
-                        "reason": f"Exchange minimum £{min_order:.2f} exceeds max trade £{max_trade:.2f}",
+                        "reason": f"Exchange minimum £{min_order:.2f} exceeds remaining budget £{remaining:.2f}",
                     }
 
-                amount = remaining * (allocation_pct / 100)
+                from ml.trading_engine import compute_allocation_pct
+                sized_pct = compute_allocation_pct(conviction, allocation_pct, coin_data)
+                amount = remaining * (sized_pct / 100)
                 amount = min(amount, remaining)
+                logger.info(
+                    f"[Scan] {symbol}: conviction={conviction}, agent_alloc={allocation_pct:.0f}%, "
+                    f"computed_alloc={sized_pct:.1f}%, amount=£{amount:.2f}"
+                )
 
                 # Use auto-execute for scheduled scans so trades don't
                 # sit waiting for manual approval overnight.
