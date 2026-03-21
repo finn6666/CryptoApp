@@ -156,28 +156,21 @@
 
         @media (max-width: 768px) {
             .health-cards { grid-template-columns: 1fr; }
-            .health-page-header { flex-direction: column; align-items: flex-start; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <div class="health-page-header">
-                <div>
-                    <h1>🖥️ Server Health</h1>
-                    <p>Live system status — auto-refreshes every 10 seconds</p>
-                </div>
-                <div class="health-nav">
-                    <a href="/" class="btn" style="background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 600; padding: 8px 18px; border: none; font-size: 14px;">
-                        ← Dashboard
-                    </a>
-                    <a href="/trades" class="btn" style="background: rgba(255,255,255,0.08); color: #fff; font-weight: 500; padding: 8px 18px; border: 1px solid var(--border); font-size: 14px;">
-                        📈 Trades
-                    </a>
-                </div>
-            </div>
+            <h1>🖥️ Server Health</h1>
+            <p>Live system status — auto-refreshes every 10 seconds</p>
         </div>
+
+        <nav class="site-nav">
+            <a href="/" class="site-nav__link">Dashboard</a>
+            <a href="/trades" class="site-nav__link">Trades</a>
+            <a href="/health-dashboard" class="site-nav__link site-nav__link--active">Health</a>
+        </nav>
 
         <!-- Status Banner -->
         <div class="health-banner health-banner--ok" id="healthBanner">

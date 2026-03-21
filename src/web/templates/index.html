@@ -76,21 +76,23 @@
 <body>
     <div class="container">
         <div class="header">
-            
             <div class="refresh-controls">
                 <div class="refresh-status">
                     <div>Last: <span class="last-updated" id="lastUpdated">Loading...</span></div>
                     <div>Next: <span id="nextRefresh">-</span></div>
                 </div>
-                <button class="btn" onclick="window.location.href='/health-dashboard'" style="background: linear-gradient(135deg, #48bb78, #38a169); color: #fff; font-weight: 600; padding: 8px 18px; border: none; font-size: 14px;">
-                    🖥️ Health
-                </button>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">
                     Refresh
                 </button>
             </div>
             <h1>Crypto Investment Dashboard</h1>
         </div>
+
+        <nav class="site-nav">
+            <a href="/" class="site-nav__link site-nav__link--active">Dashboard</a>
+            <a href="/trades" class="site-nav__link">Trades</a>
+            <a href="/health-dashboard" class="site-nav__link">Health</a>
+        </nav>
 
         <!-- Status Toast Container -->
         <div class="status-container" id="statusContainer">
@@ -167,8 +169,8 @@
 
             <!-- Portfolio Holdings Section -->
             <div class="section-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border);">
-                    <h2 style="font-size: 20px; font-weight: 700; color: var(--text-primary); margin: 0;">💼 Portfolio Holdings</h2>
+                <div class="section-header-row">
+                    <h2>💼 Portfolio Holdings</h2>
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <span id="portfolioUpdated" style="font-size: 11px; color: var(--text-secondary);"></span>
                         <button id="portfolioRefreshBtn" onclick="refreshTradesPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
@@ -177,29 +179,29 @@
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpValue">£0.00</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Total Value</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="tpValue">£0.00</div>
+                        <div class="mini-stat__label">Total Value</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700;" id="tpPnl">£0.00</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Unrealised P&L</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="tpPnl">£0.00</div>
+                        <div class="mini-stat__label">Unrealised P&L</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700;" id="tpRealisedPnl">£0.00</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Realised P&L</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="tpRealisedPnl">£0.00</div>
+                        <div class="mini-stat__label">Realised P&L</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpCount">0</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Holdings</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="tpCount">0</div>
+                        <div class="mini-stat__label">Holdings</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpTotalTrades">0</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Total Trades</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="tpTotalTrades">0</div>
+                        <div class="mini-stat__label">Total Trades</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 20px; font-weight: 700; color: var(--text-primary);" id="tpFees">£0.00</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Fees Paid</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="tpFees">£0.00</div>
+                        <div class="mini-stat__label">Fees Paid</div>
                     </div>
                 </div>
                 <div id="marketState" style="margin-bottom: 16px;">
@@ -228,7 +230,7 @@
 
             <!-- Live Trading Section -->
             <div class="section-card">
-                <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="section-header section-header--actions">
                     ⚡ Live Trading
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <span id="tradingStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600;"></span>
@@ -262,7 +264,7 @@
 
             <!-- Scan & Automation Section -->
             <div class="section-card">
-                <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 class="section-header section-header--actions">
                     📊 Automated Scanning
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <span id="scanStatusDetail" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
@@ -272,21 +274,21 @@
                     </div>
                 </h2>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanNextTime">—</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Next Scan</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="scanNextTime">—</div>
+                        <div class="mini-stat__label">Next Scan</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanLastRun">Never</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Last Scan</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="scanLastRun">Never</div>
+                        <div class="mini-stat__label">Last Scan</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanCoinsAnalysed">0</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Coins Analysed</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="scanCoinsAnalysed">0</div>
+                        <div class="mini-stat__label">Coins Analysed</div>
                     </div>
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 14px; text-align: center;">
-                        <div style="font-size: 22px; font-weight: 700; color: var(--text-primary);" id="scanProposals">0</div>
-                        <div style="font-size: 12px; color: var(--text-secondary);">Proposals Made</div>
+                    <div class="mini-stat">
+                        <div class="mini-stat__value" id="scanProposals">0</div>
+                        <div class="mini-stat__label">Proposals Made</div>
                     </div>
                 </div>
                 <div id="scanResultMsg" style="display: none; background: rgba(102,126,234,0.1); border: 1px solid var(--accent-primary); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--text-secondary);"></div>

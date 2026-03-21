@@ -272,32 +272,6 @@
             border-bottom: 2px solid var(--border);
         }
 
-        .header-top {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-
-        .back-btn {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--border);
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            color: var(--text-secondary);
-            text-decoration: none;
-            display: inline-block;
-            transition: all 0.3s;
-        }
-
-        .back-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
-            border-color: var(--accent-primary);
-        }
-
         .info-box {
             background: rgba(102, 126, 234, 0.1);
             border: 1px solid var(--accent-primary);
@@ -317,10 +291,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <div class="header-top">
-                <h1>Trade Journal & Live Trading</h1>
-                <a href="/" class="back-btn">← Dashboard</a>
-            </div>
+            <h1>Trade Journal & Live Trading</h1>
             <p>Automated scanning & multi-agent analysis • Portfolio tracking • Trade proposals via email</p>
             
             <div class="stats-grid" id="statsGrid">
@@ -351,9 +322,15 @@
             </div>
         </div>
 
+        <nav class="site-nav">
+            <a href="/" class="site-nav__link">Dashboard</a>
+            <a href="/trades" class="site-nav__link site-nav__link--active">Trades</a>
+            <a href="/health-dashboard" class="site-nav__link">Health</a>
+        </nav>
+
         <!-- Live Trading Section -->
         <div class="section-card">
-            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="section-header section-header--actions">
                 ⚡ Live Trading
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <span id="tradingStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600;"></span>
@@ -389,7 +366,7 @@
 
         <!-- Scan & Automation Section -->
         <div class="section-card">
-            <h2 class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="section-header section-header--actions">
                 📊 Automated Scanning
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <span id="scanStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
