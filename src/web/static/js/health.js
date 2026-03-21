@@ -49,11 +49,10 @@ function renderHealthPage(data) {
 
     // ── Components Card ──
     html += `<div class="health-card">
-        <div class="health-card-title"><span class="icon">⚙️</span> Components</div>
+        <div class="health-card-title">Components</div>
         <div class="health-chips">
             ${chip(c.analyzer, 'Analyzer')}
             ${chip(c.ml_pipeline, 'ML Pipeline')}
-            ${chip(c.gem_detector, 'Gem Detector')}
             ${chip(c.adk_orchestrator, 'ADK Orchestrator')}
         </div>
     </div>`;
@@ -77,10 +76,10 @@ function renderHealthPage(data) {
 
     // ── Scan Loop Card ──
     html += `<div class="health-card">
-        <div class="health-card-title"><span class="icon">🔄</span> Scan Loop</div>
-        <div class="health-metric"><span class="health-metric-label">Scheduler</span><span class="health-metric-value">${scan.scheduler_running ? '✅ Running' : '⏸️ Stopped'}</span></div>`;
+        <div class="health-card-title">Scan Loop</div>
+        <div class="health-metric"><span class="health-metric-label">Scheduler</span><span class="health-metric-value">${scan.scheduler_running ? 'Running' : 'Stopped'}</span></div>`;
     if (scan.scan_running) {
-        html += `<div class="health-metric"><span class="health-metric-label">Current</span><span class="health-metric-value" style="color:var(--warning)">Scan in progress…</span></div>`;
+        html += `<div class="health-metric"><span class="health-metric-label">Current</span><span class="health-metric-value" style="color:var(--warning)">Scan in progress</span></div>`;
     }
     if (scan.next_scan) {
         html += `<div class="health-metric"><span class="health-metric-label">Next Scan</span><span class="health-metric-value">${scan.next_scan}</span></div>`;
@@ -93,7 +92,7 @@ function renderHealthPage(data) {
     // ── System Resources Card ──
     if (sys.cpu_percent !== undefined) {
         html += `<div class="health-card">
-            <div class="health-card-title"><span class="icon">📊</span> System Resources</div>
+            <div class="health-card-title">System Resources</div>
             ${resourceBar('CPU', sys.cpu_percent)}
             ${resourceBar('Memory', sys.memory_percent)}
             ${resourceBar('Disk', sys.disk_percent)}

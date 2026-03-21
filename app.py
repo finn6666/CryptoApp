@@ -74,7 +74,6 @@ try:
     retrain_enabled = os.environ.get('RETRAIN_ENABLED', 'true').lower() in ('1', 'true', 'yes')
     if retrain_enabled:
         _ml_scheduler = get_ml_scheduler()
-        _ml_scheduler.gem_detector = state.gem_detector
         _ml_scheduler.analyzer = state.analyzer
         _ml_scheduler.start_scheduler()
 except Exception as e:
