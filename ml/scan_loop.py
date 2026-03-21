@@ -55,6 +55,9 @@ class ScanLoop:
         self._last_scan_time: Optional[datetime] = None
         self._scheduler_started_at: Optional[datetime] = None
 
+        # Cost control: reuse a cached SKIP result if it's this fresh (0 = always re-analyse)
+        self.analysis_reuse_hours = float(os.getenv("SCAN_ANALYSIS_REUSE_HOURS", "5"))
+
         SCAN_LOGS_DIR.mkdir(parents=True, exist_ok=True)
         AUDIT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -421,6 +424,25 @@ class ScanLoop:
 
         symbol = coin_data["symbol"]
         engine = get_trading_engine()
+
+        # Cost control: skip re-analysis if we have a recent SKIP result cached
+        if self.analysis_reuse_hours > 0:
+            cached = state.get_cached_analysis(symbol)
+            if cached:
+                cached_at = cached.get("_cached_at", 0)
+                age_hours = (time.time() - cached_at) / 3600
+                if age_hours <= self.analysis_reuse_hours:
+                    prev_decision = cached.get("analysis", {}).get("trade_decision", {})
+                    if not prev_decision.get("should_trade", False):
+                        logger.info(
+                            f"[Scan] {symbol}: cached SKIP ({age_hours:.1f}h old) — "
+                            f"skipping API call (set SCAN_ANALYSIS_REUSE_HOURS=0 to disable)"
+                        )
+                        return {
+                            "outcome": "skipped",
+                            "proposed": False,
+                            "reason": f"Recent analysis ({age_hours:.1f}h ago) found no trade — reusing result",
+                        }
 
         # Check budget before spending API credits
         if engine.is_budget_exhausted():

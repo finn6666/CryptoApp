@@ -35,7 +35,7 @@ class TechnicalOutput(BaseModel):
 technical_agent = Agent(
     name="technical_specialist",
     description="Cryptocurrency technical analyst",
-    model="gemini-3-flash-preview",
+    model=os.getenv("TECHNICAL_AGENT_MODEL", "gemini-2.0-flash"),
     instruction="""You are a cryptocurrency technical analyst. Assess price action for specific coins.
 
 For each coin, assess using the ACTUAL price provided:

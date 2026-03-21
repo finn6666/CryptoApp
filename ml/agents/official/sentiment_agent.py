@@ -34,7 +34,7 @@ class SentimentOutput(BaseModel):
 sentiment_agent = Agent(
     name="sentiment_specialist",
     description="Cryptocurrency sentiment analyst specializing in social media analysis and market psychology",
-    model="gemini-3-flash-preview",
+    model=os.getenv("SENTIMENT_AGENT_MODEL", "gemini-2.0-flash"),
     instruction="""You are a cryptocurrency sentiment analyst. Your analysis carries SIGNIFICANT weight — when you detect strong hype, the system will prioritise your signal over fundamentals and technicals.
 
 For each coin, assess:
