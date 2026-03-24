@@ -2,16 +2,16 @@
 Sell-Side Automation
 Monitors holdings for exit triggers and automatically proposes sell trades.
 
-Exit triggers:
-- Profit target hit (configurable, default 75%) — only after min hold period
-- Stop-loss triggered (configurable, default -50%) — always fires for capital protection
-- Trailing stop (locks in gains, default 45% from peak) — only after min hold period
-- Agent re-analysis recommends SELL/AVOID
-- Minimum hold period (configurable, default 72h) before profit/trailing triggers fire
-- Agent re-analysis every 12h per held coin to catch fundamental deterioration
+Exit triggers (in priority order):
+- Stop-loss (-50%)         — always fires for capital protection, full exit
+- Tier 1 profit (75%)      — partial sell (33%), tightens trailing stop to 20%
+- Tier 2 profit (150%)     — partial sell (50% of remaining), tightens trailing to 15%
+- Trailing stop            — full exit, uses tightened value after tiers fire
+- Nuclear profit (300%)    — full exit if position reaches extreme levels
+- Agent re-analysis        — full exit if agents recommend SELL/AVOID
 
-Thresholds are intentionally wide — crypto, especially low-cap coins, routinely
-swings 20-30% in a day. Tight stops cause premature sells on normal volatility.
+All profit/trailing triggers respect a minimum 72h hold period.
+Tier thresholds and fractions are configurable via env vars (SELL_TIER1_PCT, etc.).
 """
 
 import os
@@ -37,7 +37,6 @@ class SellAutomation:
     def __init__(self):
         # Exit thresholds — intentionally wide for crypto volatility.
         # Small-cap coins routinely swing 20-30%/day; tight stops cause premature exits.
-        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "75.0"))
         self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-50.0"))
         self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "45.0"))
         self.enable_agent_recheck = os.getenv("SELL_AGENT_RECHECK", "true").lower() in ("1", "true", "yes")
@@ -49,14 +48,32 @@ class SellAutomation:
         # 72h lets positions ride out short-term volatility before evaluating exits.
         self.min_hold_hours = float(os.getenv("SELL_MIN_HOLD_HOURS", "72.0"))
 
+        # Tiered profit-taking: partial sells that let winners run.
+        # Tier 1 (75%): take 33% off the table, tighten trailing to 20%.
+        # Tier 2 (150%): take 50% of remaining off, tighten trailing to 15%.
+        # Full exit only via trailing stop, stop-loss, or the nuclear SELL_PROFIT_TARGET_PCT.
+        self.tier1_pct = float(os.getenv("SELL_TIER1_PCT", "75.0"))
+        self.tier2_pct = float(os.getenv("SELL_TIER2_PCT", "150.0"))
+        self.tier1_fraction = float(os.getenv("SELL_TIER1_FRACTION", "0.33"))
+        self.tier2_fraction = float(os.getenv("SELL_TIER2_FRACTION", "0.50"))
+        self.tier1_trailing_pct = float(os.getenv("SELL_TIER1_TRAILING_PCT", "20.0"))
+        self.tier2_trailing_pct = float(os.getenv("SELL_TIER2_TRAILING_PCT", "15.0"))
+        # Nuclear full-exit if profit goes extreme (default 300% — very rare, last resort).
+        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "300.0"))
+
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
         self._last_recheck: Dict[str, str] = {}  # symbol → ISO timestamp
+        # Track which profit tiers have already been taken per symbol
+        self._tiers_taken: Dict[str, set] = {}
+        # Per-symbol trailing stop override (tightens after each tier)
+        self._tightened_trailing: Dict[str, float] = {}
 
         self._load_state()
 
         logger.info(
-            f"Sell automation: profit_target={self.profit_target_pct}%, "
+            f"Sell automation: tier1={self.tier1_pct}%({self.tier1_fraction*100:.0f}%), "
+            f"tier2={self.tier2_pct}%({self.tier2_fraction*100:.0f}%), "
             f"stop_loss={self.stop_loss_pct}%, trailing_stop={self.trailing_stop_pct}%, "
             f"min_hold={self.min_hold_hours}h"
         )
@@ -87,19 +104,23 @@ class SellAutomation:
         if not holdings:
             return []
 
-        # Build set of symbols that already have a pending OR recently failed sell
-        # to avoid creating duplicates on every run
-        pending_sell_symbols = set()
+        # Build a map of symbol → set of trigger types that are already pending or
+        # recently actioned, to avoid duplicate proposals for the same trigger.
+        # Tier triggers use _tiers_taken for deduplication, but stop-loss/trailing/
+        # full-exit triggers still use this map.
+        pending_sell_triggers: Dict[str, set] = {}
         for p in engine.proposals.values():
             if p.side != "sell":
                 continue
+            sym = p.symbol
+            trigger_type = getattr(p, "trigger_type", "unknown")
             if p.status == "pending":
-                pending_sell_symbols.add(p.symbol)
+                pending_sell_triggers.setdefault(sym, set()).add(trigger_type)
             elif p.status in ("rejected", "executed") and p.created_at:
                 try:
                     created = datetime.fromisoformat(p.created_at)
                     if (datetime.utcnow() - created).total_seconds() < 3600:
-                        pending_sell_symbols.add(p.symbol)
+                        pending_sell_triggers.setdefault(sym, set()).add(trigger_type)
                 except Exception:
                     pass
 
@@ -140,10 +161,15 @@ class SellAutomation:
 
             trigger = self._evaluate_exit(symbol, current_price, entry_price, pnl_pct, hold_hours)
 
-            # Skip if there's already a pending sell for this symbol
-            if trigger and symbol in pending_sell_symbols:
-                logger.info(f"Sell trigger ({trigger['type']}) for {symbol} — already has a pending sell proposal, skipping")
-                continue
+            # Skip if there's already a pending/recent proposal for the same trigger type.
+            # Tier triggers are also deduplicated via _tiers_taken.
+            if trigger:
+                pending_for_sym = pending_sell_triggers.get(symbol, set())
+                if trigger["type"] in pending_for_sym:
+                    logger.info(
+                        f"Sell trigger ({trigger['type']}) for {symbol} — already pending, skipping"
+                    )
+                    trigger = None
 
             # ── Q-learning: checkpoint unrealised P&L for open positions ──
             if not trigger:
@@ -160,22 +186,44 @@ class SellAutomation:
                     pass
 
             if trigger:
-                # ── Q-learning: record closed position outcome ──
-                try:
-                    from ml.q_learning import get_q_learner
-                    ql = get_q_learner()
-                    ql.record_outcome(
-                        symbol=symbol,
-                        coin_data=holding,
-                        action="buy",
-                        pnl_pct=pnl_pct,
-                        hold_hours=hold_hours,
-                        exit_trigger=trigger["type"],
-                    )
-                except Exception as e:
-                    logger.debug(f"Q-learning outcome recording failed: {e}")
+                sell_fraction = trigger.get("sell_fraction", 1.0)
+                amount_gbp = current_price * quantity * sell_fraction
 
-                amount_gbp = current_price * quantity
+                # ── Update tier state before proposing ──
+                if trigger["type"] == "profit_tier_1":
+                    self._tiers_taken.setdefault(symbol, set()).add(1)
+                    self._tightened_trailing[symbol] = self.tier1_trailing_pct
+                    logger.info(
+                        f"{symbol}: Tier 1 taken — trailing stop tightened to {self.tier1_trailing_pct}%"
+                    )
+                elif trigger["type"] == "profit_tier_2":
+                    self._tiers_taken.setdefault(symbol, set()).add(2)
+                    self._tightened_trailing[symbol] = self.tier2_trailing_pct
+                    logger.info(
+                        f"{symbol}: Tier 2 taken — trailing stop tightened to {self.tier2_trailing_pct}%"
+                    )
+                elif sell_fraction >= 1.0:
+                    # Full exit — clear all tier/peak state for this symbol
+                    self._tiers_taken.pop(symbol, None)
+                    self._tightened_trailing.pop(symbol, None)
+                    self._peak_prices.pop(symbol, None)
+
+                # ── Q-learning: record closed position outcome (full exits only) ──
+                if sell_fraction >= 1.0:
+                    try:
+                        from ml.q_learning import get_q_learner
+                        ql = get_q_learner()
+                        ql.record_outcome(
+                            symbol=symbol,
+                            coin_data=holding,
+                            action="buy",
+                            pnl_pct=pnl_pct,
+                            hold_hours=hold_hours,
+                            exit_trigger=trigger["type"],
+                        )
+                    except Exception as e:
+                        logger.debug(f"Q-learning outcome recording failed: {e}")
+
                 result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side="sell",
@@ -186,14 +234,16 @@ class SellAutomation:
                     recommendation="SELL",
                 )
                 outcome = "auto-executed" if result.get("auto_approved") else "proposed"
+                partial_label = f" ({sell_fraction*100:.0f}%)" if sell_fraction < 1.0 else ""
                 proposals.append({
                     "symbol": symbol,
                     "trigger": trigger["type"],
                     "pnl_pct": round(pnl_pct, 2),
+                    "sell_fraction": sell_fraction,
                     "proposal": result,
                 })
                 logger.info(
-                    f"SELL {outcome}: {symbol} — {trigger['type']} "
+                    f"SELL{partial_label} {outcome}: {symbol} — {trigger['type']} "
                     f"(PnL: {pnl_pct:.1f}%, £{amount_gbp:.4f})"
                 )
 
@@ -216,9 +266,14 @@ class SellAutomation:
         hold_hours: float = 0.0,
     ) -> Optional[Dict[str, Any]]:
         """Evaluate a single holding against exit triggers.
-        Respects minimum hold period for all triggers except stop-loss."""
+
+        Returns a trigger dict with a sell_fraction field (0–1.0).
+        sell_fraction < 1.0 means a partial sell; 1.0 means full exit.
+        Respects minimum hold period for all triggers except stop-loss.
+        """
 
         within_hold_period = hold_hours < self.min_hold_hours
+        tiers_taken = self._tiers_taken.get(symbol, set())
 
         # 1. Stop-loss — always fires regardless of hold period (capital protection)
         if pnl_pct <= self.stop_loss_pct:
@@ -230,37 +285,67 @@ class SellAutomation:
                     f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
                 ),
                 "confidence": 90,
+                "sell_fraction": 1.0,
             }
 
         # Skip profit-taking triggers during minimum hold period
         if within_hold_period:
             return None
 
-        # 2. Profit target
+        # 2. Tier 1 — first partial take-profit, then switch to tighter trailing
+        if pnl_pct >= self.tier1_pct and 1 not in tiers_taken:
+            return {
+                "type": "profit_tier_1",
+                "reason": (
+                    f"Tier 1 profit: {pnl_pct:.1f}% gain — taking {self.tier1_fraction*100:.0f}% off the table, "
+                    f"tightening trailing stop to {self.tier1_trailing_pct}% to let the rest run. "
+                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
+                ),
+                "confidence": 82,
+                "sell_fraction": self.tier1_fraction,
+            }
+
+        # 3. Tier 2 — second partial take-profit, tighten trailing further
+        if pnl_pct >= self.tier2_pct and 2 not in tiers_taken:
+            return {
+                "type": "profit_tier_2",
+                "reason": (
+                    f"Tier 2 profit: {pnl_pct:.1f}% gain — taking {self.tier2_fraction*100:.0f}% of remaining off, "
+                    f"tightening trailing stop to {self.tier2_trailing_pct}%. "
+                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
+                ),
+                "confidence": 84,
+                "sell_fraction": self.tier2_fraction,
+            }
+
+        # 4. Nuclear full exit — extreme profit level (last resort, default 300%)
         if pnl_pct >= self.profit_target_pct:
             return {
                 "type": "profit_target",
                 "reason": (
-                    f"Profit target reached: {pnl_pct:.1f}% gain "
-                    f"(target: {self.profit_target_pct}%). "
+                    f"Extreme profit target reached: {pnl_pct:.1f}% gain "
+                    f"(target: {self.profit_target_pct}%). Full exit. "
                     f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
                 ),
                 "confidence": 85,
+                "sell_fraction": 1.0,
             }
 
-        # 3. Trailing stop
+        # 5. Trailing stop — use tightened value if we're in runner mode after a tier
         peak = self._peak_prices.get(symbol, current_price)
+        trailing_pct = self._tightened_trailing.get(symbol, self.trailing_stop_pct)
         if peak > entry_price:
             drop_from_peak_pct = ((peak - current_price) / peak) * 100
-            if drop_from_peak_pct >= self.trailing_stop_pct:
+            if drop_from_peak_pct >= trailing_pct:
                 return {
                     "type": "trailing_stop",
                     "reason": (
                         f"Trailing stop triggered: dropped {drop_from_peak_pct:.1f}% "
-                        f"from peak £{peak:.6f} (trail: {self.trailing_stop_pct}%). "
+                        f"from peak £{peak:.6f} (trail: {trailing_pct}%). "
                         f"Current: £{current_price:.6f}"
                     ),
                     "confidence": 80,
+                    "sell_fraction": 1.0,
                 }
 
         return None
@@ -333,6 +418,12 @@ class SellAutomation:
     def get_status(self) -> Dict[str, Any]:
         """Return current sell automation status."""
         return {
+            "tier1_pct": self.tier1_pct,
+            "tier1_fraction": self.tier1_fraction,
+            "tier1_trailing_pct": self.tier1_trailing_pct,
+            "tier2_pct": self.tier2_pct,
+            "tier2_fraction": self.tier2_fraction,
+            "tier2_trailing_pct": self.tier2_trailing_pct,
             "profit_target_pct": self.profit_target_pct,
             "stop_loss_pct": self.stop_loss_pct,
             "trailing_stop_pct": self.trailing_stop_pct,
@@ -340,6 +431,8 @@ class SellAutomation:
             "agent_recheck_enabled": self.enable_agent_recheck,
             "recheck_interval_hours": self.recheck_interval_hours,
             "tracked_peaks": {k: round(v, 8) for k, v in self._peak_prices.items()},
+            "tiers_taken": {k: sorted(v) for k, v in self._tiers_taken.items()},
+            "tightened_trailing": self._tightened_trailing,
             "last_rechecks": self._last_recheck,
         }
 
@@ -353,6 +446,8 @@ class SellAutomation:
             state = {
                 "peak_prices": self._peak_prices,
                 "last_recheck": self._last_recheck,
+                "tiers_taken": {k: list(v) for k, v in self._tiers_taken.items()},
+                "tightened_trailing": self._tightened_trailing,
             }
             tmp = SELL_STATE_FILE.with_suffix(".tmp")
             with open(tmp, "w") as f:
@@ -373,6 +468,10 @@ class SellAutomation:
                 state = json.load(f)
             self._peak_prices = state.get("peak_prices", {})
             self._last_recheck = state.get("last_recheck", {})
+            self._tiers_taken = {
+                k: set(v) for k, v in state.get("tiers_taken", {}).items()
+            }
+            self._tightened_trailing = state.get("tightened_trailing", {})
         except Exception as e:
             logger.error(f"Failed to load sell state: {e}")
 
