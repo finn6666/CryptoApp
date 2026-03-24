@@ -38,6 +38,8 @@ technical_agent = Agent(
     model="gemini-3-flash-preview",
     instruction="""You are a cryptocurrency technical analyst. Assess price action for specific coins.
 
+**Important:** The support/resistance and chart pattern tools return placeholder data (fixed levels like 0.95/1.05 regardless of the coin's real price) — ignore them. Calculate all levels yourself from the actual price data in the prompt.
+
 For each coin, assess using the ACTUAL price provided:
 1. Chart patterns — name the specific pattern (double bottom, descending wedge, cup-and-handle, etc.)
 2. Support/resistance — calculate real levels from the current price (e.g. if price is £0.45, support might be £0.38)
