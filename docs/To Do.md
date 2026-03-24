@@ -1,11 +1,20 @@
 ## Notes
-- Want heatmap to be based on holdings p and l rather than gem score, can have that on the card but dont want to color code based on it
-- Don't really like the look of RL insights on the page, want it to be more useful and look better, up for ideas to do that
-- No emojis** — remove all existing emojis from logs, frontend templates, JS, and Python strings. Add section in docs to ensure agents don't add any in the future.
-- Gem detector still shwoing up in health page
-- Can you just check the sell logic/agent is ok
-- Can you check the instruction so the agents trade more expensive coins if the oppertunity arises. Would like the focus to be on small cap but also have the freedom to trade upwards if necessary
-- Check secruity vulnrabilities with the new web interface/app changes
+
+### Frontend / UI  (`src/web/**`)
+- Want heatmap to be based on holdings P&L rather than gem score — colour-code by price movement, gem score on the tile only
+- Don't really like the look of RL insights on the page; want it to be more useful and look better — open to ideas
+- Want the dashboard to look as fluid as the Finviz heatmap
+- No emojis — remove all existing emojis from frontend templates, JS strings, and Python log messages. Add a section in docs/CLAUDE.md to ensure agents don't add any in future.
+
+### Backend / Trading (`ml/trading_engine.py`, `ml/sell_automation.py`, `ml/agents/**`)
+- Check the sell logic — review sell_automation.py and the sell agent to make sure exit triggers are correct
+- Check agent instructions so agents trade more expensive coins if the opportunity arises. Focus should remain on small-cap but with freedom to trade upwards when conviction is high.
+
+### Health / Bugs (`routes/health.py`, `src/web/templates/`)
+- Gem detector still showing up on the health page — it has been removed, reference should be cleaned up
+
+### Security (`routes/**`, `app.py`, `src/web/**`)
+- Check security vulnerabilities introduced by recent web interface/app changes (new routes, JS, CORS, auth)
 ---
 
 ## Future Work
