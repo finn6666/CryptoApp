@@ -3,7 +3,7 @@
 
 ## Future Work
 
-### Dashboard layout rework — Finviz-style
+### ~~Dashboard layout rework — Finviz-style~~ ✓ done (March 2026, commit f6b2bb5)
 
 Agreed design (March 2026):
 
