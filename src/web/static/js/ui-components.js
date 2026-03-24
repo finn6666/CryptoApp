@@ -184,8 +184,8 @@ function formatPrice(price) {
     const n = Number(price);
     if (n >= 0.01)         return `£${n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
     if (n >= 0.000001)     return `£${n.toFixed(6)}`;
-    if (n >= 0.00000001)   return `£${n.toFixed(10)}`;
-    return `£${n.toExponential(3)}`;
+    const decimals = -Math.floor(Math.log10(n)) + 2;
+    return `£${n.toFixed(Math.min(decimals, 12))}`;
 }
 
 // Get score class and label

@@ -46,9 +46,9 @@ function _fmtPrice(price) {
     if (price >= 0.01)    return `£${price.toFixed(4)}`;
     if (price >= 0.0001)  return `£${price.toFixed(6)}`;
     if (price >= 0.000001) return `£${price.toFixed(8)}`;
-    // For very tiny prices show compact decimal (no scientific notation)
-    const sig = price.toPrecision(3);
-    return `£${sig}`;
+    // For ultra-tiny prices: calculate exact decimal places needed (no scientific notation)
+    const decimals = -Math.floor(Math.log10(price)) + 2;
+    return `£${price.toFixed(Math.min(decimals, 12))}`;
 }
 
 // ─── Tile size calculation ─────────────────────────────────────
