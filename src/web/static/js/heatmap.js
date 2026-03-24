@@ -205,7 +205,6 @@ function _renderHeatmap(coins, holdingsMap) {
             `background: ${colour}`,
             `flex-basis: ${size}px`,
             `flex-grow: ${size}`,
-            `height: ${Math.max(60, size * 0.65)}px`,
             held ? 'outline: 2px solid rgba(255,255,255,0.5); outline-offset: -2px' : '',
         ].filter(Boolean).join('; ');
         tile.title = `${coin.symbol} — ${coin.name}\n${held ? `P&L: ${displayStr}` : `24h: ${displayStr}`}\nPrice: ${priceStr}`;
