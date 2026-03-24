@@ -2630,8 +2630,11 @@ body::before {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px;
+    height: calc(100vh - 200px);  /* fill viewport; adjust offset if nav grows */
     min-height: 400px;
     position: relative;
+    box-sizing: border-box;
+    overflow-y: auto;
 }
 
 .heatmap-grid {
@@ -2639,7 +2642,7 @@ body::before {
     flex-wrap: wrap;
     gap: 4px;
     align-content: stretch;  /* rows expand to fill the full container height */
-    min-height: 100%;         /* always fill even with few tiles */
+    height: 100%;             /* fill the container — requires parent to have definite height */
 }
 
 /* Individual heatmap tile */
@@ -2655,6 +2658,7 @@ body::before {
     position: relative;
     min-width: 60px;
     min-height: 60px;
+    max-height: 220px;  /* prevent rows becoming excessively tall on large screens */
 }
 
 .hm-tile:hover {

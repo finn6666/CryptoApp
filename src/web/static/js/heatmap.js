@@ -4,26 +4,13 @@
 
 /**
  * Map a normalised position (0–1, relative to min/max of the current dataset)
- * to a CSS background colour: 0 = deep red, 0.5 = amber, 1 = rich green.
- * Using relative scaling means the colours always span the full red→green
- * spectrum regardless of what absolute score range the data has.
+ * to a CSS background colour using HSL: 0 = vivid red, 1 = vivid green.
+ * HSL ensures all colours along the spectrum are equally visible on a dark bg.
  */
 function _gemColour(t) {
-    // t is already 0–1 (passed from _renderHeatmap)
     t = Math.max(0, Math.min(1, t));
-    if (t < 0.5) {
-        // red (0) → amber (0.5)
-        const u = t / 0.5;
-        const r = Math.round(200 - u * 60);   // 200 → 140
-        const g = Math.round(40  + u * 100);  // 40  → 140
-        return `rgb(${r},${g},30)`;
-    } else {
-        // amber (0.5) → green (1)
-        const u = (t - 0.5) / 0.5;
-        const r = Math.round(140 - u * 100);  // 140 → 40
-        const g = Math.round(140 + u * 50);   // 140 → 190
-        return `rgb(${r},${g},30)`;
-    }
+    const hue = Math.round(t * 120);  // 0° = red, 60° = yellow, 120° = green
+    return `hsl(${hue}, 70%, 30%)`;
 }
 
 /**
