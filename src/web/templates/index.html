@@ -97,44 +97,12 @@
             <!-- Right: Sidebar -->
             <div class="sidebar-column">
 
-                <!-- Holdings Panel (open) -->
-                <div class="sidebar-panel panel-open">
-                    <div class="sidebar-panel__header open" onclick="toggleSidebarPanel(this)">
-                        <div class="sidebar-panel__title">Holdings</div>
-                        <div class="sidebar-panel__actions">
-                            <span id="portfolioUpdated" class="sidebar-panel__meta"></span>
-                            <button onclick="refreshTradesPortfolio(); event.stopPropagation();" class="btn-ghost">Refresh</button>
-                            <span class="sidebar-panel__toggle">▾</span>
-                        </div>
-                    </div>
-                    <div class="sidebar-panel__body open">
-                        <div class="sidebar-stats-grid sidebar-stats-grid--2">
-                            <div class="sidebar-stat">
-                                <div class="sidebar-stat__value" id="tpValue">£0.00</div>
-                                <div class="sidebar-stat__label">Total Value</div>
-                            </div>
-                            <div class="sidebar-stat">
-                                <div class="sidebar-stat__value" id="tpPnl">£0.00</div>
-                                <div class="sidebar-stat__label">Unrealised P&L</div>
-                            </div>
-                            <div class="sidebar-stat">
-                                <div class="sidebar-stat__value" id="tpRealisedPnl">£0.00</div>
-                                <div class="sidebar-stat__label">Realised P&L</div>
-                            </div>
-                            <div class="sidebar-stat">
-                                <div class="sidebar-stat__value" id="tpCount">0</div>
-                                <div class="sidebar-stat__label">Positions</div>
-                            </div>
-                        </div>
-                        <div id="holdingsList" class="holdings-list"></div>
-                        <span id="tpTotalTrades" style="display:none;"></span>
-                        <span id="tpFees" style="display:none;"></span>
-                        <!-- Hidden stubs so loadMarketState() doesn't throw -->
-                        <span id="fngDisplay" style="display:none;"></span>
-                        <span id="globalStats" style="display:none;"></span>
-                        <span id="marketHeadlines" style="display:none;"></span>
-                    </div>
-                </div>
+                <!-- Hidden stubs – prevent JS errors on shared scripts -->
+                <span id="tpTotalTrades" style="display:none;"></span>
+                <span id="tpFees" style="display:none;"></span>
+                <span id="fngDisplay" style="display:none;"></span>
+                <span id="globalStats" style="display:none;"></span>
+                <span id="marketHeadlines" style="display:none;"></span>
 
                 <!-- Live Trading Panel (open) -->
                 <div class="sidebar-panel panel-open">
@@ -236,7 +204,7 @@
 
         </div><!-- end dashboard-body -->
 
-        <div class="alert" id="tradeAlert"><span id="tradeAlertMessage"></span></div>
+        <div class="alert" id="tradeAlert" style="display:none;"><span id="tradeAlertMessage"></span></div>
 
     </div><!-- end container -->
 

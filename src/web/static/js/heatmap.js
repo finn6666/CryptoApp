@@ -140,7 +140,14 @@ function _closeTileAnalysis() {
 
 // ─── Render ───────────────────────────────────────────────────
 
-function _renderHeatmap(coins) {
+/**
+ * Render heatmap tiles.
+ * holdingsMap = { SYMBOL: holdingObject } for currently held coins.
+ * Held coins are highlighted with a white border and display P&L instead of 24h change.
+ * Held coins missing from the analyzer data are prepended as extra tiles.
+ */
+function _renderHeatmap(coins, holdingsMap) {
+    holdingsMap = holdingsMap || {};
     const grid = document.getElementById('heatmapGrid');
     if (!grid) return;
 
@@ -149,33 +156,65 @@ function _renderHeatmap(coins) {
         return;
     }
 
-    const scores = coins.map(c => c.gem_score);
+    // Prepend held coins that aren't already in the analyzer list
+    const inHeatmap = new Set(coins.map(c => c.symbol));
+    const extraCoins = [];
+    for (const [sym, h] of Object.entries(holdingsMap)) {
+        if (!inHeatmap.has(sym)) {
+            extraCoins.push({
+                symbol: sym,
+                name: h.coin_name || sym,
+                price: h.current_price || h.avg_entry_price || 0,
+                price_change_24h: h.price_change_24h || 0,
+                gem_score: 5,
+                market_cap_rank: 999,
+            });
+        }
+    }
+    const allCoins = [...extraCoins, ...coins];
+
+    const scores = allCoins.map(c => c.gem_score);
     const minScore = Math.min(...scores);
     const maxScore = Math.max(...scores);
 
     grid.innerHTML = '';
-    coins.forEach(coin => {
+    allCoins.forEach(coin => {
+        const held   = holdingsMap[coin.symbol];
         const size   = _tileSize(coin.gem_score, minScore, maxScore);
         const colour = _gemColour(coin.gem_score);
-        const chg      = coin.price_change_24h;
-        const chgStr   = chg >= 0 ? `+${chg.toFixed(1)}%` : `${chg.toFixed(1)}%`;
-        const chgColor = _changeColour(chg);
+
+        let displayStr, displayColor, scoreLabel;
+        if (held && held.unrealised_pnl_pct !== undefined && held.unrealised_pnl_pct !== null) {
+            const pnl = held.unrealised_pnl_pct;
+            displayStr   = pnl >= 0 ? `+${pnl.toFixed(1)}%` : `${pnl.toFixed(1)}%`;
+            displayColor = _changeColour(pnl);
+            scoreLabel   = 'PnL';
+        } else {
+            const chg    = coin.price_change_24h || 0;
+            displayStr   = chg >= 0 ? `+${chg.toFixed(1)}%` : `${chg.toFixed(1)}%`;
+            displayColor = _changeColour(chg);
+            scoreLabel   = String(coin.gem_score);
+        }
+
+        const priceStr   = (held && held.current_price) ? _fmtPrice(held.current_price) : _fmtPrice(coin.price);
+        const symbolText = held ? `&#9679; ${escapeHtml(coin.symbol)}` : escapeHtml(coin.symbol);
 
         const tile = document.createElement('div');
         tile.className = 'hm-tile';
-        tile.style.cssText = `
-            background: ${colour};
-            flex-basis: ${size}px;
-            flex-grow: ${size};
-            height: ${Math.max(52, size * 0.6)}px;
-        `;
-        tile.title = `${coin.symbol} — ${coin.name}\nGem score: ${coin.gem_score}\nPrice: ${_fmtPrice(coin.price)}\n24h: ${chgStr}`;
+        tile.style.cssText = [
+            `background: ${colour}`,
+            `flex-basis: ${size}px`,
+            `flex-grow: ${size}`,
+            `height: ${Math.max(60, size * 0.65)}px`,
+            held ? 'outline: 2px solid rgba(255,255,255,0.5); outline-offset: -2px' : '',
+        ].filter(Boolean).join('; ');
+        tile.title = `${coin.symbol} — ${coin.name}\n${held ? `P&L: ${displayStr}` : `24h: ${displayStr}`}\nPrice: ${priceStr}`;
 
         tile.innerHTML = `
-            <div class="hm-tile__symbol">${escapeHtml(coin.symbol)}</div>
-            <div class="hm-tile__price">${_fmtPrice(coin.price)}</div>
-            <div class="hm-tile__change" style="color:${chgColor}">${chgStr}</div>
-            <div class="hm-tile__score">${coin.gem_score}</div>
+            <div class="hm-tile__symbol">${symbolText}</div>
+            <div class="hm-tile__price">${priceStr}</div>
+            <div class="hm-tile__change" style="color:${displayColor}">${displayStr}</div>
+            <div class="hm-tile__score">${scoreLabel}</div>
         `;
 
         tile.addEventListener('click', () => _showTileAnalysis(coin.symbol, coin.name, coin.price));
@@ -192,13 +231,28 @@ async function loadHeatmap() {
     grid.innerHTML = '<div class="heatmap-loading">Loading heatmap…</div>';
 
     try {
-        const res = await fetch('/api/heatmap-data');
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        _renderHeatmap(data.coins || []);
+        const [heatmapRes, holdingsRes] = await Promise.all([
+            fetch('/api/heatmap-data'),
+            fetch('/api/portfolio/holdings', { headers: authHeaders() }),
+        ]);
+        const heatmapData  = await heatmapRes.json();
+        const holdingsData = await holdingsRes.json().catch(() => ({}));
+
+        if (heatmapData.error) throw new Error(heatmapData.error);
+
+        // Build holdings map: symbol → holding (active positions only)
+        const holdingsMap = {};
+        for (const h of holdingsData.holdings || []) {
+            if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
+        }
+
+        _renderHeatmap(heatmapData.coins || [], holdingsMap);
     } catch (err) {
         if (grid) {
             grid.innerHTML = `<div class="heatmap-loading" style="color:var(--error);">Heatmap unavailable: ${escapeHtml(err.message)}</div>`;
         }
     }
 }
+
+// Refresh every 60 s so P&L stays current
+setInterval(loadHeatmap, 60000);

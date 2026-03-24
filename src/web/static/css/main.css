@@ -2409,6 +2409,18 @@ body::before {
 
 /* ===== END HEALTH ===== */
 
+/* ===== TRADE ALERT ===== */
+.alert {
+    padding: 14px 18px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: none;
+}
+.alert.show    { display: block; }
+.alert.success { background: rgba(72,187,120,0.1);  border: 1px solid var(--success); color: var(--success); }
+.alert.error   { background: rgba(245,101,101,0.1); border: 1px solid var(--error);   color: var(--error); }
+/* ===== END TRADE ALERT ===== */
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar { width: 12px; }
 ::-webkit-scrollbar-track { background: var(--primary-bg); }
@@ -2637,11 +2649,11 @@ body::before {
     transition: opacity 0.15s, transform 0.15s;
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     overflow: hidden;
     position: relative;
     min-width: 60px;
-    min-height: 52px;
+    min-height: 60px;
 }
 
 .hm-tile:hover {

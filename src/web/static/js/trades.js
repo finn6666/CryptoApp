@@ -386,6 +386,7 @@ async function refreshTradesPortfolio(callerBtn) {
 }
 
 async function loadTradesPortfolio() {
+    if (!document.getElementById('holdingsList')) return; // Holdings panel not present on this page
     try {
         const response = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
         const data = await response.json();
