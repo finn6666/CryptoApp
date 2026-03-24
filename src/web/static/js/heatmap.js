@@ -32,8 +32,8 @@ function _gemColour(score) {
  * Avoids the global .positive/.negative class (which adds background + border).
  */
 function _changeColour(pct) {
-    if (pct > 0) return 'rgba(255,255,255,0.95)';
-    if (pct < 0) return 'rgba(252,129,129,0.95)';
+    if (pct > 0) return '#68d391';              // bright green — same as .positive
+    if (pct < 0) return '#fc8181';              // bright red   — same as .negative
     return 'rgba(255,255,255,0.7)';
 }
 
