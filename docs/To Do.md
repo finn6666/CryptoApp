@@ -1,15 +1,11 @@
 ## Notes
-
+- Want heatmap to be based on holdings p and l rather than gem score, can have that on the card but dont want to color code based on it
+- Don't really like the look of RL insights on the page, want it to be more useful and look better, up for ideas to do that
 - No emojis** — remove all existing emojis from logs, frontend templates, JS, and Python strings. Add section in docs to ensure agents don't add any in the future.
-
 - Gem detector still shwoing up in health page
-
-### ~~Dashboard layout rework — Finviz-style~~ ✓ done (March 2026, commit f6b2bb5)
-
 - Can you just check the sell logic/agent is ok
-
 - Can you check the instruction so the agents trade more expensive coins if the oppertunity arises. Would like the focus to be on small cap but also have the freedom to trade upwards if necessary
-
+- Check secruity vulnrabilities with the new web interface/app changes
 ---
 
 ## Future Work
