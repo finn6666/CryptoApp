@@ -20,6 +20,9 @@ env
 pip-log.txt
 pip-delete-this-directory.txt
 
+## AI Tools
+.claude/
+
 ## IDE
 .vscode/
 .idea/
