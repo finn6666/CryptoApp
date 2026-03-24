@@ -366,18 +366,22 @@ async function triggerScan() {
 
 // ─── Portfolio Functions ──────────────────────────────
 
-async function refreshTradesPortfolio() {
-    const btn = document.getElementById('portfolioRefreshBtn');
-    const origText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Refreshing...';
+async function refreshTradesPortfolio(callerBtn) {
+    // callerBtn may be passed directly or found by ID (trades.html has the id)
+    const btn = callerBtn || document.getElementById('portfolioRefreshBtn');
+    const origText = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Refreshing...'; }
     try {
         await loadTradesPortfolio();
-        btn.textContent = 'Updated';
-        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+        if (btn) {
+            btn.textContent = 'Updated';
+            setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+        }
     } catch (e) {
-        btn.textContent = '❌ Error';
-        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+        if (btn) {
+            btn.textContent = 'Error';
+            setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+        }
     }
 }
 

@@ -111,11 +111,28 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "one_liner": "..."}
                     if hasattr(part, "text") and part.text:
                         result_text += part.text
 
-        # Parse JSON from response
+        # Parse JSON from response.
+        # Handle markdown code fences (```json ... ```) and nested objects.
+        # The old flat regex \{[^{}]*\} broke on any nested field the model returned.
         import json, re
-        json_match = re.search(r'\{[^{}]*\}', result_text)
-        if json_match:
-            parsed = json.loads(json_match.group())
+        parsed = None
+        # Strip markdown code fences first
+        clean = re.sub(r'```(?:json)?\s*', '', result_text).strip().strip('`').strip()
+        # Try direct parse
+        try:
+            parsed = json.loads(clean)
+        except (json.JSONDecodeError, ValueError):
+            pass
+        # Fallback: greedy outermost {} — handles extra text around the JSON
+        if not parsed:
+            json_match = re.search(r'\{.*\}', clean, re.DOTALL)
+            if json_match:
+                try:
+                    parsed = json.loads(json_match.group())
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+        if parsed:
             action = str(parsed.get("action", "SKIP")).upper().strip()
             confidence = int(parsed.get("confidence", 0))
             one_liner = str(parsed.get("one_liner", ""))
@@ -125,11 +142,13 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "one_liner": "..."}
                 "one_liner": one_liner,
             }
 
-        logger.warning(f"Quick screen for {symbol}: could not parse response")
-        # Default to pass so we don't accidentally filter out good coins
-        return {"pass": True, "confidence": 50, "one_liner": "Could not parse screen result — passing to be safe"}
+        logger.warning(f"Quick screen for {symbol}: could not parse response — passing to be safe")
+        # Pass through so parse failures never silently block coins from analysis.
+        # Confidence=100 ensures this reaches the full pipeline regardless of the
+        # SCAN_QUICK_SCREEN_MIN threshold.
+        return {"pass": True, "confidence": 100, "one_liner": "Could not parse screen result — passing to be safe"}
 
     except Exception as e:
         logger.warning(f"Quick screen failed for {symbol}: {e}")
         # On error, pass through to avoid missing opportunities
-        return {"pass": True, "confidence": 50, "one_liner": f"Screen error: {e}"}
+        return {"pass": True, "confidence": 100, "one_liner": f"Screen error: {e}"}

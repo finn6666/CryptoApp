@@ -28,23 +28,27 @@ function _gemColour(score) {
 }
 
 /**
- * Map price_change_24h percentage to a text colour class.
+ * Map price_change_24h percentage to an inline colour string.
+ * Avoids the global .positive/.negative class (which adds background + border).
  */
-function _changeClass(pct) {
-    if (pct > 0) return 'positive';
-    if (pct < 0) return 'negative';
-    return '';
+function _changeColour(pct) {
+    if (pct > 0) return 'rgba(255,255,255,0.95)';
+    if (pct < 0) return 'rgba(252,129,129,0.95)';
+    return 'rgba(255,255,255,0.7)';
 }
 
 // ─── Price formatter ──────────────────────────────────────────
 
 function _fmtPrice(price) {
     if (price === null || price === undefined) return '—';
-    if (price >= 1000) return `£${price.toLocaleString('en-GB', {maximumFractionDigits: 0})}`;
-    if (price >= 1)    return `£${price.toFixed(2)}`;
-    if (price >= 0.01) return `£${price.toFixed(4)}`;
-    if (price >= 0.0001) return `£${price.toFixed(6)}`;
-    return `£${price.toExponential(2)}`;
+    if (price >= 1000)    return `£${price.toLocaleString('en-GB', {maximumFractionDigits: 0})}`;
+    if (price >= 1)       return `£${price.toFixed(2)}`;
+    if (price >= 0.01)    return `£${price.toFixed(4)}`;
+    if (price >= 0.0001)  return `£${price.toFixed(6)}`;
+    if (price >= 0.000001) return `£${price.toFixed(8)}`;
+    // For very tiny prices show compact decimal (no scientific notation)
+    const sig = price.toPrecision(3);
+    return `£${sig}`;
 }
 
 // ─── Tile size calculation ─────────────────────────────────────
@@ -153,9 +157,9 @@ function _renderHeatmap(coins) {
     coins.forEach(coin => {
         const size   = _tileSize(coin.gem_score, minScore, maxScore);
         const colour = _gemColour(coin.gem_score);
-        const chg    = coin.price_change_24h;
-        const chgStr = chg >= 0 ? `+${chg.toFixed(1)}%` : `${chg.toFixed(1)}%`;
-        const chgCls = _changeClass(chg);
+        const chg      = coin.price_change_24h;
+        const chgStr   = chg >= 0 ? `+${chg.toFixed(1)}%` : `${chg.toFixed(1)}%`;
+        const chgColor = _changeColour(chg);
 
         const tile = document.createElement('div');
         tile.className = 'hm-tile';
@@ -170,7 +174,7 @@ function _renderHeatmap(coins) {
         tile.innerHTML = `
             <div class="hm-tile__symbol">${escapeHtml(coin.symbol)}</div>
             <div class="hm-tile__price">${_fmtPrice(coin.price)}</div>
-            <div class="hm-tile__change ${chgCls}">${chgStr}</div>
+            <div class="hm-tile__change" style="color:${chgColor}">${chgStr}</div>
             <div class="hm-tile__score">${coin.gem_score}</div>
         `;
 
