@@ -9,348 +9,256 @@
     <title>Crypto Investment Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v=20260308a">
-    <style>
-        .section-card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 8px var(--shadow);
-        }
-        .section-header {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid var(--border);
-        }
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-            gap: 12px;
-            margin-top: 16px;
-        }
-        .stat-card {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            text-align: center;
-            transition: all 0.3s;
-        }
-        .stat-card:hover {
-            background: rgba(255, 255, 255, 0.05);
-            transform: translateY(-2px);
-        }
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 4px;
-        }
-        .stat-card.success .stat-value { color: var(--success); }
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 12px;
-            font-weight: 500;
-        }
-        .alert {
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-            animation: slideIn 0.3s;
-        }
-        .alert.success { background: rgba(72, 187, 120, 0.1); border: 1px solid var(--success); color: var(--success); }
-        .alert.error { background: rgba(245, 101, 101, 0.1); border: 1px solid var(--error); color: var(--error); }
-        .alert.show { display: block; }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v={{ asset_version }}">
 </head>
 <body>
     <div class="container">
+
+        <!-- Live Market Ticker -->
+        <div class="ticker-bar">
+            <div class="ticker-left">
+                <div class="ticker-track" id="tickerTrack">
+                    <span class="ticker-item"><span class="ticker-headline" style="color: var(--text-secondary);">Loading market data...</span></span>
+                </div>
+            </div>
+            <div class="ticker-right" id="tickerRight"></div>
+        </div>
+
+        <!-- Header -->
         <div class="header">
             <div class="refresh-controls">
                 <div class="refresh-status">
-                    <div>Last: <span class="last-updated" id="lastUpdated">Loading...</span></div>
+                    <div>Last: <span id="lastUpdated">Loading...</span></div>
                     <div>Next: <span id="nextRefresh">-</span></div>
                 </div>
-                <button class="btn" onclick="forceRefresh()" id="refreshBtn">
-                    Refresh
-                </button>
+                <button class="btn" onclick="forceRefresh()" id="refreshBtn">Refresh</button>
             </div>
             <h1>Crypto Investment Dashboard</h1>
         </div>
 
-        <nav class="site-nav">
-            <a href="/" class="site-nav__link site-nav__link--active">Dashboard</a>
-            <a href="/health-dashboard" class="site-nav__link">Health</a>
-        </nav>
+        <!-- Nav + Status Strip on same row -->
+        <div class="topbar">
+            <nav class="site-nav">
+                <a href="/" class="site-nav__link site-nav__link--active">Dashboard</a>
+                <a href="/health-dashboard" class="site-nav__link">Health</a>
+                <a href="/trades" class="site-nav__link">Trades</a>
+            </nav>
+            <div class="status-strip">
+                <div class="status-pill">
+                    <div class="status-pill__body">
+                        <div class="status-pill__label">Daily Budget</div>
+                        <div class="status-pill__value" id="pillBudget">—</div>
+                    </div>
+                </div>
+                <div class="status-pill">
+                    <div class="status-pill__body">
+                        <div class="status-pill__label">Portfolio P&L</div>
+                        <div class="status-pill__value" id="pillPnl">—</div>
+                    </div>
+                </div>
+                <div class="status-pill">
+                    <div class="status-pill__body">
+                        <div class="status-pill__label">Scanner</div>
+                        <div class="status-pill__value" id="pillScanner">—</div>
+                    </div>
+                </div>
+                <div class="status-pill">
+                    <div class="status-pill__body">
+                        <div class="status-pill__label">Monitor</div>
+                        <div class="status-pill__value" id="pillMonitor">—</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        <!-- Status Toast Container -->
+        <!-- Status Toast -->
         <div class="status-container" id="statusContainer">
             <div class="status-toast" id="statusToast">
                 <span id="statusMessage"></span>
             </div>
         </div>
 
-        <div class="dashboard-grid">
-            <!-- Overview Cards -->
-            <div class="overview-cards" id="overviewCards">
-                <!-- Portfolio Summary -->
-                <div class="overview-card" id="cardPortfolio">
-                    <div class="overview-card-icon">💰</div>
-                    <div class="overview-card-body">
-                        <div class="overview-card-title">Portfolio</div>
-                        <div class="overview-card-value" id="portfolioValue">£0.00</div>
-                        <div class="overview-card-sub" id="portfolioPnL">No open positions</div>
-                    </div>
+        <!-- Main two-column layout -->
+        <div class="dashboard-body">
+
+            <!-- Left: Coin Heatmap -->
+            <div class="heatmap-column" id="heatmapColumn">
+                <div class="heatmap-header">
+                    <h2>Coin Heatmap</h2>
+                    <button onclick="loadHeatmap()" class="btn-ghost">Refresh</button>
                 </div>
-                <!-- Trading Engine -->
-                <div class="overview-card" id="cardTrading">
-                    <div class="overview-card-icon">⚙️</div>
-                    <div class="overview-card-body">
-                        <div class="overview-card-title">Trading Engine</div>
-                        <div class="overview-card-value" id="tradingBudget">—</div>
-                        <div class="overview-card-sub" id="tradingSub">Connecting...</div>
-                    </div>
-                </div>
-                <!-- Scan Loop -->
-                <div class="overview-card" id="cardScan">
-                    <div class="overview-card-icon">🔍</div>
-                    <div class="overview-card-body">
-                        <div class="overview-card-title">Scanner</div>
-                        <div class="overview-card-value" id="scanStatus">—</div>
-                        <div class="overview-card-sub" id="scanSub">Connecting...</div>
-                    </div>
-                </div>
-                <!-- Market Monitor -->
-                <div class="overview-card" id="cardMonitor">
-                    <div class="overview-card-icon">📡</div>
-                    <div class="overview-card-body">
-                        <div class="overview-card-title">Monitor</div>
-                        <div class="overview-card-value" id="monitorStatus">—</div>
-                        <div class="overview-card-sub" id="monitorSub">Connecting...</div>
-                    </div>
-                </div>
-                <!-- Exchange Status -->
-                <div class="overview-card" id="cardExchange">
-                    <div class="overview-card-icon">🏦</div>
-                    <div class="overview-card-body">
-                        <div class="overview-card-title">Exchanges</div>
-                        <div class="overview-card-value" id="exchangeStatus">—</div>
-                        <div class="overview-card-sub" id="exchangeSub">Connecting...</div>
+                <div class="heatmap-container">
+                    <div class="heatmap-grid" id="heatmapGrid">
+                        <div class="heatmap-loading">Loading heatmap...</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Trade Stats -->
-            <div class="stats-grid" id="statsGrid">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalTrades">0</div>
-                    <div class="stat-label">Total Trades</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="budgetRemaining">—</div>
-                    <div class="stat-label">Budget Left Today</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="tradesToday">0</div>
-                    <div class="stat-label">Trades Today</div>
-                </div>
-            </div>
+            <!-- Right: Sidebar -->
+            <div class="sidebar-column">
 
-            <!-- Portfolio Holdings Section -->
-            <div class="section-card">
-                <div class="section-header-row">
-                    <h2>💼 Portfolio Holdings</h2>
-                    <div style="display: flex; align-items: center; gap: 12px;">
-                        <span id="portfolioUpdated" style="font-size: 11px; color: var(--text-secondary);"></span>
-                        <button id="portfolioRefreshBtn" onclick="refreshTradesPortfolio()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
-                            🔄 Refresh
-                        </button>
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 16px;">
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="tpValue">£0.00</div>
-                        <div class="mini-stat__label">Total Value</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="tpPnl">£0.00</div>
-                        <div class="mini-stat__label">Unrealised P&L</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="tpRealisedPnl">£0.00</div>
-                        <div class="mini-stat__label">Realised P&L</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="tpCount">0</div>
-                        <div class="mini-stat__label">Holdings</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="tpTotalTrades">0</div>
-                        <div class="mini-stat__label">Total Trades</div>
-                    </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="tpFees">£0.00</div>
-                        <div class="mini-stat__label">Fees Paid</div>
-                    </div>
-                </div>
-                <div id="marketState" style="margin-bottom: 16px;">
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 16px;">
-                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <div id="fngDisplay" style="display: flex; align-items: center; gap: 10px;">
-                                    <span style="color: var(--text-secondary); font-size: 13px;">Loading…</span>
-                                </div>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <div id="globalStats" style="display: flex; align-items: center; gap: 10px;"></div>
-                            </div>
-                        </div>
-                        <div id="marketHeadlines" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
-                            <div style="color: var(--text-secondary); font-size: 12px;">Fetching headlines…</div>
+                <!-- Holdings Panel (open) -->
+                <div class="sidebar-panel panel-open">
+                    <div class="sidebar-panel__header open" onclick="toggleSidebarPanel(this)">
+                        <div class="sidebar-panel__title">Holdings</div>
+                        <div class="sidebar-panel__actions">
+                            <span id="portfolioUpdated" class="sidebar-panel__meta"></span>
+                            <button onclick="refreshTradesPortfolio(); event.stopPropagation();" class="btn-ghost">Refresh</button>
+                            <span class="sidebar-panel__toggle">▾</span>
                         </div>
                     </div>
-                </div>
-                <div id="holdingsList">
-                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
-                        No holdings yet. The portfolio tracker records every executed trade automatically.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Live Trading Section -->
-            <div class="section-card">
-                <h2 class="section-header section-header--actions">
-                    ⚡ Live Trading
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <span id="tradingStatus" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600;"></span>
-                        <button id="killSwitchBtn" onclick="toggleKillSwitch()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer; font-weight: 600;">
-                            🛑 Kill Switch
-                        </button>
-                    </div>
-                </h2>
-
-                <div id="configWarning" style="display: none; background: rgba(237,137,54,0.15); border: 1px solid rgba(237,137,54,0.4); border-radius: 8px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: #ecc94b;">
-                    ⚠️ <strong>Setup required:</strong> Add your Kraken API keys and Gmail app password to <code>.env</code> — see <code>.env.example</code>
-                </div>
-
-                <div id="pendingSection" style="display: none;">
-                    <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px;">Pending Approval</h3>
-                    <div id="pendingProposals"></div>
-                </div>
-
-                <div id="executedSection" style="margin-top: 16px;">
-                    <h3 style="font-size: 14px; color: var(--text-secondary); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.8px; display: flex; justify-content: space-between; align-items: center;">
-                        Trade Log
-                        <button onclick="loadTradeLog(); loadExecutedTrades();" style="font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-secondary); cursor: pointer;">🔄 Refresh</button>
-                    </h3>
-                    <div id="tradeLogUnified" style="max-height: 500px; overflow-y: auto;">
-                        <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">
-                            No trades yet. Agents will propose trades when they find high-conviction opportunities.
-                        </p>
+                    <div class="sidebar-panel__body open">
+                        <div class="sidebar-stats-grid sidebar-stats-grid--2">
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="tpValue">£0.00</div>
+                                <div class="sidebar-stat__label">Total Value</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="tpPnl">£0.00</div>
+                                <div class="sidebar-stat__label">Unrealised P&L</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="tpRealisedPnl">£0.00</div>
+                                <div class="sidebar-stat__label">Realised P&L</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="tpCount">0</div>
+                                <div class="sidebar-stat__label">Positions</div>
+                            </div>
+                        </div>
+                        <div id="holdingsList" class="holdings-list"></div>
+                        <span id="tpTotalTrades" style="display:none;"></span>
+                        <span id="tpFees" style="display:none;"></span>
+                        <!-- Hidden stubs so loadMarketState() doesn't throw -->
+                        <span id="fngDisplay" style="display:none;"></span>
+                        <span id="globalStats" style="display:none;"></span>
+                        <span id="marketHeadlines" style="display:none;"></span>
                     </div>
                 </div>
-            </div>
 
-            <!-- Scan & Automation Section -->
-            <div class="section-card">
-                <h2 class="section-header section-header--actions">
-                    📊 Automated Scanning
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <span id="scanStatusDetail" style="font-size: 12px; padding: 4px 10px; border-radius: 20px; font-weight: 600; background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
-                        <button id="scanNowBtn" onclick="triggerScan()" style="font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--accent-primary); background: rgba(102,126,234,0.1); color: var(--accent-primary); cursor: pointer; font-weight: 600;">
-                            🔍 Scan Now
-                        </button>
+                <!-- Live Trading Panel (open) -->
+                <div class="sidebar-panel panel-open">
+                    <div class="sidebar-panel__header open" onclick="toggleSidebarPanel(this)">
+                        <div class="sidebar-panel__title">
+                            Live Trading
+                            <span id="tradingStatus" class="status-badge"></span>
+                        </div>
+                        <div class="sidebar-panel__actions">
+                            <button id="killSwitchBtn" onclick="toggleKillSwitch(); event.stopPropagation();" class="btn-ghost btn-ghost--danger">Kill Switch</button>
+                            <span class="sidebar-panel__toggle">▾</span>
+                        </div>
                     </div>
-                </h2>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;">
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="scanNextTime">—</div>
-                        <div class="mini-stat__label">Next Scan</div>
+                    <div class="sidebar-panel__body open">
+                        <div id="configWarning" class="config-warning" style="display: none;">
+                            Setup required: add Kraken API keys and SMTP credentials to <code>.env</code>
+                        </div>
+                        <div class="sidebar-stats-grid sidebar-stats-grid--3">
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="totalTrades">0</div>
+                                <div class="sidebar-stat__label">Total Trades</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="budgetRemaining">—</div>
+                                <div class="sidebar-stat__label">Budget Left</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="tradesToday">0</div>
+                                <div class="sidebar-stat__label">Today</div>
+                            </div>
+                        </div>
+                        <div id="pendingSection" style="display: none; margin-bottom: 8px;">
+                            <div class="sidebar-section-label">Pending Approval</div>
+                            <div id="pendingProposals"></div>
+                        </div>
+                        <div id="executedSection">
+                            <div class="sidebar-section-label" style="display: flex; justify-content: space-between; align-items: center;">
+                                Trade Log
+                                <button onclick="loadTradeLog(); loadExecutedTrades();" class="btn-ghost">Refresh</button>
+                            </div>
+                            <div id="tradeLogUnified" class="trade-log-scroll">
+                                <p class="empty-state">No trades yet.</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="scanLastRun">Never</div>
-                        <div class="mini-stat__label">Last Scan</div>
+                </div>
+
+                <!-- Scanner Panel (collapsed) -->
+                <div class="sidebar-panel">
+                    <div class="sidebar-panel__header" onclick="toggleSidebarPanel(this)">
+                        <div class="sidebar-panel__title">
+                            Scanner
+                            <span id="scanStatusDetail" class="status-badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
+                        </div>
+                        <div class="sidebar-panel__actions">
+                            <button id="scanNowBtn" onclick="triggerScan(); event.stopPropagation();" class="btn-ghost btn-ghost--accent">Scan Now</button>
+                            <span class="sidebar-panel__toggle">▾</span>
+                        </div>
                     </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="scanCoinsAnalysed">0</div>
-                        <div class="mini-stat__label">Coins Analysed</div>
+                    <div class="sidebar-panel__body">
+                        <div class="sidebar-stats-grid sidebar-stats-grid--2">
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="scanNextTime">—</div>
+                                <div class="sidebar-stat__label">Next Scan</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="scanLastRun">Never</div>
+                                <div class="sidebar-stat__label">Last Scan</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="scanCoinsAnalysed">0</div>
+                                <div class="sidebar-stat__label">Coins Analysed</div>
+                            </div>
+                            <div class="sidebar-stat">
+                                <div class="sidebar-stat__value" id="scanProposals">0</div>
+                                <div class="sidebar-stat__label">Proposals Made</div>
+                            </div>
+                        </div>
+                        <div id="scanResultMsg" class="scan-result" style="display: none;"></div>
                     </div>
-                    <div class="mini-stat">
-                        <div class="mini-stat__value" id="scanProposals">0</div>
-                        <div class="mini-stat__label">Proposals Made</div>
+                </div>
+
+                <!-- RL Insights Panel (collapsed) -->
+                <div class="sidebar-panel">
+                    <div class="sidebar-panel__header" onclick="toggleSidebarPanel(this)">
+                        <div class="sidebar-panel__title">RL Insights</div>
+                        <div class="sidebar-panel__actions">
+                            <span class="sidebar-panel__toggle">▾</span>
+                        </div>
+                    </div>
+                    <div class="sidebar-panel__body">
+                        <div id="rlInsights">
+                            <p class="empty-state">Loading...</p>
+                        </div>
                     </div>
                 </div>
-                <div id="scanResultMsg" style="display: none; background: rgba(102,126,234,0.1); border: 1px solid var(--accent-primary); border-radius: 8px; padding: 14px; font-size: 13px; color: var(--text-secondary);"></div>
-            </div>
 
-            <!-- Portfolio Analysis Container -->
-            <div class="portfolio-container" id="portfolioContainer" style="display: none;">
-                <div class="coins-header">
-                    <h2>🤖 AI Portfolio Analysis</h2>
-                    <button class="close-btn" onclick="closePortfolioAnalysis()">✕</button>
-                </div>
-                <div id="portfolioContent">
-                    <div class="loading">Running multi-agent portfolio analysis...</div>
-                </div>
-            </div>
+            </div><!-- end sidebar-column -->
 
-            <!-- RL Insights Section -->
-            <div class="section-card">
-                <h2 class="section-header">🧠 RL Insights</h2>
-                <div id="rlInsights">
-                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
-                </div>
-            </div>
+        </div><!-- end dashboard-body -->
 
-            <!-- Monthly Review Section -->
-            <div class="section-card">
-                <h2 class="section-header">📅 Monthly Review</h2>
-                <div id="monthlyReview">
-                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
-                </div>
-            </div>
+        <div class="alert" id="tradeAlert"><span id="tradeAlertMessage"></span></div>
 
-            <!-- Closed Positions Section -->
-            <div class="section-card">
-                <h2 class="section-header">🏁 Closed Positions</h2>
-                <div id="closedPositions">
-                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">No closed positions yet.</p>
-                </div>
-            </div>
+    </div><!-- end container -->
 
-            <!-- Activity Log Section -->
-            <div class="section-card">
-                <h2 class="section-header">📜 Activity Log</h2>
-                <div id="activityLog" style="max-height: 300px; overflow-y: auto;">
-                    <p style="color: var(--text-secondary); text-align: center; padding: 20px; font-size: 13px;">Loading…</p>
-                </div>
-            </div>
+    <script>
+    function toggleSidebarPanel(headerEl) {
+        const isOpen = headerEl.classList.contains('open');
+        const body = headerEl.nextElementSibling;
+        const panel = headerEl.parentElement;
+        headerEl.classList.toggle('open', !isOpen);
+        body.classList.toggle('open', !isOpen);
+        panel.classList.toggle('panel-open', !isOpen);
+    }
+    </script>
 
-            <!-- Trade Alert -->
-            <div class="alert" id="tradeAlert">
-                <span id="tradeAlertMessage"></span>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- Modular JavaScript -->
-    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v=20260319a"></script>
-    <script src="{{ url_for('static', filename='js/api-service.js') }}?v=20260312a"></script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v=20260315c"></script>
-    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v=20260315c"></script>
-    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v=20260317a"></script>
-    <script src="{{ url_for('static', filename='js/trades.js') }}?v=20260319a"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260312a"></script>
+    <script src="{{ url_for('static', filename='js/ticker.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/ui-components.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/api-service.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/portfolio.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/heatmap.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/trades.js') }}?v={{ asset_version }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v={{ asset_version }}"></script>
 </body>
 </html>

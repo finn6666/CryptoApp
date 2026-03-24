@@ -7,6 +7,7 @@ Route handlers are organised into Flask Blueprints under routes/.
 """
 
 import os
+import subprocess
 import logging
 from flask import Flask, render_template
 from dotenv import load_dotenv
@@ -93,6 +94,24 @@ app.register_blueprint(ml_bp)
 app.register_blueprint(symbols_bp)
 app.register_blueprint(trading_bp)
 app.register_blueprint(health_bp)
+
+# ---------------------------------------------------------------------------
+# Template globals
+# ---------------------------------------------------------------------------
+
+def _git_sha() -> str:
+    """Return the current git short SHA for cache-busting static assets."""
+    try:
+        sha = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return sha or 'dev'
+    except Exception:
+        return 'dev'
+
+app.jinja_env.globals['asset_version'] = _git_sha()
 
 # ---------------------------------------------------------------------------
 # Top-level page routes

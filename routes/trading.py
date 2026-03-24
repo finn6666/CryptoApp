@@ -666,6 +666,58 @@ def portfolio_history():
         return jsonify({"error": "Failed to get portfolio history"}), 500
 
 
+# ========================================
+# Dashboard Summary (single-call aggregation)
+# ========================================
+
+@trading_bp.route('/api/dashboard-summary')
+def dashboard_summary():
+    """Aggregate portfolio, trading, scanner, and monitor into one call.
+    Replaces 5 parallel card fetches with a single request.
+    """
+    result = {}
+
+    # Portfolio
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+        live_prices = {}
+        if state.analyzer:
+            for coin in state.analyzer.coins:
+                if coin.price:
+                    live_prices[coin.symbol.upper()] = coin.price
+        result['portfolio'] = tracker.get_total_value(live_prices)
+    except Exception as e:
+        logger.warning(f"Dashboard summary — portfolio error: {e}")
+        result['portfolio'] = {}
+
+    # Trading engine
+    try:
+        from ml.trading_engine import get_trading_engine
+        result['trading'] = get_trading_engine().get_status()
+    except Exception as e:
+        logger.warning(f"Dashboard summary — trading error: {e}")
+        result['trading'] = {}
+
+    # Scan loop
+    try:
+        from ml.scan_loop import get_scan_loop
+        result['scanner'] = get_scan_loop().get_status()
+    except Exception as e:
+        logger.warning(f"Dashboard summary — scanner error: {e}")
+        result['scanner'] = {}
+
+    # Market monitor
+    try:
+        from ml.market_monitor import get_market_monitor
+        result['monitor'] = get_market_monitor().get_status()
+    except Exception as e:
+        logger.warning(f"Dashboard summary — monitor error: {e}")
+        result['monitor'] = {}
+
+    return jsonify(result), 200
+
+
 @trading_bp.route('/api/portfolio/sell-signals')
 def portfolio_sell_signals():
     """Check current holdings for sell signals (profit targets / stop losses)."""

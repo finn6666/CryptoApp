@@ -13,15 +13,15 @@ async function loadTradingStatus() {
 
         const statusEl = document.getElementById('tradingStatus');
         if (!data.active) {
-            statusEl.textContent = '⛔ HALTED';
+            statusEl.textContent = 'HALTED';
             statusEl.style.background = 'rgba(245,101,101,0.2)';
             statusEl.style.color = '#fc8181';
-            document.getElementById('killSwitchBtn').textContent = '▶️ Resume';
+            document.getElementById('killSwitchBtn').textContent = 'Resume';
         } else {
-            statusEl.textContent = '🟢 ACTIVE';
+            statusEl.textContent = 'ACTIVE';
             statusEl.style.background = 'rgba(72,187,120,0.2)';
             statusEl.style.color = '#48bb78';
-            document.getElementById('killSwitchBtn').textContent = '🛑 Kill Switch';
+            document.getElementById('killSwitchBtn').textContent = 'Kill Switch';
         }
 
         const configWarning = document.getElementById('configWarning');
@@ -30,7 +30,7 @@ async function loadTradingStatus() {
             let warnings = [];
             if (!data.exchange_configured) warnings.push('Kraken API keys');
             if (!data.email_configured) warnings.push('Gmail SMTP credentials');
-            configWarning.innerHTML = `⚠️ <strong>Setup required:</strong> Add ${warnings.join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
+            configWarning.innerHTML = `<strong>Setup required:</strong> Add ${warnings.join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
         } else {
             configWarning.style.display = 'none';
         }
@@ -50,18 +50,18 @@ async function loadPendingProposals() {
             section.style.display = 'block';
             container.innerHTML = data.proposals.map(p => {
                 const sideColor = p.side === 'buy' ? '#48bb78' : '#fc8181';
-                const sideIcon = p.side === 'buy' ? '🟢' : '🔴';
                 const created = new Date(p.created_at).toLocaleString();
                 return `
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${sideColor}; border-radius: 8px; padding: 14px; margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${sideColor}; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                             <div>
-                                <span style="font-weight: 700; font-size: 15px;">${sideIcon} ${escapeHtml(p.side.toUpperCase())} ${escapeHtml(p.symbol)}</span>
-                                <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${Number(p.amount_gbp).toFixed(2)}</span>
+                                <span style="font-weight: 700; font-size: 13px; color: ${sideColor};">${escapeHtml(p.side.toUpperCase())}</span>
+                                <span style="font-weight: 700; font-size: 13px; margin-left: 4px;">${escapeHtml(p.symbol)}</span>
+                                <span style="color: var(--text-secondary); font-size: 11px; margin-left: 6px;">£${Number(p.amount_gbp).toFixed(2)}</span>
                             </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button onclick="approveTrade('${escapeHtml(p.id)}')" style="padding: 6px 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">✅ Approve</button>
-                                <button onclick="rejectTrade('${escapeHtml(p.id)}')" style="padding: 6px 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">❌ Reject</button>
+                            <div style="display: flex; gap: 4px;">
+                                <button onclick="approveTrade('${escapeHtml(p.id)}')" style="padding: 4px 10px; background: #38a169; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 11px;">Approve</button>
+                                <button onclick="rejectTrade('${escapeHtml(p.id)}')" style="padding: 4px 10px; background: #e53e3e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 11px;">Reject</button>
                             </div>
                         </div>
                         <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
@@ -183,15 +183,13 @@ async function loadExecutedTrades() {
             container.innerHTML = displayTrades.map(t => {
                 const isBuy = t.side === 'buy';
                 const sideColor = isBuy ? '#48bb78' : '#fc8181';
-                const sideIcon = isBuy ? '🟢' : '🔴';
                 const time = new Date(t.timestamp).toLocaleString();
                 const priceDisplay = (t.price && t.price > 0) ? `£${Number(t.price).toFixed(6)}` : '—';
                 const pnlStr = t.realised_pnl_gbp !== undefined && t.realised_pnl_gbp !== null
                     ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(2)}`
                     : '';
                 return `
-                    <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
-                        <span>${sideIcon}</span>
+                    <div style="display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 12px;">
                         <div style="flex: 1;">
                             <span style="font-weight: 700;">${escapeHtml(t.symbol)}</span>
                             <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${escapeHtml(t.side.toUpperCase())}</span>
@@ -287,15 +285,15 @@ async function loadScanStatusDetail() {
 
         const statusEl = document.getElementById('scanStatusDetail');
         if (status.scan_running) {
-            statusEl.textContent = '⏳ Running';
+            statusEl.textContent = 'Running';
             statusEl.style.background = 'rgba(237,137,54,0.2)';
             statusEl.style.color = '#ed8936';
         } else if (status.scheduler_active) {
-            statusEl.textContent = '🟢 Scheduled';
+            statusEl.textContent = 'Scheduled';
             statusEl.style.background = 'rgba(72,187,120,0.2)';
             statusEl.style.color = '#48bb78';
         } else {
-            statusEl.textContent = '⚪ Off';
+            statusEl.textContent = 'Off';
             statusEl.style.background = 'rgba(255,255,255,0.05)';
             statusEl.style.color = 'var(--text-secondary)';
         }
@@ -334,7 +332,7 @@ async function loadScanStatusDetail() {
 async function triggerScan() {
     const btn = document.getElementById('scanNowBtn');
     btn.disabled = true;
-    btn.textContent = '⏳ Scanning...';
+    btn.textContent = 'Scanning...';
     const resultEl = document.getElementById('scanResultMsg');
 
     try {
@@ -348,21 +346,21 @@ async function triggerScan() {
         if (data.success) {
             resultEl.style.borderColor = 'var(--success)';
             resultEl.style.background = 'rgba(72,187,120,0.1)';
-            resultEl.innerHTML = `✅ Scan complete — <strong>${Number(data.coins_analysed)}</strong> coins analysed, <strong>${Number(data.proposals_made)}</strong> proposals made, <strong>${Number(data.errors?.length || 0)}</strong> errors`;
+            resultEl.innerHTML = `Scan complete — <strong>${Number(data.coins_analysed)}</strong> coins, <strong>${Number(data.proposals_made)}</strong> proposals, <strong>${Number(data.errors?.length || 0)}</strong> errors`;
         } else {
             resultEl.style.borderColor = 'var(--error)';
             resultEl.style.background = 'rgba(245,101,101,0.1)';
-            resultEl.innerHTML = `⚠️ ${escapeHtml(data.error || 'Scan failed')}`;
+            resultEl.innerHTML = escapeHtml(data.error || 'Scan failed');
         }
 
         loadScanStatusDetail();
         loadPendingProposals();
     } catch (e) {
         resultEl.style.display = 'block';
-        resultEl.innerHTML = `❌ Network error`;
+        resultEl.innerHTML = 'Network error';
     } finally {
         btn.disabled = false;
-        btn.textContent = '🔍 Scan Now';
+        btn.textContent = 'Scan Now';
     }
 }
 
@@ -372,10 +370,10 @@ async function refreshTradesPortfolio() {
     const btn = document.getElementById('portfolioRefreshBtn');
     const origText = btn.textContent;
     btn.disabled = true;
-    btn.textContent = '⏳ Refreshing...';
+    btn.textContent = 'Refreshing...';
     try {
         await loadTradesPortfolio();
-        btn.textContent = '✅ Updated';
+        btn.textContent = 'Updated';
         setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
     } catch (e) {
         btn.textContent = '❌ Error';

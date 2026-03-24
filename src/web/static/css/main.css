@@ -2526,4 +2526,859 @@ body::before {
     margin: 0;
 }
 /* ===== END MINI STAT CARDS ===== */
+
+/* ===== FINVIZ-STYLE LAYOUT ===== */
+
+/* Compact status strip — replaces 5 overview cards */
+.status-strip {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
 }
+
+.status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    flex: 1;
+    min-width: 140px;
+    white-space: nowrap;
+}
+
+.status-pill__icon {
+    font-size: 14px;
+}
+
+.status-pill__body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.status-pill__label {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.status-pill__value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.status-pill__value.positive { color: var(--success); }
+.status-pill__value.negative { color: var(--error); }
+.status-pill__value.warning  { color: var(--warning); }
+
+/* Main two-column body */
+.dashboard-body {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 16px;
+    align-items: start;
+}
+
+@media (max-width: 1100px) {
+    .dashboard-body {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Heatmap column */
+.heatmap-column {
+    min-width: 0;
+}
+
+.heatmap-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.heatmap-header h2 {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.heatmap-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    min-height: 400px;
+    position: relative;
+}
+
+.heatmap-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-content: flex-start;
+}
+
+/* Individual heatmap tile */
+.hm-tile {
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    min-width: 60px;
+    min-height: 52px;
+}
+
+.hm-tile:hover {
+    opacity: 0.85;
+    transform: scale(1.03);
+    z-index: 2;
+}
+
+.hm-tile__symbol {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.95);
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hm-tile__price {
+    font-size: 9px;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.hm-tile__change {
+    font-size: 9px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.hm-tile__score {
+    font-size: 9px;
+    color: rgba(255,255,255,0.65);
+    line-height: 1.3;
+}
+
+.heatmap-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+/* AI analysis overlay (click tile) */
+.hm-analysis-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+    animation: slideIn 0.2s ease;
+}
+
+.hm-analysis-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.hm-analysis-header h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.hm-analysis-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0;
+    line-height: 1;
+}
+
+/* Sidebar column */
+.sidebar-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+/* Sidebar panel (collapsible section card) */
+.sidebar-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.sidebar-panel__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    border-bottom: 1px solid transparent;
+    transition: background 0.15s;
+}
+
+.sidebar-panel__header:hover {
+    background: rgba(255,255,255,0.03);
+}
+
+.sidebar-panel__header.open {
+    border-bottom-color: var(--border);
+}
+
+.sidebar-panel__title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sidebar-panel__actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sidebar-panel__toggle {
+    color: var(--text-secondary);
+    font-size: 11px;
+    transition: transform 0.2s;
+}
+
+.sidebar-panel__header.open .sidebar-panel__toggle {
+    transform: rotate(180deg);
+}
+
+.sidebar-panel__body {
+    padding: 12px 16px;
+    display: none;
+}
+
+.sidebar-panel__body.open {
+    display: block;
+}
+
+/* Compact holdings list inside sidebar */
+.sidebar-holdings {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar-holding {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.sidebar-holding__left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sidebar-holding__symbol {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sidebar-holding__cost {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.sidebar-holding__right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.sidebar-holding__value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.sidebar-holding__pnl {
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.sidebar-holding__pnl.positive { color: var(--success); }
+.sidebar-holding__pnl.negative { color: var(--error); }
+
+/* Compact scanner stats in sidebar */
+.sidebar-scan-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.sidebar-stat {
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: center;
+}
+
+.sidebar-stat__value {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sidebar-stat__label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+/* Compact trade log in sidebar (paginated) */
+.trade-log-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px;
+    gap: 8px;
+}
+
+.trade-log-entry:last-child { border-bottom: none; }
+
+.trade-log-entry__symbol {
+    font-weight: 700;
+    color: var(--text-primary);
+    min-width: 50px;
+}
+
+.trade-log-entry__side-buy  { color: var(--success); font-weight: 600; }
+.trade-log-entry__side-sell { color: var(--error);   font-weight: 600; }
+
+.trade-log-entry__info {
+    flex: 1;
+    color: var(--text-secondary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trade-log-entry__amount {
+    color: var(--text-primary);
+    font-weight: 600;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Pagination controls for trade log */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+.pagination button {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 10px;
+    font-size: 11px;
+    transition: background 0.15s;
+}
+
+.pagination button:hover:not(:disabled) {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+}
+
+.pagination button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.pagination__info {
+    color: var(--text-secondary);
+    min-width: 70px;
+    text-align: center;
+}
+
+/* ===== END FINVIZ-STYLE LAYOUT ===== */
+
+/* ===== VIEWPORT-FIT (no page scroll) ===== */
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Container becomes a flex column filling exactly 100vh */
+.container {
+    height: 100vh !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: column;
+    padding: 0 14px 10px !important;  /* no top padding — ticker sits flush */
+    gap: 0;
+    overflow: hidden;
+}
+
+/* Spacing between flex children except ticker (first child) */
+.container > * + * {
+    margin-top: 8px;
+}
+
+/* Live market ticker */
+.ticker-bar {
+    flex-shrink: 0;
+    background: #0d0d0d;
+    border-bottom: 1px solid var(--border);
+    height: 28px;
+    margin: 0 -14px;
+    display: flex;
+    align-items: stretch;
+}
+
+/* Left zone: scrolling headlines */
+.ticker-left {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.ticker-track {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    animation: ticker-scroll 80s linear infinite;
+    will-change: transform;
+}
+
+.ticker-track:hover {
+    animation-play-state: paused;
+}
+
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 20px;
+    font-size: 11px;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    white-space: nowrap;
+    color: var(--text-secondary);
+}
+
+.ticker-headline {
+    color: var(--text-secondary);
+}
+
+.ticker-source {
+    font-size: 9px;
+    color: rgba(255,255,255,0.25);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* Right zone: pinned Fear & Greed + stats */
+.ticker-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 0 4px;
+    border-left: 1px solid rgba(255,255,255,0.08);
+}
+
+.ticker-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    height: 100%;
+}
+
+.ticker-stat__label {
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ticker-stat__value {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.ticker-fng {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 10px 0 10px;
+    height: 100%;
+}
+
+.ticker-fng__label {
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.ticker-fng__value {
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.ticker-fng__cls {
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* Compact header */
+.header {
+    flex-shrink: 0;
+    padding: 10px 16px !important;
+    margin-bottom: 0 !important;
+}
+
+.header h1 {
+    font-size: 1.25rem !important;
+    margin-bottom: 0 !important;
+}
+
+/* Nav + status strip on same horizontal row */
+.topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.topbar .site-nav {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.topbar .status-strip {
+    flex: 1;
+    margin: 0 !important;
+}
+
+/* Status strip fills remaining topbar width */
+.status-strip {
+    display: flex;
+    gap: 6px;
+}
+
+.status-pill {
+    padding: 6px 10px !important;
+    min-width: 0 !important;
+}
+
+.status-pill__label {
+    font-size: 9px !important;
+}
+
+.status-pill__value {
+    font-size: 13px !important;
+}
+
+/* Main body fills remaining height, no page overflow */
+.dashboard-body {
+    flex: 1;
+    min-height: 0;         /* critical: lets flex child shrink below content size */
+    display: grid;
+    grid-template-columns: 1fr 420px;
+    gap: 12px;
+    overflow: hidden;
+    align-items: stretch;  /* both columns fill full height */
+}
+
+@media (max-width: 1100px) {
+    .dashboard-body {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+    }
+}
+
+/* Heatmap column — scrolls internally */
+.heatmap-column {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.heatmap-header {
+    flex-shrink: 0;
+    margin-bottom: 8px !important;
+}
+
+.heatmap-header h2 {
+    font-size: 13px !important;
+    font-weight: 600;
+}
+
+.heatmap-container {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Sidebar column — no scroll; panels share available height via flex */
+.sidebar-column {
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* Collapsed panel: fixed header height only */
+.sidebar-panel {
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* Open panel: grows to fill remaining space */
+.sidebar-panel.panel-open {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-panel.panel-open .sidebar-panel__body.open {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Compact sidebar panels */
+.sidebar-panel__header {
+    padding: 9px 12px !important;
+}
+
+.sidebar-panel__title {
+    font-size: 12px !important;
+}
+
+.sidebar-panel__body {
+    padding: 10px 12px !important;
+}
+
+/* Stats grids */
+.sidebar-stats-grid {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.sidebar-stats-grid--2 { grid-template-columns: 1fr 1fr; }
+.sidebar-stats-grid--3 { grid-template-columns: 1fr 1fr 1fr; }
+
+.sidebar-stat {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+}
+
+.sidebar-stat__value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.sidebar-stat__label {
+    font-size: 9px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-top: 1px;
+}
+
+/* Trade log and holdings list — height is governed by the flex panel, not fixed max-height */
+.trade-log-scroll {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.holdings-list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Market state block */
+.market-state {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 8px;
+}
+
+/* Sidebar section sub-label */
+.sidebar-section-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+}
+
+/* Status badge (inline in panel titles) */
+.status-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: 600;
+    margin-left: 6px;
+}
+
+/* Config warning */
+.config-warning {
+    background: rgba(237,137,54,0.15);
+    border: 1px solid rgba(237,137,54,0.4);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #ecc94b;
+}
+
+/* Scan result */
+.scan-result {
+    background: rgba(102,126,234,0.1);
+    border: 1px solid var(--accent-primary);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* Empty state placeholder */
+.empty-state {
+    color: var(--text-secondary);
+    text-align: center;
+    padding: 10px;
+    font-size: 12px;
+}
+
+/* Ghost button (secondary, no background) */
+.btn-ghost {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+
+.btn-ghost:hover { background: rgba(255,255,255,0.09); color: var(--text-primary); }
+
+.btn-ghost--accent {
+    border-color: var(--accent-primary);
+    background: rgba(102,126,234,0.08);
+    color: var(--accent-primary);
+}
+
+.btn-ghost--danger {
+    border-color: rgba(245,101,101,0.4);
+    color: var(--error);
+}
+
+/* Outline button */
+.btn-outline {
+    font-size: 11px;
+    padding: 7px;
+    border-radius: 7px;
+    border: 1px solid var(--accent-primary);
+    background: rgba(102,126,234,0.08);
+    color: var(--accent-primary);
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.btn-outline:hover { background: rgba(102,126,234,0.15); }
+
+/* Portfolio analysis overlay — sits below dashboard-body in the flex column */
+.portfolio-container {
+    flex-shrink: 0;
+}
+
+/* ===== END VIEWPORT-FIT ===== */

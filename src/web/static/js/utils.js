@@ -74,11 +74,11 @@ function startInitialRetry() {
     const maxRetries = 12; // 12 × 10s = 2 minutes
     const timer = setInterval(async () => {
         _initialRetryCount++;
-        // Check if portfolio card has loaded real data (no longer shows default text)
-        const valEl = document.getElementById('portfolioValue');
-        const tradingEl = document.getElementById('tradingBudget');
-        const hasData = (valEl && valEl.textContent !== '£0.00' && valEl.textContent !== '$0.00' && valEl.textContent !== '—') ||
-                        (tradingEl && tradingEl.textContent !== '—' && tradingEl.textContent !== 'Connecting...');
+        // Check if any status pill has loaded real data (not still showing default/empty text)
+        const budgetEl = document.getElementById('pillBudget');
+        const heatmapEl = document.getElementById('heatmapGrid');
+        const hasData = (budgetEl && budgetEl.textContent && budgetEl.textContent !== '—') ||
+                        (heatmapEl && heatmapEl.children.length > 0 && !heatmapEl.querySelector('.heatmap-loading'));
         if (hasData || _initialRetryCount >= maxRetries) {
             clearInterval(timer);
             if (hasData) console.log('Initial data loaded after', _initialRetryCount * 10, 'seconds');

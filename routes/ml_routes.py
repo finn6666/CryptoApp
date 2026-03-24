@@ -282,3 +282,40 @@ def gem_accuracy_report():
         return jsonify(report)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ─── Heatmap Data ─────────────────────────────────────────────
+
+@ml_bp.route('/api/heatmap-data')
+def heatmap_data():
+    """Return top coins with gem scores for the dashboard heatmap.
+    Sorted by attractiveness_score descending; max 60 coins.
+    """
+    try:
+        if not state.analyzer or not state.analyzer.coins:
+            return jsonify({"coins": [], "count": 0})
+
+        limit = min(int(request.args.get('limit', 60)), 100)
+        coins = sorted(
+            [c for c in state.analyzer.coins if c.price and c.price > 0],
+            key=lambda c: getattr(c, 'attractiveness_score', 0),
+            reverse=True,
+        )[:limit]
+
+        return jsonify({
+            "coins": [
+                {
+                    "symbol": c.symbol,
+                    "name": c.name,
+                    "price": c.price,
+                    "price_change_24h": getattr(c, 'price_change_24h', 0) or 0,
+                    "gem_score": round(getattr(c, 'attractiveness_score', 0), 2),
+                    "market_cap_rank": getattr(c, 'market_cap_rank', 999),
+                }
+                for c in coins
+            ],
+            "count": len(coins),
+        })
+    except Exception as e:
+        logger.error(f"Heatmap data error: {e}")
+        return jsonify({"error": str(e)}), 500
