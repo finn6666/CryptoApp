@@ -3,14 +3,16 @@
 // ─── Colour helpers ───────────────────────────────────────────
 
 /**
- * Map a normalised position (0–1, relative to min/max of the current dataset)
- * to a CSS background colour using HSL: 0 = vivid red, 1 = vivid green.
- * HSL ensures all colours along the spectrum are equally visible on a dark bg.
+ * Tile background colour based on price-change % performance.
+ * Green = up, red = down. Intensity scales with magnitude (full at ±8%).
+ * Gem score only affects tile SIZE, not colour.
  */
-function _gemColour(t) {
-    t = Math.max(0, Math.min(1, t));
-    const hue = Math.round(t * 120);  // 0° = red, 60° = yellow, 120° = green
-    return `hsl(${hue}, 70%, 30%)`;
+function _tileColour(pct) {
+    if (!pct) return 'hsl(220, 15%, 18%)';          // neutral dark
+    const intensity = Math.min(Math.abs(pct) / 8, 1); // full intensity at ±8%
+    const sat = Math.round(50 + intensity * 35);      // 50–85%
+    const lgt = Math.round(16 + intensity * 18);      // 16–34%
+    return pct > 0 ? `hsl(120, ${sat}%, ${lgt}%)` : `hsl(0, ${sat}%, ${lgt}%)`;
 }
 
 /**
@@ -37,18 +39,33 @@ function _fmtPrice(price) {
     return `£${price.toFixed(Math.min(decimals, 12))}`;
 }
 
-// ─── Tile size calculation ─────────────────────────────────────
+// ─── Treemap row packing ──────────────────────────────────────
 
 /**
- * Compute flex-basis (px) for each tile proportional to its gem score.
- * Min floor prevents tiny unreadable tiles.
+ * Pack coins into rows for treemap layout.
+ * Coins must be sorted descending by gem_score before calling.
+ * Returns array of rows; within each row tile width = flex:gem_score,
+ * so each row fills 100% of the container width exactly.
  */
-function _tileSize(score, minScore, maxScore) {
-    const MIN_PX = 72;
-    const MAX_PX = 160;
-    if (maxScore <= minScore) return MIN_PX;
-    const t = (score - minScore) / (maxScore - minScore);
-    return Math.round(MIN_PX + t * (MAX_PX - MIN_PX));
+function _packRows(coins, containerW, containerH) {
+    const n = coins.length;
+    if (n === 0) return [];
+    // Estimate rows: target roughly square tiles
+    const numRows = Math.max(1, Math.min(6, Math.round(Math.sqrt(n * containerH / (containerW || 1)))));
+    const totalScore = coins.reduce((s, c) => s + c.gem_score, 0);
+    const targetPerRow = totalScore / numRows;
+
+    const rows = [[]];
+    let rowSum = 0;
+    coins.forEach(coin => {
+        if (rowSum > 0 && rowSum >= targetPerRow && rows.length < numRows) {
+            rows.push([]);
+            rowSum = 0;
+        }
+        rows[rows.length - 1].push(coin);
+        rowSum += coin.gem_score;
+    });
+    return rows;
 }
 
 // ─── Analysis panel ───────────────────────────────────────────
@@ -157,56 +174,62 @@ function _renderHeatmap(coins, holdingsMap) {
             });
         }
     }
+    // API returns coins sorted by gem_score desc — kept so largest tiles are top-left
     const allCoins = [...extraCoins, ...coins];
 
-    const scores = allCoins.map(c => c.gem_score);
-    const minScore = Math.min(...scores);
-    const maxScore = Math.max(...scores);
-    const scoreRange = maxScore - minScore || 1;  // avoid divide-by-zero
+    // Pack into treemap rows: each row fills 100% width, tile widths proportional within row
+    const containerW = grid.parentElement ? grid.parentElement.offsetWidth  || 800 : 800;
+    const containerH = grid.parentElement ? grid.parentElement.offsetHeight || 500 : 500;
+    const rows = _packRows(allCoins, containerW, containerH);
+    const rowTotals = rows.map(r => r.reduce((s, c) => s + c.gem_score, 0));
+    const totalScore = rowTotals.reduce((a, b) => a + b, 0) || 1;
 
+    // Switch grid to column layout so rows stack and fill the height
+    grid.style.cssText = 'display:flex; flex-direction:column; height:100%; gap:4px; overflow:hidden;';
     grid.innerHTML = '';
-    allCoins.forEach(coin => {
-        const held   = holdingsMap[coin.symbol];
-        const size   = _tileSize(coin.gem_score, minScore, maxScore);
-        // Normalise score to 0–1 relative to dataset range, then colour
-        const t      = (coin.gem_score - minScore) / scoreRange;
-        const colour = _gemColour(t);
 
-        let displayStr, displayColor, scoreLabel;
-        if (held && held.unrealised_pnl_pct !== undefined && held.unrealised_pnl_pct !== null) {
-            const pnl = held.unrealised_pnl_pct;
-            displayStr   = pnl >= 0 ? `+${pnl.toFixed(1)}%` : `${pnl.toFixed(1)}%`;
-            displayColor = _changeColour(pnl);
-            scoreLabel   = 'PnL';
-        } else {
-            const chg    = coin.price_change_24h || 0;
-            displayStr   = chg >= 0 ? `+${chg.toFixed(1)}%` : `${chg.toFixed(1)}%`;
-            displayColor = _changeColour(chg);
-            scoreLabel   = String(coin.gem_score);
-        }
+    rows.forEach((row, ri) => {
+        const rowEl = document.createElement('div');
+        // flex value proportional to row's total score so taller rows get more height
+        rowEl.style.cssText = `display:flex; flex:${rowTotals[ri] / totalScore * rows.length}; gap:4px; min-height:55px;`;
 
-        const priceStr   = (held && held.current_price) ? _fmtPrice(held.current_price) : _fmtPrice(coin.price);
-        const symbolText = held ? `&#9679; ${escapeHtml(coin.symbol)}` : escapeHtml(coin.symbol);
+        row.forEach(coin => {
+            const held = holdingsMap[coin.symbol];
 
-        const tile = document.createElement('div');
-        tile.className = 'hm-tile';
-        tile.style.cssText = [
-            `background: ${colour}`,
-            `flex-basis: ${size}px`,
-            `flex-grow: ${size}`,
-            held ? 'outline: 2px solid rgba(255,255,255,0.5); outline-offset: -2px' : '',
-        ].filter(Boolean).join('; ');
-        tile.title = `${coin.symbol} — ${coin.name}\n${held ? `P&L: ${displayStr}` : `24h: ${displayStr}`}\nPrice: ${priceStr}`;
+            // Colour by price performance — held coins use P&L, others use 24h change
+            const pct = (held && held.unrealised_pnl_pct !== undefined && held.unrealised_pnl_pct !== null)
+                ? held.unrealised_pnl_pct
+                : (coin.price_change_24h || 0);
+            const bgColour = _tileColour(pct);
 
-        tile.innerHTML = `
-            <div class="hm-tile__symbol">${symbolText}</div>
-            <div class="hm-tile__price">${priceStr}</div>
-            <div class="hm-tile__change" style="color:${displayColor}">${displayStr}</div>
-            <div class="hm-tile__score">${scoreLabel}</div>
-        `;
+            const displayStr  = pct >= 0 ? `+${pct.toFixed(1)}%` : `${pct.toFixed(1)}%`;
+            const displayColor = _changeColour(pct);
+            const scoreLabel  = (held && held.unrealised_pnl_pct !== undefined) ? 'PnL' : String(coin.gem_score);
+            const priceStr    = (held && held.current_price) ? _fmtPrice(held.current_price) : _fmtPrice(coin.price);
+            const symbolText  = held ? `&#9679; ${escapeHtml(coin.symbol)}` : escapeHtml(coin.symbol);
 
-        tile.addEventListener('click', () => _showTileAnalysis(coin.symbol, coin.name, coin.price));
-        grid.appendChild(tile);
+            const tile = document.createElement('div');
+            tile.className = 'hm-tile';
+            // flex: gem_score makes tile width proportional within the row
+            tile.style.cssText = [
+                `background:${bgColour}`,
+                `flex:${coin.gem_score}`,
+                held ? 'outline:2px solid rgba(255,255,255,0.5);outline-offset:-2px' : '',
+            ].filter(Boolean).join(';');
+            tile.title = `${coin.symbol} — ${coin.name}\n${held ? `P&L: ${displayStr}` : `24h: ${displayStr}`}\nPrice: ${priceStr}`;
+
+            tile.innerHTML = `
+                <div class="hm-tile__symbol">${symbolText}</div>
+                <div class="hm-tile__price">${priceStr}</div>
+                <div class="hm-tile__change" style="color:${displayColor}">${displayStr}</div>
+                <div class="hm-tile__score">${scoreLabel}</div>
+            `;
+
+            tile.addEventListener('click', () => _showTileAnalysis(coin.symbol, coin.name, coin.price));
+            rowEl.appendChild(tile);
+        });
+
+        grid.appendChild(rowEl);
     });
 }
 
