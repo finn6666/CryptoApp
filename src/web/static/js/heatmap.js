@@ -3,27 +3,26 @@
 // ─── Colour helpers ───────────────────────────────────────────
 
 /**
- * Map a gem score (0–10) to a CSS background colour.
- * Low score → red, mid → amber, high → green.
+ * Map a normalised position (0–1, relative to min/max of the current dataset)
+ * to a CSS background colour: 0 = deep red, 0.5 = amber, 1 = rich green.
+ * Using relative scaling means the colours always span the full red→green
+ * spectrum regardless of what absolute score range the data has.
  */
-function _gemColour(score) {
-    const s = Math.max(0, Math.min(10, score));
-    // 0–3: red range, 3–6: amber, 6–10: green
-    if (s < 3) {
-        const t = s / 3;
-        const r = Math.round(180 + (1 - t) * 40);
-        const g = Math.round(40  + t * 40);
-        return `rgb(${r},${g},40)`;
-    } else if (s < 6) {
-        const t = (s - 3) / 3;
-        const r = Math.round(180 - t * 80);
-        const g = Math.round(80  + t * 60);
-        return `rgb(${r},${g},40)`;
+function _gemColour(t) {
+    // t is already 0–1 (passed from _renderHeatmap)
+    t = Math.max(0, Math.min(1, t));
+    if (t < 0.5) {
+        // red (0) → amber (0.5)
+        const u = t / 0.5;
+        const r = Math.round(200 - u * 60);   // 200 → 140
+        const g = Math.round(40  + u * 100);  // 40  → 140
+        return `rgb(${r},${g},30)`;
     } else {
-        const t = (s - 6) / 4;
-        const r = Math.round(100 - t * 60);
-        const g = Math.round(140 + t * 50);
-        return `rgb(${r},${g},${40 + Math.round(t * 30)})`;
+        // amber (0.5) → green (1)
+        const u = (t - 0.5) / 0.5;
+        const r = Math.round(140 - u * 100);  // 140 → 40
+        const g = Math.round(140 + u * 50);   // 140 → 190
+        return `rgb(${r},${g},30)`;
     }
 }
 
@@ -176,12 +175,15 @@ function _renderHeatmap(coins, holdingsMap) {
     const scores = allCoins.map(c => c.gem_score);
     const minScore = Math.min(...scores);
     const maxScore = Math.max(...scores);
+    const scoreRange = maxScore - minScore || 1;  // avoid divide-by-zero
 
     grid.innerHTML = '';
     allCoins.forEach(coin => {
         const held   = holdingsMap[coin.symbol];
         const size   = _tileSize(coin.gem_score, minScore, maxScore);
-        const colour = _gemColour(coin.gem_score);
+        // Normalise score to 0–1 relative to dataset range, then colour
+        const t      = (coin.gem_score - minScore) / scoreRange;
+        const colour = _gemColour(t);
 
         let displayStr, displayColor, scoreLabel;
         if (held && held.unrealised_pnl_pct !== undefined && held.unrealised_pnl_pct !== null) {
