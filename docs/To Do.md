@@ -19,22 +19,10 @@
 
 ## Future Work
 
-### Dashboard — Finviz-style rework
-
-Agreed design (March 2026):
-
-- Replace coin card grid with a **coin heatmap** — tile size proportional to gem score, colour green→red, text shows symbol/price/24h change/gem score, click → inline analysis
-- Replace stacked section cards with a right **sidebar**: Holdings, Live Trading, Scanner, RL Insights
-- Replace 5 overview cards with a **compact status strip**: Budget | Portfolio P&L | Scanner status | Monitor status
-- Activity Log, Monthly Review, Closed Positions stay on Trades page
-- Add sparkline SVG per holding tile once heatmap is in
-
-**Frontend tasks still needed:**
+### Frontend optimisations
 - Switch dashboard polling to SSE (reduces Pi idle CPU vs 30s setInterval)
-- Debounce/batch JS API calls on page load
-- Add `/api/dashboard-summary` single-call endpoint
+- Add `/api/dashboard-summary` single-call endpoint to batch page-load requests
 - Enable gzip compression in nginx for JSON responses
-- Pagination / virtual scroll on trades log
 - Cache-bust CSS/JS via git short SHA
 
 ---
