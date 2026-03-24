@@ -105,9 +105,9 @@ See `.env.example` for the full list. Key groups:
 - **Scan:** `SCAN_ENABLED`, `SCAN_INTERVAL_HOURS`, `SCAN_MAX_COINS`
 - **Sell:** `SELL_PROFIT_TARGET_PCT`, `SELL_STOP_LOSS_PCT`, `SELL_TRAILING_STOP_PCT`, `SELL_MIN_HOLD_HOURS`
 
-## Skills Reference
+## Domain Skills
 
-See `.github/instructions/` for domain-specific instruction files (auto-loaded by VS Code Copilot; reference manually in Claude Code):
+Domain-specific instruction files live in `.github/instructions/` (auto-loaded by VS Code Copilot; reference manually in Claude Code):
 - `trading.instructions.md` — Trading engine, proposals, approval flow, execution
 - `agents.instructions.md` — ADK agent architecture, orchestrator, sub-agents
 - `scanning.instructions.md` — Scan loop, market monitor, scheduling

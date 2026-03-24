@@ -4,7 +4,7 @@ CryptoApp is a Raspberry Pi–hosted automated cryptocurrency trading system. Fl
 
 ## Stack
 
-- **Backend:** Python 3.12, Flask, Gunicorn (1 worker, 2 threads)
+- **Backend:** Python 3.13, Flask, Gunicorn (1 worker, 2 threads)
 - **AI:** Google ADK, Gemini Flash — `ml/agents/official/`
 - **Exchange:** Kraken via ccxt — `ml/exchange_manager.py`
 - **Frontend:** Vanilla JS + Jinja2 templates, no build step

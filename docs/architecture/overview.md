@@ -49,7 +49,7 @@ CryptoApp is a Raspberry Pi–hosted automated trading system. Data flows from C
 
 | Parameter | Value |
 |-----------|-------|
-| Daily budget | £3 (configurable) |
+| Daily budget | £5 (configurable via `DAILY_TRADE_BUDGET_GBP`) |
 | Conviction threshold | ≥45% to propose |
 | Stop-loss | -20% |
 | Profit target | +50% (after 48h) |
@@ -70,7 +70,7 @@ CryptoApp is a Raspberry Pi–hosted automated trading system. Data flows from C
 
 | Layer | Technology |
 |-------|-----------|
-| Language | Python 3.12 |
+| Language | Python 3.13 |
 | Web framework | Flask + Gunicorn (1 worker, 2 threads) |
 | AI | Google ADK, Gemini Flash |
 | Exchange | Kraken via ccxt |
