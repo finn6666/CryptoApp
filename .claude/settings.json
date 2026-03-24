@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path' 2>/dev/null); [[ \"$f\" == *.py ]] && cd /Users/finnbryant/Dev/Projects/CryptoApp && uv run python -m py_compile \"$f\" && echo \"Syntax OK: $f\" || true",
+            "statusMessage": "Checking Python syntax..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path' 2>/dev/null); if [[ \"$f\" == *\"data/trades/audit_log.jsonl\"* ]]; then echo '{\"decision\":\"block\",\"reason\":\"audit_log.jsonl is append-only — direct writes are blocked to protect the audit trail.\"}'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
