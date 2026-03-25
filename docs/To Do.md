@@ -1,20 +1,3 @@
-## Notes
-
-### Frontend / UI  (`src/web/**`)
-- ~~Want heatmap to be based on holdings P&L rather than gem score — colour-code by price movement, gem score on the tile only~~ Done
-- ~~Don't really like the look of RL insights on the page; want it to be more useful and look better — open to ideas~~ Done — categorised SIGNAL/AVOID/PATTERN tags, ordered by type
-- ~~Want the dashboard to look as fluid as the Finviz heatmap~~ Done — tighter gaps, background transition, micro-tile text hiding, smaller border-radius
-- ~~No emojis — remove all existing emojis from frontend templates, JS strings, and Python log messages. Add a section in docs/CLAUDE.md to ensure agents don't add any in future.~~ Done
-
-### Backend / Trading (`ml/trading_engine.py`, `ml/sell_automation.py`, `ml/agents/**`)
-- ~~Check the sell logic — review sell_automation.py and the sell agent to make sure exit triggers are correct~~ Fixed: `_agent_recheck` was checking `result["recommendation"]` which always returned `"Analysis completed"` — agent-driven sells never fired. Now checks `trade_decision["trade_side"] == "sell"`.
-- ~~Check agent instructions so agents trade more expensive coins if the opportunity arises.~~ Done: trading agent rule 4a reinforced with explicit high-conviction rule (≥70% on any cap = always trade).
-
-### Health / Bugs (`routes/health.py`, `src/web/templates/`)
-- ~~Gem detector still showing up on the health page — it has been removed, reference should be cleaned up~~ Done: removed stale `rl_detector_available` from `health.py` and `ml_routes.py`, updated stale docstring and `app.py` comment.
-
----
-
 ## Future Work
 
 ### Frontend optimisations
@@ -48,4 +31,3 @@ Multiple teams with different strategies (conservative vs aggressive) vote on th
 [OpenViking](https://github.com/volcengine/OpenViking) — open-source tiered context database for agents (L0 abstract / L1 overview / L2 full content). Better than flat prompt stuffing for long-running agents with large memory.
 
 Not worth it now: `use_memory=False`, Pi RAM limit, needs Go + C++ build, extra embedding API. Revisit if agent memory is re-enabled and past trade context starts overflowing prompts.
-
