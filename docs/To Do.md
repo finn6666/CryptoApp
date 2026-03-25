@@ -1,11 +1,5 @@
 ## Future Work
 
-### Frontend optimisations
-- Switch dashboard polling to SSE (reduces Pi idle CPU vs 30s setInterval)
-- Add `/api/dashboard-summary` single-call endpoint to batch page-load requests
-- Enable gzip compression in nginx for JSON responses
-- Cache-bust CSS/JS via git short SHA
-
 ---
 
 ### Self-custody / wallet consolidation

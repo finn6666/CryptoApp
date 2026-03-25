@@ -3,10 +3,12 @@
 
 // ─── Live Trading Functions ──────────────────────────
 
-async function loadTradingStatus() {
+async function loadTradingStatus(data = null) {
     try {
-        const response = await fetch('/api/trades/status', { headers: authHeaders() });
-        const data = await response.json();
+        if (!data) {
+            const response = await fetch('/api/trades/status', { headers: authHeaders() });
+            data = await response.json();
+        }
 
         document.getElementById('budgetRemaining').textContent = `£${data.remaining_today_gbp.toFixed(2)}`;
         document.getElementById('tradesToday').textContent = data.trades_today || 0;
@@ -39,10 +41,15 @@ async function loadTradingStatus() {
     }
 }
 
-async function loadPendingProposals() {
+async function loadPendingProposals(prefetchedProposals = null) {
     try {
-        const response = await fetch('/api/trades/pending', { headers: authHeaders() });
-        const data = await response.json();
+        let data;
+        if (prefetchedProposals !== null) {
+            data = { proposals: prefetchedProposals };
+        } else {
+            const response = await fetch('/api/trades/pending', { headers: authHeaders() });
+            data = await response.json();
+        }
         const section = document.getElementById('pendingSection');
         const container = document.getElementById('pendingProposals');
 
@@ -277,10 +284,9 @@ async function toggleKillSwitch() {
 
 // ─── Scan Functions ───────────────────────────────────
 
-async function loadScanStatusDetail() {
+async function loadScanStatusDetail(prefetchedData = null) {
     try {
-        const response = await fetch('/api/trades/scan-status', { headers: authHeaders() });
-        const data = await response.json();
+        const data = prefetchedData || await fetch('/api/trades/scan-status', { headers: authHeaders() }).then(r => r.json());
         const status = data.status || {};
 
         const statusEl = document.getElementById('scanStatusDetail');
@@ -753,11 +759,16 @@ async function loadMonthlyReview() {
     }
 }
 
-async function loadActivityLog() {
+async function loadActivityLog(prefetchedData = null) {
     try {
-        const response = await fetch('/api/trades/audit-trail?limit=20', { headers: authHeaders() });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
+        let data;
+        if (prefetchedData !== null) {
+            data = prefetchedData;
+        } else {
+            const response = await fetch('/api/trades/audit-trail?limit=20', { headers: authHeaders() });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            data = await response.json();
+        }
         const entries = data.entries || [];
         const container = document.getElementById('activityLog');
 
@@ -849,11 +860,8 @@ function initTradingSections() {
     loadMonthlyReview();
     loadActivityLog();
 
-    // Periodic refresh
-    setInterval(loadPendingProposals, 30000);
-    setInterval(loadTradingStatus, 30000);
-    setInterval(loadScanStatusDetail, 60000);
-    setInterval(loadTradesPortfolio, 60000);
-    setInterval(loadMarketState, 600000);
-    setInterval(loadActivityLog, 30000);
+    // Periodic refresh — most sidebar sections are driven by SSE (startDashboardSSE).
+    // Only keep timers for data not included in the SSE bundle.
+    setInterval(loadTradesPortfolio, 120000);  // live P&L — needs exchange prices, 2 min
+    setInterval(loadMarketState, 600000);       // market state — low cadence, keep as-is
 }

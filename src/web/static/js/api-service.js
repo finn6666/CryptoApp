@@ -6,10 +6,9 @@
  * Fetch /api/dashboard-summary once and populate the compact status strip
  * and sidebar panel stats. Reduces 5 parallel card fetches to 1 call.
  */
-async function loadDashboardSummary() {
+async function loadDashboardSummary(prefetchedData = null) {
     try {
-        const res = await fetch('/api/dashboard-summary', { headers: authHeaders() });
-        const data = await res.json();
+        const data = prefetchedData || await fetch('/api/dashboard-summary', { headers: authHeaders() }).then(r => r.json());
 
         // Budget pill
         _updatePill('pillBudget', () => {
