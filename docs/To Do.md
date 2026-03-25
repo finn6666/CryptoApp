@@ -1,18 +1,23 @@
-## Current Work
+## Git Workflow
 
-### Branch: `frontend` — UI layout & visual polish
+Create feature branches from `dev`, work on them, merge back to `dev`, delete the branch.
+Only merge `dev` into `main` when ready for a release/deploy.
+
+## Current To Do
+
+### UI layout & visual polish
 - Text is showing a bit small on each coin (coin rating, current cost etc)
-- Getting a flickering while on the page
+- ~~Getting a flickering while on the page~~ **Fixed** — heatmap no longer flashes "Loading..." on auto-refresh
 - Last scan/refresh in corner looks weird
 - Scanner/scan now button on the side is a bit pointless
 - Want portfolio value and portfolio P&L on the right to be clear and easy to see
 - Collapse trade log on the right
 
-### Branch: `features` — Behaviour & UX changes
+### Behaviour & UX changes
 - When I click on a tile/coin, just want very short analysis rather than what it's showing currently
 - On RL insights, want stuff that I can learn e.g. trade patterns etc
 
-### Branch: `backend` — System & stability
+### System & stability
 - Daily budget/budget remaining has been removed (bug — restore it)
 - Ensure the Pi isn't being overly extended
 
