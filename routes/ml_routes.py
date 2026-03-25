@@ -28,7 +28,6 @@ def get_ml_status():
                 'ML_AVAILABLE': state.ML_AVAILABLE,
                 'ml_pipeline_exists': state.ml_pipeline is not None,
                 'suggestion': 'Click "Train ML Model" to initialize and train the model',
-                'rl_detector_available': False,
             }
             try:
                 import sklearn, pandas, numpy
@@ -274,7 +273,7 @@ def gem_score_trend(symbol):
 
 @ml_bp.route('/api/gems/accuracy')
 def gem_accuracy_report():
-    """Get overall gem detector accuracy metrics."""
+    """Get gem score tracker accuracy metrics."""
     try:
         from ml.gem_score_tracker import get_gem_score_tracker
         tracker = get_gem_score_tracker()

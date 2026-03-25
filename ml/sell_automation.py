@@ -386,9 +386,18 @@ class SellAutomation:
 
                 self._last_recheck[symbol] = now.isoformat()
 
-                recommendation = result.get("recommendation", "").upper()
-                if recommendation in ("SELL", "AVOID"):
-                    confidence = result.get("confidence", 70)
+                # analyze_crypto returns a trade_decision dict, not a top-level
+                # recommendation string. The top-level "recommendation" field is
+                # always "Analysis completed" — never SELL — so we must read the
+                # actual trading decision from trade_decision.
+                trade_decision = result.get("trade_decision", {})
+                should_sell = (
+                    trade_decision.get("should_trade", False)
+                    and trade_decision.get("trade_side", "buy").lower() == "sell"
+                )
+                if should_sell:
+                    confidence = trade_decision.get("trade_conviction", 70)
+                    reason_text = trade_decision.get("trade_reasoning", "Agent re-analysis recommends exit")
                     from ml.trading_engine import get_trading_engine
                     engine = get_trading_engine()
                     current_price = live_prices.get(symbol, 0)
@@ -399,7 +408,7 @@ class SellAutomation:
                         side="sell",
                         amount_gbp=current_price * quantity,
                         current_price=current_price,
-                        reason=f"Agent re-analysis recommends {recommendation}: {result.get('action_plan', 'Exit position')}",
+                        reason=f"Agent re-analysis recommends SELL: {reason_text}",
                         confidence=confidence,
                         recommendation="SELL",
                     )

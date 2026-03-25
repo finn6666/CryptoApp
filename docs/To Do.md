@@ -7,11 +7,11 @@
 - No emojis — remove all existing emojis from frontend templates, JS strings, and Python log messages. Add a section in docs/CLAUDE.md to ensure agents don't add any in future.
 
 ### Backend / Trading (`ml/trading_engine.py`, `ml/sell_automation.py`, `ml/agents/**`)
-- Check the sell logic — review sell_automation.py and the sell agent to make sure exit triggers are correct
-- Check agent instructions so agents trade more expensive coins if the opportunity arises. Focus should remain on small-cap but with freedom to trade upwards when conviction is high.
+- ~~Check the sell logic — review sell_automation.py and the sell agent to make sure exit triggers are correct~~ Fixed: `_agent_recheck` was checking `result["recommendation"]` which always returned `"Analysis completed"` — agent-driven sells never fired. Now checks `trade_decision["trade_side"] == "sell"`.
+- ~~Check agent instructions so agents trade more expensive coins if the opportunity arises.~~ Done: trading agent rule 4a reinforced with explicit high-conviction rule (≥70% on any cap = always trade).
 
 ### Health / Bugs (`routes/health.py`, `src/web/templates/`)
-- Gem detector still showing up on the health page — it has been removed, reference should be cleaned up
+- ~~Gem detector still showing up on the health page — it has been removed, reference should be cleaned up~~ Done: removed stale `rl_detector_available` from `health.py` and `ml_routes.py`, updated stale docstring and `app.py` comment.
 
 ### Security (`routes/**`, `app.py`, `src/web/**`)
 - Check security vulnerabilities introduced by recent web interface/app changes (new routes, JS, CORS, auth)

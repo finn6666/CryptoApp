@@ -141,7 +141,6 @@ def api_metrics():
         'application': {
             'total_coins': len(state.analyzer.coins) if state.analyzer else 0,
             'ml_available': state.ML_AVAILABLE,
-            'rl_detector_available': False
         }
     }), 200
 
