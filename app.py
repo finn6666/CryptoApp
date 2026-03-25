@@ -52,7 +52,7 @@ init_cors(app)
 # Shared state — initialise all ML / data components
 # ---------------------------------------------------------------------------
 import services.app_state as state       # noqa: E402
-state.init_all()                         # ML, gem detector, data pipeline, ADK, analyzer
+state.init_all()                         # ML, data pipeline, ADK, analyzer
 state.start_idle_monitor()
 
 # ---------------------------------------------------------------------------
