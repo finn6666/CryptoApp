@@ -141,12 +141,12 @@ def api_metrics():
         'application': {
             'total_coins': len(state.analyzer.coins) if state.analyzer else 0,
             'ml_available': state.ML_AVAILABLE,
-            'rl_detector_available': False
         }
     }), 200
 
 
 @health_bp.route('/api/debug/coins')
+@require_trading_auth
 def debug_coins():
     """Debug endpoint to see what coins are currently loaded"""
     try:

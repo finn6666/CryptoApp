@@ -30,7 +30,7 @@ async function loadTradingStatus() {
             let warnings = [];
             if (!data.exchange_configured) warnings.push('Kraken API keys');
             if (!data.email_configured) warnings.push('Gmail SMTP credentials');
-            configWarning.innerHTML = `<strong>Setup required:</strong> Add ${warnings.join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
+            configWarning.innerHTML = `<strong>Setup required:</strong> Add ${warnings.map(escapeHtml).join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
         } else {
             configWarning.style.display = 'none';
         }

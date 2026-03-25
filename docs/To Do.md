@@ -11,10 +11,7 @@
 - Check agent instructions so agents trade more expensive coins if the opportunity arises. Focus should remain on small-cap but with freedom to trade upwards when conviction is high.
 
 ### Health / Bugs (`routes/health.py`, `src/web/templates/`)
-- Gem detector still showing up on the health page — it has been removed, reference should be cleaned up
-
-### Security (`routes/**`, `app.py`, `src/web/**`)
-- Check security vulnerabilities introduced by recent web interface/app changes (new routes, JS, CORS, auth)
+- ~~Gem detector still showing up on the health page — it has been removed, reference should be cleaned up~~ Done
 ---
 
 ## Future Work

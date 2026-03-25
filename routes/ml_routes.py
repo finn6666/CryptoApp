@@ -28,7 +28,6 @@ def get_ml_status():
                 'ML_AVAILABLE': state.ML_AVAILABLE,
                 'ml_pipeline_exists': state.ml_pipeline is not None,
                 'suggestion': 'Click "Train ML Model" to initialize and train the model',
-                'rl_detector_available': False,
             }
             try:
                 import sklearn, pandas, numpy
@@ -98,6 +97,8 @@ def initialize_ml_endpoint():
 
 
 @ml_bp.route('/api/gemini/quota')
+@require_trading_auth
+@limiter.limit('5 per hour')
 def check_gemini_quota():
     try:
         api_key = os.getenv('GOOGLE_API_KEY')

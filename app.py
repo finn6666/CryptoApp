@@ -10,6 +10,7 @@ import os
 import subprocess
 import logging
 from flask import Flask, render_template
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__,
             template_folder='src/web/templates',
             static_folder='src/web/static')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 app.secret_key = os.environ.get('SECRET_KEY')
 if not app.secret_key:
