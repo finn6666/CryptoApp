@@ -73,7 +73,7 @@ def get_ml_prediction(symbol):
 @require_trading_auth
 def train_ml_model():
     try:
-        logger.info("🎯 ML Training requested")
+        logger.info("ML Training requested")
         if not state.ML_AVAILABLE or state.ml_pipeline is None:
             if not state.initialize_ml():
                 return jsonify({'success': False, 'error': 'ML components not available.'}), 503
@@ -108,7 +108,7 @@ def check_gemini_quota():
         try:
             model = genai.GenerativeModel('gemini-3-flash-preview')
             response = model.generate_content("Say 'OK'")
-            return jsonify({'status': 'SUCCESS', 'message': '✅ Gemini API is working!', 'test_response': response.text})
+            return jsonify({'status': 'SUCCESS', 'message': 'Gemini API is working!', 'test_response': response.text})
         except Exception as e:
             if '429' in str(e) or 'quota' in str(e).lower():
                 return jsonify({'status': 'QUOTA_ERROR', 'message': 'Still hitting quota limits'})

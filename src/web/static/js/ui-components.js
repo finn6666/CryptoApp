@@ -76,7 +76,7 @@ function generateUnifiedAIAnalysis(coin, coinId) {
                 <div style="display: flex; gap: 6px; margin-top: 6px;">
                     ${recommendation === 'BUY' || recommendation === 'STRONG BUY' ? `
                     <button class="ai-expand-btn" onclick="proposeTrade('${coin.symbol}', ${coin.price || 0}, ${JSON.stringify({gem_score: gemScore, recommendation, confidence, risk_level: riskLevel, summary: (summary || '').substring(0,150), key_strengths: strengths.slice(0,2), key_weaknesses: weaknesses.slice(0,2)}).replace(/'/g, "\\'")})" style="flex: 1; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; font-weight: 700;">
-                        ⚡ Trade
+                        Trade
                     </button>
                     ` : ''}
                     ${strengths.length > 1 || weaknesses.length > 1 ? `
@@ -116,7 +116,6 @@ function generateUnifiedAIAnalysis(coin, coinId) {
         return `
             <div class="unified-ai-analysis loading-analysis">
                 <div class="ai-loading">
-                    <span class="loading-icon">🔄</span>
                     <span>AI analysis loading in background...</span>
                 </div>
             </div>
@@ -155,7 +154,6 @@ function generateUnifiedAIAnalysis(coin, coinId) {
             <div class="unified-ai-analysis">
                 <div class="ai-header">
                     <div class="ai-title">
-                        <span class="ai-icon">🤖</span>
                         <span>Analysis</span>
                     </div>
                     <div class="ai-sentiment ${recommendationClass}">

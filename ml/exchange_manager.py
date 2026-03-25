@@ -76,7 +76,7 @@ class ExchangeManager:
             })
             self._load_markets_with_retry(exchange, exchange_id)
             self._exchanges[exchange_id] = exchange
-            logger.info(f"✅ {exchange_id} connected — {len(exchange.markets)} markets")
+            logger.info(f"{exchange_id} connected — {len(exchange.markets)} markets")
             return exchange
         except Exception as e:
             logger.error(f"Failed to connect {exchange_id}: {e}")
@@ -722,7 +722,7 @@ class ExchangeManager:
                 return False
 
             logger.info(
-                f"💱 Auto-converting £{gbp_to_sell:.2f} GBP → {target_currency} "
+                f"Auto-converting £{gbp_to_sell:.2f} GBP → {target_currency} "
                 f"on {exchange_id} (rate {rate:.4f}, need {amount_needed:.4f} {target_currency})"
             )
 
@@ -732,7 +732,7 @@ class ExchangeManager:
             received = filled * avg_price
 
             logger.info(
-                f"💱 Converted £{filled:.2f} → {received:.4f} {target_currency} "
+                f"Converted £{filled:.2f} → {received:.4f} {target_currency} "
                 f"(avg rate {avg_price:.4f}, order {order.get('id', 'unknown')})"
             )
             return True

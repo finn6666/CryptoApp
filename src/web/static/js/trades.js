@@ -220,9 +220,9 @@ async function approveTrade(proposalId) {
         });
         const data = await response.json();
         if (data.success) {
-            showTradeAlert(`✅ Trade approved — ${data.side?.toUpperCase()} ${data.symbol}`, 'success');
+            showTradeAlert(`Trade approved — ${data.side?.toUpperCase()} ${data.symbol}`, 'success');
         } else {
-            showTradeAlert(`⚠️ ${data.error || 'Could not approve'}`, 'error');
+            showTradeAlert(data.error || 'Could not approve', 'error');
         }
         setTimeout(() => {
             loadPendingProposals();
@@ -246,7 +246,7 @@ async function rejectTrade(proposalId) {
         if (data.success) {
             showTradeAlert('Trade rejected', 'success');
         } else {
-            showTradeAlert(`⚠️ ${data.error || 'Could not reject'}`, 'error');
+            showTradeAlert(data.error || 'Could not reject', 'error');
         }
         loadPendingProposals();
     } catch (e) {
@@ -259,7 +259,7 @@ async function toggleKillSwitch() {
     const isHalted = btn.textContent.includes('Resume');
     const action = isHalted ? 'deactivate' : 'activate';
 
-    if (!isHalted && !confirm('⛔ This will HALT all trading and reject pending proposals. Continue?')) return;
+    if (!isHalted && !confirm('This will HALT all trading and reject pending proposals. Continue?')) return;
 
     try {
         await fetch('/api/trades/kill-switch', {
@@ -599,20 +599,38 @@ async function loadRlInsights() {
         const insights = data.insights || [];
         const container = document.getElementById('rlInsights');
 
-        if (insights.length > 0) {
-            container.innerHTML = insights.map(text => {
-                const lower = text.toLowerCase();
-                let accent = 'var(--accent-primary)';
-                if (/loss|losses|underperform|red|worst|penalty|avoid|mistake/.test(lower)) {
-                    accent = 'var(--warning)';
-                } else if (/winner|winning|wins|promis|nice|lean toward|worked/.test(lower)) {
-                    accent = 'var(--success)';
-                }
-                return `<div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-left: 3px solid ${accent}; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; font-size: 13px; color: var(--text-primary); line-height: 1.6;">${escapeHtml(text)}</div>`;
-            }).join('');
-        } else {
-            container.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px; padding: 12px 0;">Nothing to report yet.</p>';
+        if (insights.length === 0) {
+            container.innerHTML = '<p class="empty-state">No patterns yet — insights appear after trades complete.</p>';
+            return;
         }
+
+        // Categorise each insight so we can sort and label them
+        const categorised = insights.map(text => {
+            const lower = text.toLowerCase();
+            if (/loss|losses|underperform|worst|penalty|avoid|mistake/.test(lower)) {
+                return { text, type: 'avoid',   tag: 'AVOID'   };
+            } else if (/winner|winning|wins|promis|lean toward|worked|profit/.test(lower)) {
+                return { text, type: 'signal',  tag: 'SIGNAL'  };
+            }
+            return { text, type: 'pattern', tag: 'PATTERN' };
+        });
+
+        // Signals first, then avoids, then patterns
+        const ordered = [
+            ...categorised.filter(i => i.type === 'signal'),
+            ...categorised.filter(i => i.type === 'avoid'),
+            ...categorised.filter(i => i.type === 'pattern'),
+        ];
+
+        container.innerHTML = `
+            <div class="rl-summary">${insights.length} insight${insights.length !== 1 ? 's' : ''} from recent trades</div>
+            ${ordered.map(({ text, type, tag }) => `
+                <div class="rl-insight rl-insight--${type}">
+                    <span class="rl-tag rl-tag--${type}">${tag}</span>
+                    <span class="rl-text">${escapeHtml(text)}</span>
+                </div>
+            `).join('')}
+        `;
     } catch (e) {
         console.error('Error loading RL insights:', e);
     }
@@ -631,13 +649,12 @@ async function loadClosedPositions() {
             container.innerHTML = positions.map(p => {
                 const won = p.won;
                 const pnlColor = won ? '#48bb78' : '#fc8181';
-                const icon = won ? '✅' : '❌';
                 const closedDate = p.closed_at ? new Date(p.closed_at).toLocaleDateString() : '—';
                 return `
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${pnlColor}; border-radius: 8px; padding: 14px; margin-bottom: 8px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="font-weight: 700; font-size: 15px;">${icon} ${escapeHtml(p.symbol)}</span>
+                                <span style="font-weight: 700; font-size: 15px;">${escapeHtml(p.symbol)}</span>
                                 <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${p.trades} trades</span>
                             </div>
                             <div style="text-align: right;">
@@ -747,17 +764,16 @@ async function loadActivityLog() {
         if (entries.length > 0) {
             container.innerHTML = entries.map(e => {
                 const time = new Date(e.timestamp).toLocaleString();
-                let icon = '📋', color = 'var(--text-secondary)';
-                if (e.event === 'proposal') { icon = '📨'; color = '#667eea'; }
-                else if (e.event === 'sell_proposal') { icon = '📤'; color = '#ed8936'; }
-                else if (e.event === 'skip') { icon = '⏭️'; color = 'var(--text-secondary)'; }
-                else if (e.event === 'scan_start') { icon = '🔍'; color = '#ed8936'; }
-                else if (e.event === 'scan_complete') { icon = '✅'; color = '#48bb78'; }
-                else if (e.event === 'trade_executed') { icon = '💰'; color = '#48bb78'; }
-                else if (e.event === 'trade_failed') { icon = '⚠️'; color = '#fc8181'; }
-                else if (e.event === 'error') { icon = '❌'; color = '#fc8181'; }
-                else if (e.event === 'scan_no_coins') { icon = '⚠️'; color = '#ecc94b'; }
-                else if (e.event === 'budget_exhausted') { icon = '💸'; color = '#ecc94b'; }
+                let color = 'var(--text-secondary)';
+                if (e.event === 'proposal') { color = '#667eea'; }
+                else if (e.event === 'sell_proposal') { color = '#ed8936'; }
+                else if (e.event === 'scan_start') { color = '#ed8936'; }
+                else if (e.event === 'scan_complete') { color = '#48bb78'; }
+                else if (e.event === 'trade_executed') { color = '#48bb78'; }
+                else if (e.event === 'trade_failed') { color = '#fc8181'; }
+                else if (e.event === 'error') { color = '#fc8181'; }
+                else if (e.event === 'scan_no_coins') { color = '#ecc94b'; }
+                else if (e.event === 'budget_exhausted') { color = '#ecc94b'; }
 
                 let detail = '';
                 if (e.symbol) detail += `<strong>${escapeHtml(e.symbol)}</strong> `;
@@ -771,7 +787,6 @@ async function loadActivityLog() {
                 if (e.error) detail += `— ${escapeHtml(truncate(e.error, 120))} `;
 
                 return `<div style="display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
-                    <span>${icon}</span>
                     <div style="flex: 1;">
                         <span style="color: ${color}; font-weight: 600;">${escapeHtml(e.event)}</span>
                         <span style="color: var(--text-secondary);"> ${detail}</span>

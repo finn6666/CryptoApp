@@ -2644,23 +2644,34 @@ body::before {
 
 /* Individual heatmap tile */
 .hm-tile {
-    border-radius: 6px;
+    border-radius: 4px;
     padding: 6px 8px;
     cursor: pointer;
-    transition: opacity 0.15s, transform 0.15s;
+    transition: background 0.4s ease, opacity 0.15s, transform 0.15s;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     overflow: hidden;
     position: relative;
-    min-width: 55px;
+    min-width: 40px;
     min-height: 55px;
 }
 
 .hm-tile:hover {
     opacity: 0.85;
-    transform: scale(1.03);
+    transform: scale(1.02);
     z-index: 2;
+}
+
+/* Micro tiles: too small to show detail */
+.hm-tile--micro .hm-tile__price,
+.hm-tile--micro .hm-tile__change,
+.hm-tile--micro .hm-tile__score {
+    display: none;
+}
+
+.hm-tile--micro .hm-tile__symbol {
+    font-size: 9px;
 }
 
 .hm-tile__symbol {
@@ -2804,6 +2815,50 @@ body::before {
 
 .sidebar-panel__body.open {
     display: block;
+}
+
+/* RL Insights panel */
+.rl-summary {
+    font-size: 11px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 10px;
+}
+
+.rl-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    margin-bottom: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.rl-insight--signal { border-left: 3px solid var(--success); }
+.rl-insight--avoid  { border-left: 3px solid var(--warning); }
+.rl-insight--pattern { border-left: 3px solid var(--accent-primary); }
+
+.rl-tag {
+    flex-shrink: 0;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-top: 1px;
+}
+
+.rl-tag--signal  { background: rgba(72, 187, 120, 0.15); color: var(--success); }
+.rl-tag--avoid   { background: rgba(252, 129, 129, 0.15); color: var(--warning); }
+.rl-tag--pattern { background: rgba(100, 130, 240, 0.12); color: var(--accent-primary); }
+
+.rl-text {
+    flex: 1;
 }
 
 /* Compact holdings list inside sidebar */

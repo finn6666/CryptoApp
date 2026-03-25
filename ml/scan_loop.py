@@ -675,9 +675,9 @@ class ScanLoop:
         )
         self._scheduler_thread.start()
         if self.scan_interval_hours > 0:
-            logger.info(f"📊 Scan scheduler started — scanning every {self.scan_interval_hours}h")
+            logger.info(f"Scan scheduler started — scanning every {self.scan_interval_hours}h")
         else:
-            logger.info(f"📊 Scan scheduler started — daily scan at {self.scan_time}")
+            logger.info(f"Scan scheduler started — daily scan at {self.scan_time}")
 
         # Start the lightweight market monitor between deep scans
         monitor_enabled = os.getenv("MONITOR_ENABLED", "true").lower() in ("1", "true", "yes")

@@ -120,8 +120,8 @@ async function loadMLStatus() {
 
         if (data.error) {
             console.error('ML Status Error:', data.error);
-            document.getElementById('mlStatusContent').innerHTML = 
-                `<div class="error">❌ ML status unavailable</div>`;
+            document.getElementById('mlStatusContent').innerHTML =
+                `<div class="error">ML status unavailable</div>`;
             return;
         }
 
@@ -132,30 +132,27 @@ async function loadMLStatus() {
         
         statusHtml += `
             <div class="ml-status-item ${isEnabled ? 'success' : 'warning'}">
-                <span class="ml-status-icon">${isEnabled ? '✅' : '⚠️'}</span>
                 <span class="ml-status-label">Status</span>
                 <span class="ml-status-value">${isEnabled ? 'Active' : 'Inactive'}</span>
             </div>
         `;
-        
+
         if (status.model_trained) {
             statusHtml += `
                 <div class="ml-status-item">
-                    <span class="ml-status-icon">📊</span>
                     <span class="ml-status-label">Training Samples</span>
                     <span class="ml-status-value">${status.training_samples || 0}</span>
                 </div>
             `;
         }
-        
+
         if (status.last_trained) {
             const trainedDate = new Date(status.last_trained);
             const now = new Date();
             const hoursSince = Math.floor((now - trainedDate) / (1000 * 60 * 60));
-            
+
             statusHtml += `
                 <div class="ml-status-item">
-                    <span class="ml-status-icon">⏰</span>
                     <span class="ml-status-label">Last Trained</span>
                     <span class="ml-status-value">${hoursSince}h ago</span>
                 </div>
@@ -167,8 +164,8 @@ async function loadMLStatus() {
         
     } catch (error) {
         console.error('Error loading ML status:', error);
-        document.getElementById('mlStatusContent').innerHTML = 
-            `<div class="error">❌ Error loading ML status</div>`;
+        document.getElementById('mlStatusContent').innerHTML =
+            `<div class="error">Error loading ML status</div>`;
     }
 }
 
@@ -177,18 +174,18 @@ async function refreshMLStatus() {
     if (!btn) return;
     
     const originalText = btn.textContent;
-    btn.textContent = '🔄 Refreshing...';
+    btn.textContent = 'Refreshing...';
     btn.disabled = true;
-    
+
     try {
         await loadMLStatus();
-        btn.textContent = '✅ Refreshed!';
+        btn.textContent = 'Refreshed!';
         setTimeout(() => {
             btn.textContent = originalText;
             btn.disabled = false;
         }, 2000);
     } catch (error) {
-        btn.textContent = '❌ Error';
+        btn.textContent = 'Error';
         setTimeout(() => {
             btn.textContent = originalText;
             btn.disabled = false;
@@ -200,10 +197,10 @@ async function trainMLModel() {
     const btn = document.getElementById('trainBtn');
     const originalText = btn.textContent;
     
-    btn.textContent = '🎯 Training...';
+    btn.textContent = 'Training...';
     btn.disabled = true;
-    
-    showStatus('🎯 Starting ML model training (this may take 30-60 seconds)...', 'info', 60000);
+
+    showStatus('Starting ML model training (this may take 30-60 seconds)...', 'info', 60000);
     
     try {
         const controller = new AbortController();
@@ -228,9 +225,9 @@ async function trainMLModel() {
         
     } catch (error) {
         if (error.name === 'AbortError') {
-            showStatus('⏱️ Training timed out. The model may still be training in the background.', 'warning', 8000);
+            showStatus('Training timed out. The model may still be training in the background.', 'warning', 8000);
         } else {
-            showStatus(`❌ Training failed: ${error.message}`, 'error', 8000);
+            showStatus(`Training failed: ${error.message}`, 'error', 8000);
         }
         console.error('Training error:', error);
     } finally {

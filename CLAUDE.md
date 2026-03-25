@@ -3,6 +3,7 @@
 ## Developer Preferences
 
 - **Package manager:** `uv` — always use `uv run`, `uv add`, `uv sync` (never pip)
+- **No emojis:** Never use emoji characters anywhere — not in JS strings, HTML templates, Python log messages, or route responses. Use plain text instead (e.g. `STOPPED` not `🛑 STOPPED`, `Auto-approving` not `🤖 Auto-approving`).
 - **Code style:** Keep the project tidy — no redundant files, dead code, or orphaned imports
 - **Git workflow:** `dev` branch for work, merge to `main` for releases. Commit + push after every completed change. Descriptive commit messages with bullet-point body.
 - **Deployment:** Raspberry Pi 4 — use `/deploy` skill or run `ssh pi "cd ~/CryptoApp && git pull && sudo systemctl restart cryptoapp"`

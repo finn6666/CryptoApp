@@ -68,7 +68,7 @@ async function loadTradingCard() {
         const subEl = document.getElementById('tradingSub');
 
         if (killSwitch) {
-            valEl.textContent = '🛑 STOPPED';
+            valEl.textContent = 'STOPPED';
             valEl.style.color = 'var(--error)';
             subEl.textContent = 'Kill switch active';
             subEl.className = 'overview-card-sub negative';

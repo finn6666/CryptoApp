@@ -13,7 +13,7 @@ async function analyzePortfolio() {
     button.disabled = true;
     button.textContent = 'Analyzing...';
     
-    content.innerHTML = '<div class="loading">🤖 AI agents analyzing portfolio opportunities...</div>';
+    content.innerHTML = '<div class="loading">AI agents analyzing portfolio opportunities...</div>';
     
     try {
         const response = await fetch('/api/portfolio/analyze?max_coins=15');
@@ -30,7 +30,7 @@ async function analyzePortfolio() {
         
         // Render portfolio analysis
         content.innerHTML = generatePortfolioHTML(data);
-        button.textContent = '📊 Portfolio Analysis';
+        button.textContent = 'Portfolio Analysis';
         button.disabled = false;
         
         showStatus('Portfolio analysis complete!', 'success');
@@ -38,7 +38,7 @@ async function analyzePortfolio() {
     } catch (error) {
         console.error('Portfolio analysis error:', error);
         content.innerHTML = `<div class="error">Analysis failed</div>`;
-        button.textContent = '📊 Portfolio Analysis';
+        button.textContent = 'Portfolio Analysis';
         button.disabled = false;
         showStatus('Portfolio analysis failed', 'error');
     }
@@ -87,7 +87,7 @@ function generatePortfolioHTML(data) {
     if (data.top_opportunities && data.top_opportunities.length > 0) {
         html += `
             <div class="portfolio-section">
-                <h3>🌟 Top Opportunities</h3>
+                <h3>Top Opportunities</h3>
                 <div class="opportunities-grid">
                     ${data.top_opportunities.map(opp => `
                         <div class="opportunity-card">
@@ -109,7 +109,7 @@ function generatePortfolioHTML(data) {
     if (data.allocation_strategy && Object.keys(data.allocation_strategy).length > 0) {
         html += `
             <div class="portfolio-section">
-                <h3>💼 Suggested Allocation</h3>
+                <h3>Suggested Allocation</h3>
                 <div class="allocation-chart">
                     ${Object.entries(data.allocation_strategy).map(([symbol, pct]) => `
                         <div class="allocation-item">
@@ -131,10 +131,10 @@ function generatePortfolioHTML(data) {
     if (data.risk_warnings && data.risk_warnings.length > 0) {
         html += `
             <div class="portfolio-section">
-                <h3>📋 Market Notes</h3>
+                <h3>Market Notes</h3>
                 <div class="market-notes">
                     ${data.risk_warnings.map(warning => `
-                        <div class="market-note">📌 ${escapeHtml(warning)}</div>
+                        <div class="market-note">${escapeHtml(warning)}</div>
                     `).join('')}
                 </div>
             </div>
@@ -145,7 +145,7 @@ function generatePortfolioHTML(data) {
     if (recs.buy && recs.buy.length > 0) {
         html += `
             <div class="portfolio-section">
-                <h3>✅ BUY Recommendations (${recs.buy.length})</h3>
+                <h3>BUY Recommendations (${recs.buy.length})</h3>
                 <div class="recs-list">
                     ${recs.buy.slice(0, 5).map(rec => `
                         <div class="rec-item buy">
@@ -174,7 +174,7 @@ function generatePortfolioHTML(data) {
         html += `
             <div class="portfolio-section">
                 <h3 style="cursor: pointer;" onclick="togglePortfolioSection('hold')">
-                    ⏸️ HOLD Recommendations (${recs.hold.length}) <span id="hold-arrow">▼</span>
+                    HOLD Recommendations (${recs.hold.length}) <span id="hold-arrow">▼</span>
                 </h3>
                 <div id="hold-section" class="recs-list" style="display: none;">
                     ${recs.hold.slice(0, 5).map(rec => `

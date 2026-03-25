@@ -113,7 +113,7 @@ class TradingEngine:
         # Email config (from env)
         self.email_to = os.getenv("TRADE_NOTIFICATION_EMAIL", "")
         if not self.email_to:
-            logger.warning("⚠️  TRADE_NOTIFICATION_EMAIL not set — trade approval emails will not be sent")
+            logger.warning("TRADE_NOTIFICATION_EMAIL not set — trade approval emails will not be sent")
         self.smtp_user = os.getenv("SMTP_USER", "")
         self.smtp_password = os.getenv("SMTP_PASSWORD", "")  # Gmail app password
         self.smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -124,16 +124,16 @@ class TradingEngine:
             "BUY_AUTO_APPROVE", "true"
         ).lower() in ("1", "true", "yes")
         if self.buy_auto_approve:
-            logger.info("🤖 Buy-side: auto-approve ENABLED — buys within budget execute immediately")
+            logger.info("Buy-side: auto-approve ENABLED — buys within budget execute immediately")
 
         # Sell-side control
         self.sell_require_approval = os.getenv(
             "SELL_REQUIRE_APPROVAL", "false"
         ).lower() in ("1", "true", "yes")
         if self.sell_require_approval:
-            logger.info("🔒 Sell-side: manual approval REQUIRED for ALL sells")
+            logger.info("Sell-side: manual approval REQUIRED for ALL sells")
         else:
-            logger.info("🤖 Sell-side: auto-approve ENABLED for all sells")
+            logger.info("Sell-side: auto-approve ENABLED for all sells")
 
         # Manual approval threshold: trades above this amount always require approval
         self.approval_threshold_gbp = float(os.getenv("APPROVAL_THRESHOLD_GBP", "50.0"))
@@ -433,7 +433,7 @@ class TradingEngine:
         # Auto-approve: execute immediately
         side_label = "SELL" if is_sell else "BUY"
         logger.info(
-            f"🤖 Auto-approving {side_label} {symbol} £{amount_gbp:.4f} "
+            f"Auto-approving {side_label} {symbol} £{amount_gbp:.4f} "
             f"(confidence {confidence}%)"
         )
         exec_result = self.approve_trade(proposal_id)

@@ -185,13 +185,13 @@ function _renderHeatmap(coins, holdingsMap) {
     const totalScore = rowTotals.reduce((a, b) => a + b, 0) || 1;
 
     // Switch grid to column layout so rows stack and fill the height
-    grid.style.cssText = 'display:flex; flex-direction:column; height:100%; gap:4px; overflow:hidden;';
+    grid.style.cssText = 'display:flex; flex-direction:column; height:100%; gap:2px; overflow:hidden;';
     grid.innerHTML = '';
 
     rows.forEach((row, ri) => {
         const rowEl = document.createElement('div');
         // flex value proportional to row's total score so taller rows get more height
-        rowEl.style.cssText = `display:flex; flex:${rowTotals[ri] / totalScore * rows.length}; gap:4px; min-height:55px;`;
+        rowEl.style.cssText = `display:flex; flex:${rowTotals[ri] / totalScore * rows.length}; gap:2px; min-height:55px;`;
 
         row.forEach(coin => {
             const held = holdingsMap[coin.symbol];
@@ -204,12 +204,12 @@ function _renderHeatmap(coins, holdingsMap) {
 
             const displayStr  = pct >= 0 ? `+${pct.toFixed(1)}%` : `${pct.toFixed(1)}%`;
             const displayColor = _changeColour(pct);
-            const scoreLabel  = (held && held.unrealised_pnl_pct !== undefined) ? 'PnL' : String(coin.gem_score);
+            const scoreLabel  = String(coin.gem_score);
             const priceStr    = (held && held.current_price) ? _fmtPrice(held.current_price) : _fmtPrice(coin.price);
             const symbolText  = held ? `&#9679; ${escapeHtml(coin.symbol)}` : escapeHtml(coin.symbol);
 
             const tile = document.createElement('div');
-            tile.className = 'hm-tile';
+            tile.className = 'hm-tile' + (coin.gem_score < 2 ? ' hm-tile--micro' : '');
             // flex: gem_score makes tile width proportional within the row
             tile.style.cssText = [
                 `background:${bgColour}`,

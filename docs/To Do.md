@@ -1,10 +1,10 @@
 ## Notes
 
 ### Frontend / UI  (`src/web/**`)
-- Want heatmap to be based on holdings P&L rather than gem score — colour-code by price movement, gem score on the tile only
-- Don't really like the look of RL insights on the page; want it to be more useful and look better — open to ideas
-- Want the dashboard to look as fluid as the Finviz heatmap
-- No emojis — remove all existing emojis from frontend templates, JS strings, and Python log messages. Add a section in docs/CLAUDE.md to ensure agents don't add any in future.
+- ~~Want heatmap to be based on holdings P&L rather than gem score — colour-code by price movement, gem score on the tile only~~ Done
+- ~~Don't really like the look of RL insights on the page; want it to be more useful and look better — open to ideas~~ Done — categorised SIGNAL/AVOID/PATTERN tags, ordered by type
+- ~~Want the dashboard to look as fluid as the Finviz heatmap~~ Done — tighter gaps, background transition, micro-tile text hiding, smaller border-radius
+- ~~No emojis — remove all existing emojis from frontend templates, JS strings, and Python log messages. Add a section in docs/CLAUDE.md to ensure agents don't add any in future.~~ Done
 
 ### Backend / Trading (`ml/trading_engine.py`, `ml/sell_automation.py`, `ml/agents/**`)
 - Check the sell logic — review sell_automation.py and the sell agent to make sure exit triggers are correct

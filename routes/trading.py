@@ -128,7 +128,7 @@ def confirm_trade(token):
     # ── GET: show confirmation page ───────────────────────────
     if request.method == 'GET':
         action_colour = '#38a169' if action == 'approve' else '#e53e3e'
-        action_label = '✅ CONFIRM APPROVE' if action == 'approve' else '❌ CONFIRM REJECT'
+        action_label = 'CONFIRM APPROVE' if action == 'approve' else 'CONFIRM REJECT'
         action_desc = ('Approve and execute this trade' if action == 'approve'
                        else 'Reject this trade — no money will be spent')
 
@@ -139,7 +139,6 @@ def confirm_trade(token):
             <div style="background: #151520; padding: 40px; border-radius: 16px; border: 1px solid #2d3748;
                         max-width: 420px; width: 100%;">
                 <h2 style="margin: 0 0 20px; color: #e2e8f0; font-size: 18px;">
-                    {'🟢' if proposal['side'] == 'buy' else '🔴'}
                     {proposal['side'].upper()} {proposal['symbol']}
                 </h2>
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -179,7 +178,6 @@ def confirm_trade(token):
                              display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
                     <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                                 border: 1px solid #2d3748; max-width: 400px;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
                         <h2 style="margin: 0 0 8px; color: #48bb78;">Trade Approved &amp; Executed</h2>
                         <p style="color: #a0aec0; margin: 0 0 16px;">
                             {result.get('side', '').upper()} {result.get('quantity', 0):.6f} {result.get('symbol', '')}
@@ -204,7 +202,6 @@ def confirm_trade(token):
                          display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
                 <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                             border: 1px solid #2d3748; max-width: 400px;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
                     <h2 style="margin: 0 0 8px; color: #fc8181;">Trade Rejected</h2>
                     <p style="color: #a0aec0;">No money was spent.</p>
                     <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px;
@@ -227,7 +224,6 @@ def _error_page(title: str, message: str) -> str:
                  display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
         <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                     border: 1px solid #2d3748; max-width: 400px;">
-            <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
             <h2 style="margin: 0 0 8px; color: #ecc94b;">{title}</h2>
             <p style="color: #a0aec0;">{message}</p>
             <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px;
