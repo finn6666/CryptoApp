@@ -55,6 +55,9 @@ class ScanLoop:
         self._last_scan_time: Optional[datetime] = None
         self._scheduler_started_at: Optional[datetime] = None
 
+        # Cost control: reuse a cached SKIP result if it's this fresh (0 = always re-analyse)
+        self.analysis_reuse_hours = float(os.getenv("SCAN_ANALYSIS_REUSE_HOURS", "5"))
+
         SCAN_LOGS_DIR.mkdir(parents=True, exist_ok=True)
         AUDIT_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 
@@ -422,6 +425,25 @@ class ScanLoop:
         symbol = coin_data["symbol"]
         engine = get_trading_engine()
 
+        # Cost control: skip re-analysis if we have a recent SKIP result cached
+        if self.analysis_reuse_hours > 0:
+            cached = state.get_cached_analysis(symbol)
+            if cached:
+                cached_at = cached.get("_cached_at", 0)
+                age_hours = (time.time() - cached_at) / 3600
+                if age_hours <= self.analysis_reuse_hours:
+                    prev_decision = cached.get("analysis", {}).get("trade_decision", {})
+                    if not prev_decision.get("should_trade", False):
+                        logger.info(
+                            f"[Scan] {symbol}: cached SKIP ({age_hours:.1f}h old) — "
+                            f"skipping API call (set SCAN_ANALYSIS_REUSE_HOURS=0 to disable)"
+                        )
+                        return {
+                            "outcome": "skipped",
+                            "proposed": False,
+                            "reason": f"Recent analysis ({age_hours:.1f}h ago) found no trade — reusing result",
+                        }
+
         # Check budget before spending API credits
         if engine.is_budget_exhausted():
             return {"outcome": "skipped", "reason": "Daily budget exhausted", "proposed": False}
@@ -548,17 +570,25 @@ class ScanLoop:
                 if remaining < engine.min_useful_budget_gbp:
                     return {"outcome": "skipped", "proposed": False, "reason": "Daily budget exhausted"}
 
-                # Check exchange minimum before wasting an API proposal
+                # Check exchange minimum before wasting an API proposal.
+                # Compare against remaining budget (not max_trade_pct cap) because
+                # propose_trade already has bump-to-minimum logic that can exceed the
+                # per-trade % cap when the exchange floor requires it.
                 min_order = engine._get_min_order_gbp(symbol)
-                max_trade = min(remaining, engine.daily_budget_gbp * engine.max_trade_pct)
-                if min_order > 0 and min_order > max_trade:
+                if min_order > 0 and min_order > remaining:
                     return {
                         "outcome": "skipped", "proposed": False,
-                        "reason": f"Exchange minimum £{min_order:.2f} exceeds max trade £{max_trade:.2f}",
+                        "reason": f"Exchange minimum £{min_order:.2f} exceeds remaining budget £{remaining:.2f}",
                     }
 
-                amount = remaining * (allocation_pct / 100)
+                from ml.trading_engine import compute_allocation_pct
+                sized_pct = compute_allocation_pct(conviction, allocation_pct, coin_data)
+                amount = remaining * (sized_pct / 100)
                 amount = min(amount, remaining)
+                logger.info(
+                    f"[Scan] {symbol}: conviction={conviction}, agent_alloc={allocation_pct:.0f}%, "
+                    f"computed_alloc={sized_pct:.1f}%, amount=£{amount:.2f}"
+                )
 
                 # Use auto-execute for scheduled scans so trades don't
                 # sit waiting for manual approval overnight.
@@ -645,9 +675,9 @@ class ScanLoop:
         )
         self._scheduler_thread.start()
         if self.scan_interval_hours > 0:
-            logger.info(f"📊 Scan scheduler started — scanning every {self.scan_interval_hours}h")
+            logger.info(f"Scan scheduler started — scanning every {self.scan_interval_hours}h")
         else:
-            logger.info(f"📊 Scan scheduler started — daily scan at {self.scan_time}")
+            logger.info(f"Scan scheduler started — daily scan at {self.scan_time}")
 
         # Start the lightweight market monitor between deep scans
         monitor_enabled = os.getenv("MONITOR_ENABLED", "true").lower() in ("1", "true", "yes")

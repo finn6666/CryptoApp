@@ -3,25 +3,27 @@
 
 // ─── Live Trading Functions ──────────────────────────
 
-async function loadTradingStatus() {
+async function loadTradingStatus(data = null) {
     try {
-        const response = await fetch('/api/trades/status', { headers: authHeaders() });
-        const data = await response.json();
+        if (!data) {
+            const response = await fetch('/api/trades/status', { headers: authHeaders() });
+            data = await response.json();
+        }
 
         document.getElementById('budgetRemaining').textContent = `£${data.remaining_today_gbp.toFixed(2)}`;
         document.getElementById('tradesToday').textContent = data.trades_today || 0;
 
         const statusEl = document.getElementById('tradingStatus');
         if (!data.active) {
-            statusEl.textContent = '⛔ HALTED';
+            statusEl.textContent = 'HALTED';
             statusEl.style.background = 'rgba(245,101,101,0.2)';
             statusEl.style.color = '#fc8181';
-            document.getElementById('killSwitchBtn').textContent = '▶️ Resume';
+            document.getElementById('killSwitchBtn').textContent = 'Resume';
         } else {
-            statusEl.textContent = '🟢 ACTIVE';
+            statusEl.textContent = 'ACTIVE';
             statusEl.style.background = 'rgba(72,187,120,0.2)';
             statusEl.style.color = '#48bb78';
-            document.getElementById('killSwitchBtn').textContent = '🛑 Kill Switch';
+            document.getElementById('killSwitchBtn').textContent = 'Kill Switch';
         }
 
         const configWarning = document.getElementById('configWarning');
@@ -30,7 +32,7 @@ async function loadTradingStatus() {
             let warnings = [];
             if (!data.exchange_configured) warnings.push('Kraken API keys');
             if (!data.email_configured) warnings.push('Gmail SMTP credentials');
-            configWarning.innerHTML = `⚠️ <strong>Setup required:</strong> Add ${warnings.join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
+            configWarning.innerHTML = `<strong>Setup required:</strong> Add ${warnings.map(escapeHtml).join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
         } else {
             configWarning.style.display = 'none';
         }
@@ -39,10 +41,15 @@ async function loadTradingStatus() {
     }
 }
 
-async function loadPendingProposals() {
+async function loadPendingProposals(prefetchedProposals = null) {
     try {
-        const response = await fetch('/api/trades/pending', { headers: authHeaders() });
-        const data = await response.json();
+        let data;
+        if (prefetchedProposals !== null) {
+            data = { proposals: prefetchedProposals };
+        } else {
+            const response = await fetch('/api/trades/pending', { headers: authHeaders() });
+            data = await response.json();
+        }
         const section = document.getElementById('pendingSection');
         const container = document.getElementById('pendingProposals');
 
@@ -50,18 +57,18 @@ async function loadPendingProposals() {
             section.style.display = 'block';
             container.innerHTML = data.proposals.map(p => {
                 const sideColor = p.side === 'buy' ? '#48bb78' : '#fc8181';
-                const sideIcon = p.side === 'buy' ? '🟢' : '🔴';
                 const created = new Date(p.created_at).toLocaleString();
                 return `
-                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${sideColor}; border-radius: 8px; padding: 14px; margin-bottom: 10px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${sideColor}; border-radius: 8px; padding: 10px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                             <div>
-                                <span style="font-weight: 700; font-size: 15px;">${sideIcon} ${escapeHtml(p.side.toUpperCase())} ${escapeHtml(p.symbol)}</span>
-                                <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">£${Number(p.amount_gbp).toFixed(2)}</span>
+                                <span style="font-weight: 700; font-size: 13px; color: ${sideColor};">${escapeHtml(p.side.toUpperCase())}</span>
+                                <span style="font-weight: 700; font-size: 13px; margin-left: 4px;">${escapeHtml(p.symbol)}</span>
+                                <span style="color: var(--text-secondary); font-size: 11px; margin-left: 6px;">£${Number(p.amount_gbp).toFixed(2)}</span>
                             </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button onclick="approveTrade('${escapeHtml(p.id)}')" style="padding: 6px 14px; background: linear-gradient(135deg, #38a169, #48bb78); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">✅ Approve</button>
-                                <button onclick="rejectTrade('${escapeHtml(p.id)}')" style="padding: 6px 14px; background: linear-gradient(135deg, #e53e3e, #fc8181); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;">❌ Reject</button>
+                            <div style="display: flex; gap: 4px;">
+                                <button onclick="approveTrade('${escapeHtml(p.id)}')" style="padding: 4px 10px; background: #38a169; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 11px;">Approve</button>
+                                <button onclick="rejectTrade('${escapeHtml(p.id)}')" style="padding: 4px 10px; background: #e53e3e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 11px;">Reject</button>
                             </div>
                         </div>
                         <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">
@@ -81,7 +88,12 @@ async function loadPendingProposals() {
 
 function formatPrice(price) {
     if (price === null || price === undefined || price === 0) return '—';
-    return `£${Number(price).toFixed(6)}`;
+    const n = Number(price);
+    if (n >= 100)          return `£${n.toFixed(2)}`;
+    if (n >= 0.01)         return `£${n.toFixed(4)}`;
+    if (n >= 0.000001)     return `£${n.toFixed(6)}`;
+    const decimals = -Math.floor(Math.log10(n)) + 2;
+    return `£${n.toFixed(Math.min(decimals, 12))}`;
 }
 
 // Smart GBP formatter — uses extra decimal places for sub-penny values
@@ -178,15 +190,13 @@ async function loadExecutedTrades() {
             container.innerHTML = displayTrades.map(t => {
                 const isBuy = t.side === 'buy';
                 const sideColor = isBuy ? '#48bb78' : '#fc8181';
-                const sideIcon = isBuy ? '🟢' : '🔴';
                 const time = new Date(t.timestamp).toLocaleString();
                 const priceDisplay = (t.price && t.price > 0) ? `£${Number(t.price).toFixed(6)}` : '—';
                 const pnlStr = t.realised_pnl_gbp !== undefined && t.realised_pnl_gbp !== null
                     ? ` • P&L: ${t.realised_pnl_gbp >= 0 ? '+' : ''}£${t.realised_pnl_gbp.toFixed(2)}`
                     : '';
                 return `
-                    <div style="display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
-                        <span>${sideIcon}</span>
+                    <div style="display: flex; gap: 8px; align-items: flex-start; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 12px;">
                         <div style="flex: 1;">
                             <span style="font-weight: 700;">${escapeHtml(t.symbol)}</span>
                             <span style="color: ${sideColor}; font-weight: 600; margin-left: 6px;">${escapeHtml(t.side.toUpperCase())}</span>
@@ -217,9 +227,9 @@ async function approveTrade(proposalId) {
         });
         const data = await response.json();
         if (data.success) {
-            showTradeAlert(`✅ Trade approved — ${data.side?.toUpperCase()} ${data.symbol}`, 'success');
+            showTradeAlert(`Trade approved — ${data.side?.toUpperCase()} ${data.symbol}`, 'success');
         } else {
-            showTradeAlert(`⚠️ ${data.error || 'Could not approve'}`, 'error');
+            showTradeAlert(data.error || 'Could not approve', 'error');
         }
         setTimeout(() => {
             loadPendingProposals();
@@ -243,7 +253,7 @@ async function rejectTrade(proposalId) {
         if (data.success) {
             showTradeAlert('Trade rejected', 'success');
         } else {
-            showTradeAlert(`⚠️ ${data.error || 'Could not reject'}`, 'error');
+            showTradeAlert(data.error || 'Could not reject', 'error');
         }
         loadPendingProposals();
     } catch (e) {
@@ -256,7 +266,7 @@ async function toggleKillSwitch() {
     const isHalted = btn.textContent.includes('Resume');
     const action = isHalted ? 'deactivate' : 'activate';
 
-    if (!isHalted && !confirm('⛔ This will HALT all trading and reject pending proposals. Continue?')) return;
+    if (!isHalted && !confirm('This will HALT all trading and reject pending proposals. Continue?')) return;
 
     try {
         await fetch('/api/trades/kill-switch', {
@@ -274,23 +284,22 @@ async function toggleKillSwitch() {
 
 // ─── Scan Functions ───────────────────────────────────
 
-async function loadScanStatusDetail() {
+async function loadScanStatusDetail(prefetchedData = null) {
     try {
-        const response = await fetch('/api/trades/scan-status', { headers: authHeaders() });
-        const data = await response.json();
+        const data = prefetchedData || await fetch('/api/trades/scan-status', { headers: authHeaders() }).then(r => r.json());
         const status = data.status || {};
 
         const statusEl = document.getElementById('scanStatusDetail');
         if (status.scan_running) {
-            statusEl.textContent = '⏳ Running';
+            statusEl.textContent = 'Running';
             statusEl.style.background = 'rgba(237,137,54,0.2)';
             statusEl.style.color = '#ed8936';
         } else if (status.scheduler_active) {
-            statusEl.textContent = '🟢 Scheduled';
+            statusEl.textContent = 'Scheduled';
             statusEl.style.background = 'rgba(72,187,120,0.2)';
             statusEl.style.color = '#48bb78';
         } else {
-            statusEl.textContent = '⚪ Off';
+            statusEl.textContent = 'Off';
             statusEl.style.background = 'rgba(255,255,255,0.05)';
             statusEl.style.color = 'var(--text-secondary)';
         }
@@ -329,7 +338,7 @@ async function loadScanStatusDetail() {
 async function triggerScan() {
     const btn = document.getElementById('scanNowBtn');
     btn.disabled = true;
-    btn.textContent = '⏳ Scanning...';
+    btn.textContent = 'Scanning...';
     const resultEl = document.getElementById('scanResultMsg');
 
     try {
@@ -343,42 +352,47 @@ async function triggerScan() {
         if (data.success) {
             resultEl.style.borderColor = 'var(--success)';
             resultEl.style.background = 'rgba(72,187,120,0.1)';
-            resultEl.innerHTML = `✅ Scan complete — <strong>${Number(data.coins_analysed)}</strong> coins analysed, <strong>${Number(data.proposals_made)}</strong> proposals made, <strong>${Number(data.errors?.length || 0)}</strong> errors`;
+            resultEl.innerHTML = `Scan complete — <strong>${Number(data.coins_analysed)}</strong> coins, <strong>${Number(data.proposals_made)}</strong> proposals, <strong>${Number(data.errors?.length || 0)}</strong> errors`;
         } else {
             resultEl.style.borderColor = 'var(--error)';
             resultEl.style.background = 'rgba(245,101,101,0.1)';
-            resultEl.innerHTML = `⚠️ ${escapeHtml(data.error || 'Scan failed')}`;
+            resultEl.innerHTML = escapeHtml(data.error || 'Scan failed');
         }
 
         loadScanStatusDetail();
         loadPendingProposals();
     } catch (e) {
         resultEl.style.display = 'block';
-        resultEl.innerHTML = `❌ Network error`;
+        resultEl.innerHTML = 'Network error';
     } finally {
         btn.disabled = false;
-        btn.textContent = '🔍 Scan Now';
+        btn.textContent = 'Scan Now';
     }
 }
 
 // ─── Portfolio Functions ──────────────────────────────
 
-async function refreshTradesPortfolio() {
-    const btn = document.getElementById('portfolioRefreshBtn');
-    const origText = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = '⏳ Refreshing...';
+async function refreshTradesPortfolio(callerBtn) {
+    // callerBtn may be passed directly or found by ID (trades.html has the id)
+    const btn = callerBtn || document.getElementById('portfolioRefreshBtn');
+    const origText = btn ? btn.textContent : null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Refreshing...'; }
     try {
         await loadTradesPortfolio();
-        btn.textContent = '✅ Updated';
-        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+        if (btn) {
+            btn.textContent = 'Updated';
+            setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+        }
     } catch (e) {
-        btn.textContent = '❌ Error';
-        setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+        if (btn) {
+            btn.textContent = 'Error';
+            setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 2000);
+        }
     }
 }
 
 async function loadTradesPortfolio() {
+    if (!document.getElementById('holdingsList')) return; // Holdings panel not present on this page
     try {
         const response = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
         const data = await response.json();
@@ -591,20 +605,38 @@ async function loadRlInsights() {
         const insights = data.insights || [];
         const container = document.getElementById('rlInsights');
 
-        if (insights.length > 0) {
-            container.innerHTML = insights.map(text => {
-                const lower = text.toLowerCase();
-                let accent = 'var(--accent-primary)';
-                if (/loss|losses|underperform|red|worst|penalty|avoid|mistake/.test(lower)) {
-                    accent = 'var(--warning)';
-                } else if (/winner|winning|wins|promis|nice|lean toward|worked/.test(lower)) {
-                    accent = 'var(--success)';
-                }
-                return `<div style="background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-left: 3px solid ${accent}; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px; font-size: 13px; color: var(--text-primary); line-height: 1.6;">${escapeHtml(text)}</div>`;
-            }).join('');
-        } else {
-            container.innerHTML = '<p style="color: var(--text-secondary); font-size: 13px; padding: 12px 0;">Nothing to report yet.</p>';
+        if (insights.length === 0) {
+            container.innerHTML = '<p class="empty-state">No patterns yet — insights appear after trades complete.</p>';
+            return;
         }
+
+        // Categorise each insight so we can sort and label them
+        const categorised = insights.map(text => {
+            const lower = text.toLowerCase();
+            if (/loss|losses|underperform|worst|penalty|avoid|mistake/.test(lower)) {
+                return { text, type: 'avoid',   tag: 'AVOID'   };
+            } else if (/winner|winning|wins|promis|lean toward|worked|profit/.test(lower)) {
+                return { text, type: 'signal',  tag: 'SIGNAL'  };
+            }
+            return { text, type: 'pattern', tag: 'PATTERN' };
+        });
+
+        // Signals first, then avoids, then patterns
+        const ordered = [
+            ...categorised.filter(i => i.type === 'signal'),
+            ...categorised.filter(i => i.type === 'avoid'),
+            ...categorised.filter(i => i.type === 'pattern'),
+        ];
+
+        container.innerHTML = `
+            <div class="rl-summary">${insights.length} insight${insights.length !== 1 ? 's' : ''} from recent trades</div>
+            ${ordered.map(({ text, type, tag }) => `
+                <div class="rl-insight rl-insight--${type}">
+                    <span class="rl-tag rl-tag--${type}">${tag}</span>
+                    <span class="rl-text">${escapeHtml(text)}</span>
+                </div>
+            `).join('')}
+        `;
     } catch (e) {
         console.error('Error loading RL insights:', e);
     }
@@ -623,13 +655,12 @@ async function loadClosedPositions() {
             container.innerHTML = positions.map(p => {
                 const won = p.won;
                 const pnlColor = won ? '#48bb78' : '#fc8181';
-                const icon = won ? '✅' : '❌';
                 const closedDate = p.closed_at ? new Date(p.closed_at).toLocaleDateString() : '—';
                 return `
                     <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-left: 3px solid ${pnlColor}; border-radius: 8px; padding: 14px; margin-bottom: 8px;">
                         <div style="display: flex; justify-content: space-between; align-items: center;">
                             <div>
-                                <span style="font-weight: 700; font-size: 15px;">${icon} ${escapeHtml(p.symbol)}</span>
+                                <span style="font-weight: 700; font-size: 15px;">${escapeHtml(p.symbol)}</span>
                                 <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">${p.trades} trades</span>
                             </div>
                             <div style="text-align: right;">
@@ -728,28 +759,32 @@ async function loadMonthlyReview() {
     }
 }
 
-async function loadActivityLog() {
+async function loadActivityLog(prefetchedData = null) {
     try {
-        const response = await fetch('/api/trades/audit-trail?limit=20', { headers: authHeaders() });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
+        let data;
+        if (prefetchedData !== null) {
+            data = prefetchedData;
+        } else {
+            const response = await fetch('/api/trades/audit-trail?limit=20', { headers: authHeaders() });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            data = await response.json();
+        }
         const entries = data.entries || [];
         const container = document.getElementById('activityLog');
 
         if (entries.length > 0) {
             container.innerHTML = entries.map(e => {
                 const time = new Date(e.timestamp).toLocaleString();
-                let icon = '📋', color = 'var(--text-secondary)';
-                if (e.event === 'proposal') { icon = '📨'; color = '#667eea'; }
-                else if (e.event === 'sell_proposal') { icon = '📤'; color = '#ed8936'; }
-                else if (e.event === 'skip') { icon = '⏭️'; color = 'var(--text-secondary)'; }
-                else if (e.event === 'scan_start') { icon = '🔍'; color = '#ed8936'; }
-                else if (e.event === 'scan_complete') { icon = '✅'; color = '#48bb78'; }
-                else if (e.event === 'trade_executed') { icon = '💰'; color = '#48bb78'; }
-                else if (e.event === 'trade_failed') { icon = '⚠️'; color = '#fc8181'; }
-                else if (e.event === 'error') { icon = '❌'; color = '#fc8181'; }
-                else if (e.event === 'scan_no_coins') { icon = '⚠️'; color = '#ecc94b'; }
-                else if (e.event === 'budget_exhausted') { icon = '💸'; color = '#ecc94b'; }
+                let color = 'var(--text-secondary)';
+                if (e.event === 'proposal') { color = '#667eea'; }
+                else if (e.event === 'sell_proposal') { color = '#ed8936'; }
+                else if (e.event === 'scan_start') { color = '#ed8936'; }
+                else if (e.event === 'scan_complete') { color = '#48bb78'; }
+                else if (e.event === 'trade_executed') { color = '#48bb78'; }
+                else if (e.event === 'trade_failed') { color = '#fc8181'; }
+                else if (e.event === 'error') { color = '#fc8181'; }
+                else if (e.event === 'scan_no_coins') { color = '#ecc94b'; }
+                else if (e.event === 'budget_exhausted') { color = '#ecc94b'; }
 
                 let detail = '';
                 if (e.symbol) detail += `<strong>${escapeHtml(e.symbol)}</strong> `;
@@ -763,7 +798,6 @@ async function loadActivityLog() {
                 if (e.error) detail += `— ${escapeHtml(truncate(e.error, 120))} `;
 
                 return `<div style="display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 13px;">
-                    <span>${icon}</span>
                     <div style="flex: 1;">
                         <span style="color: ${color}; font-weight: 600;">${escapeHtml(e.event)}</span>
                         <span style="color: var(--text-secondary);"> ${detail}</span>
@@ -826,11 +860,8 @@ function initTradingSections() {
     loadMonthlyReview();
     loadActivityLog();
 
-    // Periodic refresh
-    setInterval(loadPendingProposals, 30000);
-    setInterval(loadTradingStatus, 30000);
-    setInterval(loadScanStatusDetail, 60000);
-    setInterval(loadTradesPortfolio, 60000);
-    setInterval(loadMarketState, 600000);
-    setInterval(loadActivityLog, 30000);
+    // Periodic refresh — most sidebar sections are driven by SSE (startDashboardSSE).
+    // Only keep timers for data not included in the SSE bundle.
+    setInterval(loadTradesPortfolio, 120000);  // live P&L — needs exchange prices, 2 min
+    setInterval(loadMarketState, 600000);       // market state — low cadence, keep as-is
 }

@@ -172,6 +172,9 @@ class QLearningTrader:
         self.epsilon_decay = epsilon_decay if epsilon_decay is not None else float(
             os.environ.get("QL_EPSILON_DECAY", "0.995")
         )
+        # Minimum visits a state needs before Q-learning can block/adjust trades.
+        # Prevents one bad trade from poisoning an entire state class.
+        self.min_visits_to_act = int(os.environ.get("QL_MIN_VISITS", "5"))
 
         # Q-table: state → {action → value}
         self.q_table: Dict[str, Dict[str, float]] = defaultdict(
@@ -293,8 +296,8 @@ class QLearningTrader:
         q_skip = self.q_table[state]["skip"]
         visits = self.visit_counts[state]["buy"]
 
-        # No opinion yet — don't adjust
-        if visits == 0:
+        # Not enough data — don't adjust until we have min_visits_to_act observations
+        if visits < self.min_visits_to_act:
             return 0
 
         # Difference between buy and skip Q-values
@@ -326,8 +329,9 @@ class QLearningTrader:
             self._symbol_state_cache[symbol] = state
 
         visits = sum(self.visit_counts[state].values())
-        # No data on this state yet — don't block the trade
-        if visits == 0:
+        # Need at least min_visits_to_act observations before blocking trades.
+        # Prevents a single bad trade from locking out an entire state class.
+        if visits < self.min_visits_to_act * 2:  # *2 because buy+skip are both updated
             return False, ""
 
         action = self.get_action(state)
@@ -533,7 +537,11 @@ class QLearningTrader:
             self.loss_memory = {k: min(v, 5) for k, v in raw_loss.items()}
 
             self._symbol_state_cache = data.get("symbol_state_cache", {})
-            self.epsilon = data.get("epsilon", self.epsilon)
+            loaded_eps = data.get("epsilon", self.epsilon)
+            # QL_EPSILON_FLOOR: minimum exploration rate to restore on load.
+            # Set this env var (e.g. 0.2) to re-open exploration after a losing streak.
+            eps_floor = float(os.environ.get("QL_EPSILON_FLOOR", "0.0"))
+            self.epsilon = max(loaded_eps, eps_floor)
             self.episodes = data.get("episodes", 0)
             self.closed_trades = data.get("closed_trades", self.episodes // 2)
 

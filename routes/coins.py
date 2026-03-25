@@ -123,15 +123,15 @@ def get_market_conditions():
         score = max(0, min(100, score))
 
         if score >= 75:
-            lvl, msg = 'EXCELLENT', '🟢 Excellent Opportunity - Strong market conditions'
+            lvl, msg = 'EXCELLENT', 'Excellent Opportunity - Strong market conditions'
         elif score >= 60:
-            lvl, msg = 'GOOD', '🟢 Good Opportunity - Favorable conditions'
+            lvl, msg = 'GOOD', 'Good Opportunity - Favorable conditions'
         elif score >= 40:
-            lvl, msg = 'MODERATE', '🟡 Moderate Opportunity - Standard conditions'
+            lvl, msg = 'MODERATE', 'Moderate Opportunity - Standard conditions'
         elif score >= 25:
-            lvl, msg = 'LIMITED', '⚪ Limited Opportunity - Quiet market'
+            lvl, msg = 'LIMITED', 'Limited Opportunity - Quiet market'
         else:
-            lvl, msg = 'LOW', '⚪ Low Opportunity - Waiting for movement'
+            lvl, msg = 'LOW', 'Low Opportunity - Waiting for movement'
 
         return jsonify({
             'opportunity_level': lvl, 'opportunity_score': int(score), 'opportunity_percentage': int(score),

@@ -30,14 +30,16 @@ propose_and_auto_execute(symbol, side, amount, price, reason, confidence)
 
 ## SellAutomation Exit Triggers
 
-| Trigger | Default | Min Hold |
-|---------|---------|----------|
-| Stop-loss | -20% | None (fires immediately) |
-| Profit target | +50% | 48h |
-| Trailing stop | -20% from peak | 48h |
-| Agent re-analysis | variable | `SELL_RECHECK_HOURS` (24h) |
+| Trigger | Setting | Notes |
+|---------|---------|-------|
+| Stop-loss | -80% | Intentionally loose — emergency floor only, not a normal exit |
+| Trailing stop | -45% from peak | Very wide — won't fire on normal volatility |
+| Profit target | 9999% (disabled) | Agents decide when to take profit via re-checks |
+| Agent re-analysis | variable | Primary sell mechanism — `SELL_RECHECK_HOURS` (24h) |
 
-Sells **always** require email approval regardless of `BUY_AUTO_APPROVE`.
+**Strategy:** Stop-loss and trailing stop are set wide intentionally. Normal crypto volatility (-25% to -40%) should NOT trigger auto-sells. The agent re-analysis cycle is the primary exit mechanism. Hard stops only protect against catastrophic/near-total loss.
+
+Sells do **not** require email approval (`SELL_REQUIRE_APPROVAL=false`). Manual approval only applies to trades above `APPROVAL_THRESHOLD_GBP=50.0`.
 
 ## ExchangeManager Routing
 

@@ -65,7 +65,46 @@ function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
 function startRefreshTimer() {
     setInterval(() => {
         refreshData();
-    }, 300000); // 5 minutes
+    }, 300000); // 5 minutes — fallback when SSE is unavailable
+}
+
+// ─── SSE Dashboard Stream ───────────────────────────────────
+// Replaces the setInterval soup in initTradingSections().
+// The server sends one event with all sidebar data then closes;
+// the browser auto-reconnects after 30s (set via SSE retry field).
+// Thread on the Pi is only held during the actual data fetch, not idle.
+
+let _sseSource = null;
+
+function startDashboardSSE() {
+    if (_sseSource) { _sseSource.close(); _sseSource = null; }
+
+    const key = getApiKey();
+    const url = key
+        ? `/api/stream/dashboard?key=${encodeURIComponent(key)}`
+        : '/api/stream/dashboard';
+
+    _sseSource = new EventSource(url);
+
+    _sseSource.onmessage = (evt) => {
+        try {
+            const d = JSON.parse(evt.data);
+            if (typeof loadDashboardSummary  === 'function') loadDashboardSummary(d);
+            if (typeof loadTradingStatus     === 'function') loadTradingStatus(d.trading || null);
+            if (typeof loadPendingProposals  === 'function') loadPendingProposals(d.pending_proposals ?? null);
+            if (typeof loadScanStatusDetail  === 'function') loadScanStatusDetail(d.scan_detail ?? null);
+            if (typeof loadActivityLog       === 'function') loadActivityLog(d.activity ?? null);
+        } catch (e) {
+            console.warn('SSE parse error:', e);
+        }
+    };
+
+    _sseSource.onerror = () => {
+        _sseSource.close();
+        _sseSource = null;
+        console.warn('SSE stream unavailable — falling back to 5-min poll');
+        startRefreshTimer();
+    };
 }
 
 // Fast retry loop: polls every 10s until data appears (max 2 min)
@@ -74,11 +113,11 @@ function startInitialRetry() {
     const maxRetries = 12; // 12 × 10s = 2 minutes
     const timer = setInterval(async () => {
         _initialRetryCount++;
-        // Check if portfolio card has loaded real data (no longer shows default text)
-        const valEl = document.getElementById('portfolioValue');
-        const tradingEl = document.getElementById('tradingBudget');
-        const hasData = (valEl && valEl.textContent !== '£0.00' && valEl.textContent !== '$0.00' && valEl.textContent !== '—') ||
-                        (tradingEl && tradingEl.textContent !== '—' && tradingEl.textContent !== 'Connecting...');
+        // Check if any status pill has loaded real data (not still showing default/empty text)
+        const budgetEl = document.getElementById('pillBudget');
+        const heatmapEl = document.getElementById('heatmapGrid');
+        const hasData = (budgetEl && budgetEl.textContent && budgetEl.textContent !== '—') ||
+                        (heatmapEl && heatmapEl.children.length > 0 && !heatmapEl.querySelector('.heatmap-loading'));
         if (hasData || _initialRetryCount >= maxRetries) {
             clearInterval(timer);
             if (hasData) console.log('Initial data loaded after', _initialRetryCount * 10, 'seconds');

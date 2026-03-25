@@ -61,7 +61,7 @@ def initialize_official_adk():
         from ml.agents.official import analyze_crypto
         analyze_crypto_adk = analyze_crypto
         official_adk_available = True
-        logger.info("✅ Official Google ADK initialized successfully")
+        logger.info("Official Google ADK initialized successfully")
         return True
     except Exception as e:
         logger.warning(f"Official ADK not available: {e}")
@@ -270,16 +270,16 @@ def _build_gem_analysis(gem_result):
     summary_parts = []
     if ai_sentiment and ai_sentiment.get('key_points'):
         key_points = ai_sentiment['key_points']
-        summary_parts.append(f"🔥 {key_points[0]}" if is_gem else key_points[0])
+        summary_parts.append(key_points[0])
         if len(key_points) > 2:
-            summary_parts.append(f"⚠️ {key_points[2]}")
+            summary_parts.append(key_points[2])
     else:
         if is_gem:
-            summary_parts.append(f"🔥 Hidden gem ({gem_prob*100:.0f}% confidence)")
+            summary_parts.append(f"Hidden gem ({gem_prob*100:.0f}% confidence)")
         if strengths:
             summary_parts.append(f"{', '.join(strengths[:1])}")
         if weaknesses:
-            summary_parts.append(f"⚠️ {weaknesses[0]}")
+            summary_parts.append(weaknesses[0])
 
     raw_summary = ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...')
     clean_summary = _sanitize_ai_text(raw_summary) or 'Monitoring...'
@@ -441,7 +441,7 @@ def start_idle_monitor():
             time.sleep(30)
             idle_time = time.time() - last_request_time
             if idle_time > IDLE_TIMEOUT:
-                logger.info(f"🛑 No activity for {int(idle_time)}s. Shutting down to save resources...")
+                logger.info(f"No activity for {int(idle_time)}s. Shutting down to save resources...")
                 os.kill(os.getpid(), signal.SIGTERM)
                 break
 

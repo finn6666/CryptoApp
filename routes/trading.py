@@ -4,12 +4,13 @@ Live trading engine and RL learning routes.
 
 import os
 import hmac
+import html as _html
 import json as _json
 import re
 import logging
 import asyncio
 from functools import wraps
-from flask import Blueprint, jsonify, request, render_template, redirect
+from flask import Blueprint, jsonify, request, render_template, redirect, Response, stream_with_context
 from itsdangerous import SignatureExpired, BadSignature
 
 from extensions import limiter
@@ -54,6 +55,7 @@ def require_trading_auth(f):
 # ========================================
 
 @trading_bp.route('/api/trades/status')
+@require_trading_auth
 def trading_status():
     """Get trading engine status — budget, active trades, kill switch state"""
     try:
@@ -66,6 +68,7 @@ def trading_status():
 
 
 @trading_bp.route('/api/trades/pending')
+@require_trading_auth
 def pending_proposals():
     """Get all pending trade proposals awaiting approval"""
     try:
@@ -78,6 +81,7 @@ def pending_proposals():
 
 
 @trading_bp.route('/api/trades/history')
+@require_trading_auth
 def trade_history():
     """Get executed trade history"""
     try:
@@ -128,9 +132,14 @@ def confirm_trade(token):
     # ── GET: show confirmation page ───────────────────────────
     if request.method == 'GET':
         action_colour = '#38a169' if action == 'approve' else '#e53e3e'
-        action_label = '✅ CONFIRM APPROVE' if action == 'approve' else '❌ CONFIRM REJECT'
+        action_label = 'CONFIRM APPROVE' if action == 'approve' else 'CONFIRM REJECT'
         action_desc = ('Approve and execute this trade' if action == 'approve'
                        else 'Reject this trade — no money will be spent')
+
+        p_side   = _html.escape(str(proposal['side']).upper())
+        p_symbol = _html.escape(str(proposal['symbol']))
+        p_conf   = _html.escape(str(proposal['confidence']))
+        side_dot = '&#x1F7E2;' if proposal['side'] == 'buy' else '&#x1F534;'
 
         return f"""
         <html>
@@ -139,29 +148,28 @@ def confirm_trade(token):
             <div style="background: #151520; padding: 40px; border-radius: 16px; border: 1px solid #2d3748;
                         max-width: 420px; width: 100%;">
                 <h2 style="margin: 0 0 20px; color: #e2e8f0; font-size: 18px;">
-                    {'🟢' if proposal['side'] == 'buy' else '🔴'}
-                    {proposal['side'].upper()} {proposal['symbol']}
+                    {side_dot} {p_side} {p_symbol}
                 </h2>
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                     <tr><td style="padding:6px 0; color:#a0aec0;">Amount</td>
-                        <td style="text-align:right; font-weight:700;">£{proposal['amount_gbp']:.4f}</td></tr>
+                        <td style="text-align:right; font-weight:700;">&#xA3;{proposal['amount_gbp']:.4f}</td></tr>
                     <tr><td style="padding:6px 0; color:#a0aec0;">Price</td>
-                        <td style="text-align:right;">£{proposal['price_at_proposal']:.6f}</td></tr>
+                        <td style="text-align:right;">&#xA3;{proposal['price_at_proposal']:.6f}</td></tr>
                     <tr><td style="padding:6px 0; color:#a0aec0;">Confidence</td>
-                        <td style="text-align:right;">{proposal['confidence']}%</td></tr>
+                        <td style="text-align:right;">{p_conf}%</td></tr>
                 </table>
-                <p style="color: #a0aec0; font-size: 13px; margin-bottom: 20px;">{action_desc}</p>
+                <p style="color: #a0aec0; font-size: 13px; margin-bottom: 20px;">{_html.escape(action_desc)}</p>
                 <form method="POST">
                     <button type="submit"
                             style="width: 100%; padding: 14px; background: {action_colour}; color: white;
                                    border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
                                    cursor: pointer;">
-                        {action_label}
+                        {_html.escape(action_label)}
                     </button>
                 </form>
                 <a href="/trades" style="display: block; text-align: center; margin-top: 12px;
                                          color: #667eea; text-decoration: none; font-size: 13px;">
-                    ← Back to trades
+                    &larr; Back to trades
                 </a>
             </div>
         </body>
@@ -179,7 +187,6 @@ def confirm_trade(token):
                              display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
                     <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                                 border: 1px solid #2d3748; max-width: 400px;">
-                        <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
                         <h2 style="margin: 0 0 8px; color: #48bb78;">Trade Approved &amp; Executed</h2>
                         <p style="color: #a0aec0; margin: 0 0 16px;">
                             {result.get('side', '').upper()} {result.get('quantity', 0):.6f} {result.get('symbol', '')}
@@ -204,7 +211,6 @@ def confirm_trade(token):
                          display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
                 <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                             border: 1px solid #2d3748; max-width: 400px;">
-                    <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
                     <h2 style="margin: 0 0 8px; color: #fc8181;">Trade Rejected</h2>
                     <p style="color: #a0aec0;">No money was spent.</p>
                     <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px;
@@ -227,7 +233,6 @@ def _error_page(title: str, message: str) -> str:
                  display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
         <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                     border: 1px solid #2d3748; max-width: 400px;">
-            <div style="font-size: 48px; margin-bottom: 16px;">⚠️</div>
             <h2 style="margin: 0 0 8px; color: #ecc94b;">{title}</h2>
             <p style="color: #a0aec0;">{message}</p>
             <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px;
@@ -461,7 +466,9 @@ def auto_evaluate_trade():
                     pass
 
         if should_trade and conviction >= 75:
-            amount = remaining * (allocation_pct / 100)
+            from ml.trading_engine import compute_allocation_pct
+            sized_pct = compute_allocation_pct(conviction, allocation_pct, coin_data)
+            amount = remaining * (sized_pct / 100)
             amount = min(amount, remaining)
 
             proposal = engine.propose_trade(
@@ -583,6 +590,7 @@ def monitor_price_history(symbol):
 # ========================================
 
 @trading_bp.route('/api/portfolio/holdings')
+@require_trading_auth
 def portfolio_holdings():
     """Get current portfolio holdings with live P&L."""
     try:
@@ -662,6 +670,137 @@ def portfolio_history():
     except Exception as e:
         logger.error(f"Portfolio history error: {e}")
         return jsonify({"error": "Failed to get portfolio history"}), 500
+
+
+# ========================================
+# Dashboard Summary (single-call aggregation)
+# ========================================
+
+@trading_bp.route('/api/dashboard-summary')
+def dashboard_summary():
+    """Aggregate portfolio, trading, scanner, and monitor into one call.
+    Replaces 5 parallel card fetches with a single request.
+    """
+    result = {}
+
+    # Portfolio
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+        live_prices = {}
+        if state.analyzer:
+            for coin in state.analyzer.coins:
+                if coin.price:
+                    live_prices[coin.symbol.upper()] = coin.price
+        result['portfolio'] = tracker.get_total_value(live_prices)
+    except Exception as e:
+        logger.warning(f"Dashboard summary — portfolio error: {e}")
+        result['portfolio'] = {}
+
+    # Trading engine
+    try:
+        from ml.trading_engine import get_trading_engine
+        result['trading'] = get_trading_engine().get_status()
+    except Exception as e:
+        logger.warning(f"Dashboard summary — trading error: {e}")
+        result['trading'] = {}
+
+    # Scan loop
+    try:
+        from ml.scan_loop import get_scan_loop
+        result['scanner'] = get_scan_loop().get_status()
+    except Exception as e:
+        logger.warning(f"Dashboard summary — scanner error: {e}")
+        result['scanner'] = {}
+
+    # Market monitor
+    try:
+        from ml.market_monitor import get_market_monitor
+        result['monitor'] = get_market_monitor().get_status()
+    except Exception as e:
+        logger.warning(f"Dashboard summary — monitor error: {e}")
+        result['monitor'] = {}
+
+    return jsonify(result), 200
+
+
+@trading_bp.route('/api/stream/dashboard')
+def stream_dashboard():
+    """SSE stream for the dashboard sidebar.
+    Sends one event containing all sidebar data then closes; the browser reconnects
+    after the retry interval. This keeps the Pi thread free between events while
+    eliminating the client-side setInterval soup.
+    Auth via ?key= query param — EventSource cannot send Authorization headers.
+    """
+    api_key = os.environ.get('TRADING_API_KEY')
+    if api_key:
+        provided = request.args.get('key', '')
+        if not provided or not hmac.compare_digest(provided, api_key):
+            return jsonify({'error': 'Invalid API key'}), 403
+
+    def generate():
+        payload = {}
+
+        # Portfolio summary (same as dashboard_summary)
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            tracker = get_portfolio_tracker()
+            live_prices = {}
+            if state.analyzer:
+                for coin in state.analyzer.coins:
+                    if coin.price:
+                        live_prices[coin.symbol.upper()] = coin.price
+            payload['portfolio'] = tracker.get_total_value(live_prices)
+        except Exception as e:
+            logger.warning(f"SSE stream — portfolio error: {e}")
+            payload['portfolio'] = {}
+
+        # Trading engine: status + pending proposals
+        try:
+            from ml.trading_engine import get_trading_engine
+            engine = get_trading_engine()
+            payload['trading'] = engine.get_status()
+            payload['pending_proposals'] = engine.get_pending_proposals()
+        except Exception as e:
+            logger.warning(f"SSE stream — trading error: {e}")
+            payload['trading'] = {}
+            payload['pending_proposals'] = []
+
+        # Scan loop: summary pill + detailed status for sidebar
+        try:
+            from ml.scan_loop import get_scan_loop
+            scanner = get_scan_loop()
+            scan_status = scanner.get_status()
+            payload['scanner'] = scan_status
+            payload['scan_detail'] = {
+                'status': scan_status,
+                'recent_logs': scanner.get_recent_logs(days=3),
+            }
+            payload['activity'] = {'entries': scanner.get_audit_trail(limit=20)}
+        except Exception as e:
+            logger.warning(f"SSE stream — scan error: {e}")
+            payload['scanner'] = {}
+            payload['scan_detail'] = {'status': {}, 'recent_logs': []}
+            payload['activity'] = {'entries': []}
+
+        # Market monitor
+        try:
+            from ml.market_monitor import get_market_monitor
+            payload['monitor'] = get_market_monitor().get_status()
+        except Exception as e:
+            logger.warning(f"SSE stream — monitor error: {e}")
+            payload['monitor'] = {}
+
+        yield f"retry: 30000\ndata: {_json.dumps(payload)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',   # prevent nginx from buffering the stream
+        }
+    )
 
 
 @trading_bp.route('/api/portfolio/sell-signals')
@@ -800,6 +939,7 @@ def exchange_status():
 
 
 @trading_bp.route('/api/exchanges/balance')
+@require_trading_auth
 def exchange_balance():
     """Get free cash balances across all connected exchanges."""
     try:
@@ -847,7 +987,7 @@ def check_symbol_tradeable(symbol):
 
 
 # ========================================
-# RL Insights
+# Learning Insights
 # ========================================
 
 @trading_bp.route('/api/rl/insights')

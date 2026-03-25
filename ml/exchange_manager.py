@@ -76,7 +76,7 @@ class ExchangeManager:
             })
             self._load_markets_with_retry(exchange, exchange_id)
             self._exchanges[exchange_id] = exchange
-            logger.info(f"✅ {exchange_id} connected — {len(exchange.markets)} markets")
+            logger.info(f"{exchange_id} connected — {len(exchange.markets)} markets")
             return exchange
         except Exception as e:
             logger.error(f"Failed to connect {exchange_id}: {e}")
@@ -102,8 +102,15 @@ class ExchangeManager:
             passphrase = os.getenv("KUCOIN_PASSPHRASE", "")
             if key and secret and passphrase:
                 return {"apiKey": key, "secret": secret, "password": passphrase}
+        elif exchange_id == "mexc":
+            key = os.getenv("MEXC_API_KEY", "")
+            secret = os.getenv("MEXC_API_SECRET", "")
+            if key and secret:
+                # MEXC v3 spot doesn't use a passphrase; pass empty string to
+                # satisfy ccxt's requiredCredentials check without breaking auth.
+                return {"apiKey": key, "secret": secret, "password": ""}
         else:
-            # Generic fallback: EXCHANGE_API_KEY / EXCHANGE_API_SECRET
+            # Generic fallback — uses {EXCHANGE}_API_KEY / {EXCHANGE}_API_SECRET
             prefix = exchange_id.upper()
             key = os.getenv(f"{prefix}_API_KEY", "")
             secret = os.getenv(f"{prefix}_API_SECRET", "")
@@ -715,7 +722,7 @@ class ExchangeManager:
                 return False
 
             logger.info(
-                f"💱 Auto-converting £{gbp_to_sell:.2f} GBP → {target_currency} "
+                f"Auto-converting £{gbp_to_sell:.2f} GBP → {target_currency} "
                 f"on {exchange_id} (rate {rate:.4f}, need {amount_needed:.4f} {target_currency})"
             )
 
@@ -725,7 +732,7 @@ class ExchangeManager:
             received = filled * avg_price
 
             logger.info(
-                f"💱 Converted £{filled:.2f} → {received:.4f} {target_currency} "
+                f"Converted £{filled:.2f} → {received:.4f} {target_currency} "
                 f"(avg rate {avg_price:.4f}, order {order.get('id', 'unknown')})"
             )
             return True

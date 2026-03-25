@@ -3,10 +3,27 @@
 ## Developer Preferences
 
 - **Package manager:** `uv` — always use `uv run`, `uv add`, `uv sync` (never pip)
+- **No emojis:** Never use emoji characters anywhere — not in JS strings, HTML templates, Python log messages, or route responses. Use plain text instead (e.g. `STOPPED` not `🛑 STOPPED`, `Auto-approving` not `🤖 Auto-approving`).
 - **Code style:** Keep the project tidy — no redundant files, dead code, or orphaned imports
-- **Git workflow:** Single `dev` branch for work, merge to `main` for releases. Descriptive commit messages with bullet-point body
-- **Commit convention:** Commit + push after every completed change. Verify syntax first with `uv run python -c "import py_compile; ..."`
-- **Deployment:** Raspberry Pi 4 — restart with `ssh pi "sudo systemctl restart cryptoapp"`
+- **Git workflow:** `dev` branch for work, merge to `main` for releases. Commit + push after every completed change. Descriptive commit messages with bullet-point body.
+- **Deployment:** Raspberry Pi 4 — use `/deploy` skill or run `ssh pi "cd ~/CryptoApp && git pull && sudo systemctl restart cryptoapp"`
+
+## Verification Commands
+
+After making changes, verify with:
+- **Syntax check:** `uv run python -m py_compile <file>.py` (also runs automatically via hook on every edit)
+- **Import check:** `uv run python -c "import app"` — catches missing deps and circular imports
+- **Run app locally:** `uv run python app.py` (dev mode, port 5001)
+- **Health check:** `curl -s http://localhost:5001/` — should return 200
+- **Lint:** `uv run flake8 ml/ routes/ --max-line-length=120 --ignore=E501`
+
+## Context Compaction
+
+When compacting, ALWAYS preserve:
+- The list of files modified in this session and what changed
+- Any in-progress task or feature being built
+- Current error messages or test failures being debugged
+- Trade safety mechanism states (kill switch, budget, approval settings)
 
 ## Project Overview
 
@@ -20,7 +37,7 @@ AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 
 |-------|-----------|
 | Language | Python 3.13 |
 | Web | Flask + Gunicorn (1 worker, 2 gthread) |
-| AI Agents | Google ADK + `gemini-3-flash-preview` |
+| AI Agents | Google ADK + `gemini-3-flash-preview` (preview — may be deprecated) |
 | Exchange | Kraken via ccxt |
 | ML | scikit-learn (training), ONNX Runtime (inference), Q-learning RL |
 | Frontend | Vanilla JS + Jinja2 templates + CSS |
@@ -38,7 +55,7 @@ extensions.py       — Flask-Limiter, Flask-CORS (avoids circular imports)
 
 ml/                 — All ML, trading, and agent logic
   scan_loop.py      — Automated scan pipeline (every 12h)
-  market_monitor.py — Between-scan price checks (5/15/30 min)
+  market_monitor.py — Between-scan price checks at 5, 15, and 30-min intervals
   trading_engine.py — Proposals, budget, approval, execution, kill switch
   exchange_manager.py — Kraken via ccxt, pair cache, FX, orders
   sell_automation.py  — Exit triggers (profit/stop-loss/trailing/agent)
@@ -84,8 +101,8 @@ docs/               — Markdown documentation
 | Kill switch | Halts all trading instantly |
 | Daily budget | `DAILY_TRADE_BUDGET_GBP` (£5 default) |
 | Per-trade max | 50% of daily budget |
-| Proposal expiry | 1 hour |
-| Trade cooldown | 60 min between proposals |
+| Proposal expiry | 1 hour (proposal auto-cancels if unactioned) |
+| Trade cooldown | 60 min between new proposal generation |
 | Scan cooldown | 1 hour between scans |
 | Max proposals/scan | 3 |
 | Conviction threshold | ≥55% (agent) / ≥45% (scan loop) |
@@ -103,15 +120,21 @@ See `.env.example` for the full list. Key groups:
 - **Trading:** `KRAKEN_API_KEY`, `KRAKEN_PRIVATE_KEY`, `TRADING_API_KEY`, `DAILY_TRADE_BUDGET_GBP`
 - **Approval:** `BUY_AUTO_APPROVE`, `SELL_REQUIRE_APPROVAL`, `TRADE_NOTIFICATION_EMAIL`, SMTP settings
 - **Scan:** `SCAN_ENABLED`, `SCAN_INTERVAL_HOURS`, `SCAN_MAX_COINS`
-- **Sell:** `SELL_PROFIT_TARGET_PCT`, `SELL_STOP_LOSS_PCT`, `SELL_TRAILING_STOP_PCT`, `SELL_MIN_HOLD_HOURS`
+- **Sell:** `SELL_TIER1_PCT` (75%), `SELL_TIER1_FRACTION` (0.33), `SELL_TIER1_TRAILING_PCT` (20%), `SELL_TIER2_PCT` (150%), `SELL_TIER2_FRACTION` (0.50), `SELL_TIER2_TRAILING_PCT` (15%), `SELL_PROFIT_TARGET_PCT` (300% nuclear), `SELL_STOP_LOSS_PCT`, `SELL_TRAILING_STOP_PCT`, `SELL_MIN_HOLD_HOURS`
 
-## Skills Reference
+## Domain Knowledge
 
-See `.github/instructions/` for domain-specific instruction files (auto-loaded by VS Code Copilot; reference manually in Claude Code):
-- `trading.instructions.md` — Trading engine, proposals, approval flow, execution
-- `agents.instructions.md` — ADK agent architecture, orchestrator, sub-agents
-- `scanning.instructions.md` — Scan loop, market monitor, scheduling
-- `deployment.instructions.md` — Pi setup, systemd, nginx, Tailscale SSH
-- `frontend.instructions.md` — Templates, JS modules, API endpoints, dashboard
+Load these when working on the relevant area (use `@` to import):
+- @.github/instructions/trading.instructions.md — Trading engine, proposals, approval flow, execution
+- @.github/instructions/agents.instructions.md — ADK agent architecture, orchestrator, sub-agents
+- @.github/instructions/scanning.instructions.md — Scan loop, market monitor, scheduling
+- @.github/instructions/deployment.instructions.md — Pi setup, systemd, nginx, Tailscale SSH
+- @.github/instructions/frontend.instructions.md — Templates, JS modules, API endpoints, dashboard
 
 Broader architecture context: `docs/architecture/`.
+
+## Skills & Agents
+
+- `/deploy` — Deploy to Pi and verify the service is healthy
+- `/backtest` — Run backtesting framework with optional custom thresholds
+- `security-reviewer` subagent — Ask: *"use a subagent to review this code for security issues"*

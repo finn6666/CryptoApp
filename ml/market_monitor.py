@@ -492,7 +492,7 @@ class MarketMonitor:
             coin_data["tradeable_exchanges"] = exchanges
             coin_data["primary_exchange"] = exchanges[0]
 
-            logger.info(f"[Monitor] 🎯 Auto-buy trigger: {symbol} (trigger={trigger})")
+            logger.info(f"[Monitor] Auto-buy trigger: {symbol} (trigger={trigger})")
             self._stats["buy_triggers"] += 1
 
             # Use the scan loop's existing analysis pipeline
@@ -510,7 +510,7 @@ class MarketMonitor:
                 self._auto_buys_today += 1
                 self._stats["buy_proposals"] += 1
                 logger.info(
-                    f"[Monitor] ✅ Auto-buy proposed for {symbol}: "
+                    f"[Monitor] Auto-buy proposed for {symbol}: "
                     f"outcome={outcome}, confidence={result.get('confidence', 0)}"
                 )
                 # Write to shared audit log so the Activity Log UI shows it
@@ -590,7 +590,7 @@ class MarketMonitor:
         )
         self._thread.start()
         logger.info(
-            f"📡 Market monitor started — "
+            f"Market monitor started — "
             f"price/{self.price_check_interval}m, "
             f"momentum/{self.momentum_interval}m, "
             f"quick_scan/{self.quick_scan_interval}m"
@@ -723,21 +723,21 @@ class MarketMonitor:
         try:
             from ml.error_handling import send_email_alert
 
-            lines = [f"⚡ Market Monitor — {len(significant)} alert(s)\n"]
+            lines = [f"Market Monitor — {len(significant)} alert(s)\n"]
             for a in significant:
                 if a["type"] == "rapid_move":
                     lines.append(
-                        f"  🚀 {a['symbol']}: {a['pct_1h']:+.1f}% in 1h "
+                        f"  {a['symbol']}: {a['pct_1h']:+.1f}% in 1h "
                         f"(price: ${a.get('price', 0):.6f})"
                     )
                 elif a["type"] == "volume_spike":
                     lines.append(
-                        f"  📊 {a['symbol']}: volume spike {a.get('spike_pct', 0):.0f}% "
+                        f"  {a['symbol']}: volume spike {a.get('spike_pct', 0):.0f}% "
                         f"above average"
                     )
                 elif a["type"] == "sell_trigger":
                     lines.append(
-                        f"  🔔 {a['symbol']}: {a.get('trigger', 'exit trigger')}"
+                        f"  {a['symbol']}: {a.get('trigger', 'exit trigger')}"
                     )
 
             send_email_alert("Market Monitor Alert", "\n".join(lines))

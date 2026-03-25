@@ -7,8 +7,10 @@ Route handlers are organised into Flask Blueprints under routes/.
 """
 
 import os
+import subprocess
 import logging
 from flask import Flask, render_template
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -25,6 +27,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__,
             template_folder='src/web/templates',
             static_folder='src/web/static')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 app.secret_key = os.environ.get('SECRET_KEY')
 if not app.secret_key:
@@ -51,7 +54,7 @@ init_cors(app)
 # Shared state — initialise all ML / data components
 # ---------------------------------------------------------------------------
 import services.app_state as state       # noqa: E402
-state.init_all()                         # ML, gem detector, data pipeline, ADK, analyzer
+state.init_all()                         # ML, data pipeline, ADK, analyzer
 state.start_idle_monitor()
 
 # ---------------------------------------------------------------------------
@@ -74,7 +77,6 @@ try:
     retrain_enabled = os.environ.get('RETRAIN_ENABLED', 'true').lower() in ('1', 'true', 'yes')
     if retrain_enabled:
         _ml_scheduler = get_ml_scheduler()
-        _ml_scheduler.gem_detector = state.gem_detector
         _ml_scheduler.analyzer = state.analyzer
         _ml_scheduler.start_scheduler()
 except Exception as e:
@@ -94,6 +96,24 @@ app.register_blueprint(ml_bp)
 app.register_blueprint(symbols_bp)
 app.register_blueprint(trading_bp)
 app.register_blueprint(health_bp)
+
+# ---------------------------------------------------------------------------
+# Template globals
+# ---------------------------------------------------------------------------
+
+def _git_sha() -> str:
+    """Return the current git short SHA for cache-busting static assets."""
+    try:
+        sha = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip()
+        return sha or 'dev'
+    except Exception:
+        return 'dev'
+
+app.jinja_env.globals['asset_version'] = _git_sha()
 
 # ---------------------------------------------------------------------------
 # Top-level page routes

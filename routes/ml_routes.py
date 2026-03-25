@@ -28,7 +28,6 @@ def get_ml_status():
                 'ML_AVAILABLE': state.ML_AVAILABLE,
                 'ml_pipeline_exists': state.ml_pipeline is not None,
                 'suggestion': 'Click "Train ML Model" to initialize and train the model',
-                'rl_detector_available': False,
             }
             try:
                 import sklearn, pandas, numpy
@@ -73,7 +72,7 @@ def get_ml_prediction(symbol):
 @require_trading_auth
 def train_ml_model():
     try:
-        logger.info("🎯 ML Training requested")
+        logger.info("ML Training requested")
         if not state.ML_AVAILABLE or state.ml_pipeline is None:
             if not state.initialize_ml():
                 return jsonify({'success': False, 'error': 'ML components not available.'}), 503
@@ -98,6 +97,8 @@ def initialize_ml_endpoint():
 
 
 @ml_bp.route('/api/gemini/quota')
+@require_trading_auth
+@limiter.limit('5 per hour')
 def check_gemini_quota():
     try:
         api_key = os.getenv('GOOGLE_API_KEY')
@@ -108,7 +109,7 @@ def check_gemini_quota():
         try:
             model = genai.GenerativeModel('gemini-3-flash-preview')
             response = model.generate_content("Say 'OK'")
-            return jsonify({'status': 'SUCCESS', 'message': '✅ Gemini API is working!', 'test_response': response.text})
+            return jsonify({'status': 'SUCCESS', 'message': 'Gemini API is working!', 'test_response': response.text})
         except Exception as e:
             if '429' in str(e) or 'quota' in str(e).lower():
                 return jsonify({'status': 'QUOTA_ERROR', 'message': 'Still hitting quota limits'})
@@ -274,11 +275,48 @@ def gem_score_trend(symbol):
 
 @ml_bp.route('/api/gems/accuracy')
 def gem_accuracy_report():
-    """Get overall gem detector accuracy metrics."""
+    """Get gem score tracker accuracy metrics."""
     try:
         from ml.gem_score_tracker import get_gem_score_tracker
         tracker = get_gem_score_tracker()
         report = tracker.get_accuracy_report()
         return jsonify(report)
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ─── Heatmap Data ─────────────────────────────────────────────
+
+@ml_bp.route('/api/heatmap-data')
+def heatmap_data():
+    """Return top coins with gem scores for the dashboard heatmap.
+    Sorted by attractiveness_score descending; max 60 coins.
+    """
+    try:
+        if not state.analyzer or not state.analyzer.coins:
+            return jsonify({"coins": [], "count": 0})
+
+        limit = min(int(request.args.get('limit', 60)), 100)
+        coins = sorted(
+            [c for c in state.analyzer.coins if c.price and c.price > 0],
+            key=lambda c: getattr(c, 'attractiveness_score', 0),
+            reverse=True,
+        )[:limit]
+
+        return jsonify({
+            "coins": [
+                {
+                    "symbol": c.symbol,
+                    "name": c.name,
+                    "price": c.price,
+                    "price_change_24h": getattr(c, 'price_change_24h', 0) or 0,
+                    "gem_score": round(getattr(c, 'attractiveness_score', 0), 2),
+                    "market_cap_rank": getattr(c, 'market_cap_rank', 999),
+                }
+                for c in coins
+            ],
+            "count": len(coins),
+        })
+    except Exception as e:
+        logger.error(f"Heatmap data error: {e}")
         return jsonify({"error": str(e)}), 500

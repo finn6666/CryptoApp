@@ -130,7 +130,7 @@ class PortfolioTracker:
         self._save()
 
         logger.info(
-            f"📒 Recorded: {side.upper()} {quantity:.8f} {sym} @ £{(price or 0):.6f} "
+            f"Recorded: {side.upper()} {quantity:.8f} {sym} @ £{(price or 0):.6f} "
             f"(£{amount_gbp:.4f}) on {exchange}"
         )
         return trade

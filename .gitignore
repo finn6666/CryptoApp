@@ -20,6 +20,10 @@ env
 pip-log.txt
 pip-delete-this-directory.txt
 
+## AI Tools — ignore personal/local files, commit shared config
+.claude/settings.local.json
+.claude/worktrees/
+
 ## IDE
 .vscode/
 .idea/

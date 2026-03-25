@@ -49,24 +49,23 @@ function renderHealthPage(data) {
 
     // ── Components Card ──
     html += `<div class="health-card">
-        <div class="health-card-title"><span class="icon">⚙️</span> Components</div>
+        <div class="health-card-title">Components</div>
         <div class="health-chips">
             ${chip(c.analyzer, 'Analyzer')}
             ${chip(c.ml_pipeline, 'ML Pipeline')}
-            ${chip(c.gem_detector, 'Gem Detector')}
             ${chip(c.adk_orchestrator, 'ADK Orchestrator')}
         </div>
     </div>`;
 
     // ── Trading Engine Card ──
     html += `<div class="health-card">
-        <div class="health-card-title"><span class="icon">💰</span> Trading Engine</div>`;
+        <div class="health-card-title">Trading Engine</div>`;
     if (trading.error) {
         html += `<div class="health-metric"><span class="health-metric-label">Status</span><span class="health-metric-value" style="color:var(--error)">Unavailable</span></div>`;
     } else {
         html += `
-            <div class="health-metric"><span class="health-metric-label">Active</span><span class="health-metric-value">${trading.active ? '✅ Yes' : '⏸️ No'}</span></div>
-            <div class="health-metric"><span class="health-metric-label">Kill Switch</span><span class="health-metric-value" style="color:${trading.kill_switch ? 'var(--error)' : 'var(--success)'}">${trading.kill_switch ? '🛑 ON' : '✅ Off'}</span></div>
+            <div class="health-metric"><span class="health-metric-label">Active</span><span class="health-metric-value">${trading.active ? 'Yes' : 'No'}</span></div>
+            <div class="health-metric"><span class="health-metric-label">Kill Switch</span><span class="health-metric-value" style="color:${trading.kill_switch ? 'var(--error)' : 'var(--success)'}">${trading.kill_switch ? 'ON' : 'Off'}</span></div>
             <div class="health-metric"><span class="health-metric-label">Budget Remaining</span><span class="health-metric-value">£${Number(trading.budget_remaining || 0).toFixed(2)}</span></div>
             <div class="health-metric"><span class="health-metric-label">Trades Today</span><span class="health-metric-value">${trading.trades_today || 0}</span></div>`;
         if (trading.pending_proposals > 0) {
@@ -77,10 +76,10 @@ function renderHealthPage(data) {
 
     // ── Scan Loop Card ──
     html += `<div class="health-card">
-        <div class="health-card-title"><span class="icon">🔄</span> Scan Loop</div>
-        <div class="health-metric"><span class="health-metric-label">Scheduler</span><span class="health-metric-value">${scan.scheduler_running ? '✅ Running' : '⏸️ Stopped'}</span></div>`;
+        <div class="health-card-title">Scan Loop</div>
+        <div class="health-metric"><span class="health-metric-label">Scheduler</span><span class="health-metric-value">${scan.scheduler_running ? 'Running' : 'Stopped'}</span></div>`;
     if (scan.scan_running) {
-        html += `<div class="health-metric"><span class="health-metric-label">Current</span><span class="health-metric-value" style="color:var(--warning)">Scan in progress…</span></div>`;
+        html += `<div class="health-metric"><span class="health-metric-label">Current</span><span class="health-metric-value" style="color:var(--warning)">Scan in progress</span></div>`;
     }
     if (scan.next_scan) {
         html += `<div class="health-metric"><span class="health-metric-label">Next Scan</span><span class="health-metric-value">${scan.next_scan}</span></div>`;
@@ -93,7 +92,7 @@ function renderHealthPage(data) {
     // ── System Resources Card ──
     if (sys.cpu_percent !== undefined) {
         html += `<div class="health-card">
-            <div class="health-card-title"><span class="icon">📊</span> System Resources</div>
+            <div class="health-card-title">System Resources</div>
             ${resourceBar('CPU', sys.cpu_percent)}
             ${resourceBar('Memory', sys.memory_percent)}
             ${resourceBar('Disk', sys.disk_percent)}
@@ -103,14 +102,14 @@ function renderHealthPage(data) {
     // ── Cache Card ──
     if (data.cache) {
         html += `<div class="health-card">
-            <div class="health-card-title"><span class="icon">🗂️</span> Cache</div>
+            <div class="health-card-title">Cache</div>
             <div class="health-metric"><span class="health-metric-label">Cached Analyses</span><span class="health-metric-value">${data.cache.analysis_entries}</span></div>
         </div>`;
     }
 
     // ── Uptime Card ──
     html += `<div class="health-card">
-        <div class="health-card-title"><span class="icon">⏱️</span> Server Info</div>
+        <div class="health-card-title">Server Info</div>
         <div class="health-metric"><span class="health-metric-label">Uptime</span><span class="health-metric-value">${formatUptime(data.uptime_hours)}</span></div>
         <div class="health-metric"><span class="health-metric-label">Status</span><span class="health-metric-value" style="color:var(--success)">${data.status}</span></div>
         <div class="health-metric"><span class="health-metric-label">Timestamp</span><span class="health-metric-value">${new Date(data.timestamp).toLocaleString()}</span></div>

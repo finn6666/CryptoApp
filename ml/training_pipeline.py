@@ -336,15 +336,15 @@ class CryptoMLPipeline:
             if abs(pred_pct) < 1:
                 signal = "Hold"
                 color_class = "text-warning"
-                icon = "➡️"
+                icon = "-"
             elif pred_pct > 0:
                 signal = "Bullish" if pred_pct > 2 else "Weak Buy"
-                color_class = "text-success" 
-                icon = "📈"
+                color_class = "text-success"
+                icon = "+"
             else:
                 signal = "Bearish" if pred_pct < -2 else "Weak Sell"
                 color_class = "text-danger"
-                icon = "📉"
+                icon = "-"
             
             return {
                 "available": True,

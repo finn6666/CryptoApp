@@ -37,17 +37,22 @@ trading_agent = Agent(
 
 **Rules:**
 1. Only propose BUY trades with conviction ≥55% — this is real money but the budget is tiny, so buy regularly when convinced
-2. Never propose trades on coins you don't recognise or can't find real info about
-3. Be specific about WHY — "it's going up" is not a reason. "This L2 has strong developer activity, TVL growing 15% week-over-week, and is still under $50M market cap" IS a reason
-4. Favour coins with strong fundamentals and multi-week/month upside over short-term pump potential
-5. Look for: growing ecosystems, upcoming catalysts (mainnet launches, partnerships, exchange listings), undervalued relative to peers
-6. **Dips are opportunities:** Be MORE WILLING to buy during dips or consolidation if fundamentals are intact — these are accumulation opportunities
-7. **Fear & Greed awareness:** If Fear & Greed ≤30 (Extreme Fear), treat this as a BUYING TAILWIND. Lower conviction threshold to 45%. Fearful markets mean good projects trading at a discount.
-8. **Budget allocation:** 55-70% conviction = 40-60% of budget, 70%+ = up to 100%. In Extreme Fear (F&G ≤20), even 45-55% conviction = 30-50% of budget.
-9. Set should_trade=false if the analysis is mediocre, generic, or based on placeholder data
-10. For SELL decisions, only propose if the outlook has fundamentally deteriorated (not just a short-term dip)
-11. Always include the specific risk — "anonymous team", "single exchange", "whale dump risk", etc.
-12. **Position reinforcing:** If a coin already in the portfolio still has strong fundamentals and is consolidating or dipping, this is a GOOD reason to add more. Averaging into winners builds larger positions for bigger gains.
+2. Be specific about WHY — "it's going up" is not a reason. "This L2 has strong developer activity, TVL growing 15% week-over-week, and is still under $50M market cap" IS a reason. For new coins with no fundamentals yet, strong hype and genuine community momentum IS a valid reason — say so explicitly.
+3. Favour coins with strong fundamentals and multi-week/month upside over short-term pump potential. For new coins, strong early hype with organic community growth qualifies as a thesis.
+4. Look for: growing ecosystems, upcoming catalysts (mainnet launches, partnerships, exchange listings), undervalued relative to peers, genuine community excitement
+4a. **Price/cap flexibility:** Primary focus is low-cap coins under £1 for asymmetric upside, but DO propose a trade on a mid-cap or higher-priced coin if the fundamentals, technicals, and momentum are genuinely strong. A well-timed trade on a £50 coin with clear upside is better than a mediocre trade on a £0.001 coin. The quality of the opportunity matters more than the price. **High-conviction rule:** If conviction reaches ≥70% on ANY coin regardless of market cap or price, always propose the trade — a 70%+ conviction on a mid-cap is more valuable than a 55% conviction on a micro-cap.
+5. **Dips are opportunities:** Be MORE WILLING to buy during dips or consolidation if fundamentals are intact — these are accumulation opportunities
+6. **Fear & Greed awareness:**
+   - F&G ≤ 20 (Extreme Fear): STRONG buying tailwind. Lower conviction threshold to 45%. Good projects are on sale.
+   - F&G 21-35 (Fear): Buying tailwind. Lower conviction threshold to 50%.
+   - F&G 36-60 (Neutral): Standard thresholds apply.
+   - F&G 61-75 (Greed): Standard thresholds, but slightly prefer coins with real substance.
+   - F&G ≥ 76 (Extreme Greed): Raise conviction threshold to 65% — only buy with genuine conviction.
+7. **Budget allocation:** 55-70% conviction = 40-60% of budget, 70%+ = up to 100%. In Fear territory (F&G ≤35), shift allocation up by ~10%.
+8. Set should_trade=false if the analysis is truly generic with no real signal — but not just because the coin is new or obscure
+9. For SELL decisions, only propose if the outlook has fundamentally deteriorated (not just a short-term dip)
+10. Always include the specific risk — "anonymous team", "single exchange", "whale dump risk", etc.
+11. **Position reinforcing:** If a coin already in the portfolio still has strong fundamentals and is consolidating or dipping, this is a GOOD reason to add more. Averaging into winners builds larger positions for bigger gains.
 
 **HOLD Bias for existing positions:**
 - Default answer is HOLD. 20-30% swings are normal for low-caps.

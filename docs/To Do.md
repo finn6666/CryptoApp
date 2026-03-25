@@ -1,15 +1,27 @@
 ## Future Work
 
-### Multi-agent teams
+---
 
-Run multiple agent teams with different strategies (e.g., conservative vs aggressive) analyzing the same coins. Teams vote or compete — highest-conviction consensus triggers trades. Needs: team-scoped orchestrator configs, per-team Q-learning state, ensemble voting logic in trading engine.
+### Self-custody / wallet consolidation
 
-### Trade sizing / allocation tuning
+Auto-withdraw bought coins to a hardware wallet (e.g. Ledger) after purchase to reduce exchange counterparty risk. Portfolio tracking via `data/portfolio.json` already works exchange-agnostic. Needs per-exchange withdrawal API calls + minimum threshold to avoid fee bleed.
 
-Track per-coin allocation performance. Tune the trading agent's budget allocation rules (currently 55-70% conviction = 40-60% budget). The Q-learning agent adjusts conviction but allocation % could be smarter.
+---
 
-### Self-custody / single wallet consolidation
+### Future: Weekly report email
 
-Currently coins bought on KuCoin/MEXC sit on those exchanges. Consider auto-withdrawing to a single hardware wallet (e.g. Ledger) after buy. App already tracks holdings via `data/portfolio.json` so P&L and sell decisions don't depend on which exchange holds the coin — withdrawal would just reduce exchange counterparty risk. Needs: per-exchange withdrawal API calls, minimum withdrawal threshold to avoid fee bleed.
+---
 
-### Weekly Report (revisit in future)
+### Future: Multi-agent teams
+
+Multiple teams with different strategies (conservative vs aggressive) vote on the same coins. Highest-conviction consensus triggers trades. Needs: team-scoped orchestrator configs, per-team Q-learning state, ensemble voting logic.
+
+**Consider CrewAI** for implementation — natural `Crew` + `Agent` + `Task` model maps directly to the existing orchestrator/specialist pattern. Supports role delegation, sequential or parallel task execution, shared memory between agents, and works with Gemini via the LiteLLM backend. Much cleaner than wiring ADK multi-team logic manually.
+
+---
+
+### Future: OpenViking for agent memory
+
+[OpenViking](https://github.com/volcengine/OpenViking) — open-source tiered context database for agents (L0 abstract / L1 overview / L2 full content). Better than flat prompt stuffing for long-running agents with large memory.
+
+Not worth it now: `use_memory=False`, Pi RAM limit, needs Go + C++ build, extra embedding API. Revisit if agent memory is re-enabled and past trade context starts overflowing prompts.
