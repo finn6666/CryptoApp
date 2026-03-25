@@ -235,11 +235,16 @@ function _renderHeatmap(coins, holdingsMap) {
 
 // ─── Public API ───────────────────────────────────────────────
 
+let _heatmapLoaded = false;
+
 async function loadHeatmap() {
     const grid = document.getElementById('heatmapGrid');
     if (!grid) return;
 
-    grid.innerHTML = '<div class="heatmap-loading">Loading heatmap…</div>';
+    // Only show loading placeholder on first load — avoids flicker on auto-refresh
+    if (!_heatmapLoaded) {
+        grid.innerHTML = '<div class="heatmap-loading">Loading heatmap…</div>';
+    }
 
     try {
         const [heatmapRes, holdingsRes] = await Promise.all([
@@ -258,6 +263,7 @@ async function loadHeatmap() {
         }
 
         _renderHeatmap(heatmapData.coins || [], holdingsMap);
+        _heatmapLoaded = true;
     } catch (err) {
         if (grid) {
             grid.innerHTML = `<div class="heatmap-loading" style="color:var(--error);">Heatmap unavailable: ${escapeHtml(err.message)}</div>`;
