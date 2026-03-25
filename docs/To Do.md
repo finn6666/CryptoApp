@@ -13,8 +13,6 @@
 ### Health / Bugs (`routes/health.py`, `src/web/templates/`)
 - ~~Gem detector still showing up on the health page — it has been removed, reference should be cleaned up~~ Done: removed stale `rl_detector_available` from `health.py` and `ml_routes.py`, updated stale docstring and `app.py` comment.
 
-### Security (`routes/**`, `app.py`, `src/web/**`)
-- Check security vulnerabilities introduced by recent web interface/app changes (new routes, JS, CORS, auth)
 ---
 
 ## Future Work

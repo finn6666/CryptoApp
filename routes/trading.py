@@ -4,6 +4,7 @@ Live trading engine and RL learning routes.
 
 import os
 import hmac
+import html as _html
 import json as _json
 import re
 import logging
@@ -54,6 +55,7 @@ def require_trading_auth(f):
 # ========================================
 
 @trading_bp.route('/api/trades/status')
+@require_trading_auth
 def trading_status():
     """Get trading engine status — budget, active trades, kill switch state"""
     try:
@@ -66,6 +68,7 @@ def trading_status():
 
 
 @trading_bp.route('/api/trades/pending')
+@require_trading_auth
 def pending_proposals():
     """Get all pending trade proposals awaiting approval"""
     try:
@@ -78,6 +81,7 @@ def pending_proposals():
 
 
 @trading_bp.route('/api/trades/history')
+@require_trading_auth
 def trade_history():
     """Get executed trade history"""
     try:
@@ -132,6 +136,11 @@ def confirm_trade(token):
         action_desc = ('Approve and execute this trade' if action == 'approve'
                        else 'Reject this trade — no money will be spent')
 
+        p_side   = _html.escape(str(proposal['side']).upper())
+        p_symbol = _html.escape(str(proposal['symbol']))
+        p_conf   = _html.escape(str(proposal['confidence']))
+        side_dot = '&#x1F7E2;' if proposal['side'] == 'buy' else '&#x1F534;'
+
         return f"""
         <html>
         <body style="font-family: -apple-system, sans-serif; background: #0d0d14; color: #e2e8f0;
@@ -139,28 +148,28 @@ def confirm_trade(token):
             <div style="background: #151520; padding: 40px; border-radius: 16px; border: 1px solid #2d3748;
                         max-width: 420px; width: 100%;">
                 <h2 style="margin: 0 0 20px; color: #e2e8f0; font-size: 18px;">
-                    {proposal['side'].upper()} {proposal['symbol']}
+                    {side_dot} {p_side} {p_symbol}
                 </h2>
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                     <tr><td style="padding:6px 0; color:#a0aec0;">Amount</td>
-                        <td style="text-align:right; font-weight:700;">£{proposal['amount_gbp']:.4f}</td></tr>
+                        <td style="text-align:right; font-weight:700;">&#xA3;{proposal['amount_gbp']:.4f}</td></tr>
                     <tr><td style="padding:6px 0; color:#a0aec0;">Price</td>
-                        <td style="text-align:right;">£{proposal['price_at_proposal']:.6f}</td></tr>
+                        <td style="text-align:right;">&#xA3;{proposal['price_at_proposal']:.6f}</td></tr>
                     <tr><td style="padding:6px 0; color:#a0aec0;">Confidence</td>
-                        <td style="text-align:right;">{proposal['confidence']}%</td></tr>
+                        <td style="text-align:right;">{p_conf}%</td></tr>
                 </table>
-                <p style="color: #a0aec0; font-size: 13px; margin-bottom: 20px;">{action_desc}</p>
+                <p style="color: #a0aec0; font-size: 13px; margin-bottom: 20px;">{_html.escape(action_desc)}</p>
                 <form method="POST">
                     <button type="submit"
                             style="width: 100%; padding: 14px; background: {action_colour}; color: white;
                                    border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
                                    cursor: pointer;">
-                        {action_label}
+                        {_html.escape(action_label)}
                     </button>
                 </form>
                 <a href="/trades" style="display: block; text-align: center; margin-top: 12px;
                                          color: #667eea; text-decoration: none; font-size: 13px;">
-                    ← Back to trades
+                    &larr; Back to trades
                 </a>
             </div>
         </body>
@@ -581,6 +590,7 @@ def monitor_price_history(symbol):
 # ========================================
 
 @trading_bp.route('/api/portfolio/holdings')
+@require_trading_auth
 def portfolio_holdings():
     """Get current portfolio holdings with live P&L."""
     try:
@@ -850,6 +860,7 @@ def exchange_status():
 
 
 @trading_bp.route('/api/exchanges/balance')
+@require_trading_auth
 def exchange_balance():
     """Get free cash balances across all connected exchanges."""
     try:

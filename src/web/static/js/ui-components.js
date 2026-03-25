@@ -42,32 +42,32 @@ function generateUnifiedAIAnalysis(coin, coinId) {
                 <div class="ai-header-compact">
                     <div class="ai-score-badge ${scoreClass}">
                         <div class="score-number">${Math.round(gemScore)}%</div>
-                        <div class="score-action ${recClass}">${recommendation}</div>
+                        <div class="score-action ${recClass}">${escapeHtml(recommendation)}</div>
                     </div>
                     <div class="ai-confidence-risk">
                         <div class="confidence-indicator">${confidence}% confident</div>
-                        <div class="opportunity-badge ${oppClass}">${opportunityLabel}</div>
+                        <div class="opportunity-badge ${oppClass}">${escapeHtml(opportunityLabel)}</div>
                     </div>
                 </div>
-                
+
                 ${summary ? `
                 <div class="ai-summary-text">
-                    ${summary.length > 200 ? summary.substring(0, 200) + '...' : summary}
+                    ${escapeHtml(summary.length > 200 ? summary.substring(0, 200) + '...' : summary)}
                 </div>
                 ` : ''}
-                
+
                 ${strengths.length > 0 || weaknesses.length > 0 ? `
                 <div class="ai-summary-compact">
                     ${strengths.length > 0 ? `
                     <div class="summary-item positive">
                         <span class="summary-icon">✓</span>
-                        <span class="summary-text">${strengths[0].length > 100 ? strengths[0].substring(0, 100) + '...' : strengths[0]}</span>
+                        <span class="summary-text">${escapeHtml(strengths[0].length > 100 ? strengths[0].substring(0, 100) + '...' : strengths[0])}</span>
                     </div>
                     ` : ''}
                     ${weaknesses.length > 0 ? `
                     <div class="summary-item negative">
                         <span class="summary-icon">!</span>
-                        <span class="summary-text">${weaknesses[0].length > 100 ? weaknesses[0].substring(0, 100) + '...' : weaknesses[0]}</span>
+                        <span class="summary-text">${escapeHtml(weaknesses[0].length > 100 ? weaknesses[0].substring(0, 100) + '...' : weaknesses[0])}</span>
                     </div>
                     ` : ''}
                 </div>
@@ -90,7 +90,7 @@ function generateUnifiedAIAnalysis(coin, coinId) {
                             <div class="detail-section">
                                 <div class="detail-header positive">Key Insights</div>
                                 ${strengths.slice(1, 4).map(s => `
-                                    <div class="detail-item">• ${s.length > 120 ? s.substring(0, 120) + '...' : s}</div>
+                                    <div class="detail-item">• ${escapeHtml(s.length > 120 ? s.substring(0, 120) + '...' : s)}</div>
                                 `).join('')}
                             </div>
                         ` : ''}
@@ -98,7 +98,7 @@ function generateUnifiedAIAnalysis(coin, coinId) {
                             <div class="detail-section">
                                 <div class="detail-header negative">Watch For</div>
                                 ${weaknesses.slice(1, 3).map(w => `
-                                    <div class="detail-item">• ${w.length > 120 ? w.substring(0, 120) + '...' : w}</div>
+                                    <div class="detail-item">• ${escapeHtml(w.length > 120 ? w.substring(0, 120) + '...' : w)}</div>
                                 `).join('')}
                             </div>
                         ` : ''}
@@ -157,7 +157,7 @@ function generateUnifiedAIAnalysis(coin, coinId) {
                         <span>Analysis</span>
                     </div>
                     <div class="ai-sentiment ${recommendationClass}">
-                        ${analysis.recommendation}${sentimentText}${confidence ? ' • ' + confidence : ''}
+                        ${escapeHtml(analysis.recommendation)}${escapeHtml(sentimentText)}${confidence ? ' • ' + escapeHtml(String(confidence)) : ''}
                     </div>
                 </div>
                 ${gemScore ? `
@@ -166,7 +166,7 @@ function generateUnifiedAIAnalysis(coin, coinId) {
                 </div>
                 ` : ''}
                 <div class="ai-summary">
-                    ${summaryText}
+                    ${escapeHtml(summaryText)}
                 </div>
             </div>
         `;

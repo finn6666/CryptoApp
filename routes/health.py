@@ -8,6 +8,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, render_template
 
 from routes.trading import require_trading_auth
+from extensions import limiter
 import services.app_state as state
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ def get_idle_status():
 
 
 @health_bp.route('/health')
+@limiter.exempt
 def health():
     """Simple health check endpoint for load balancers and smoke tests"""
     return jsonify({'status': 'ok', 'time': datetime.now().isoformat()}), 200
@@ -45,6 +47,7 @@ def health_dashboard():
 
 
 @health_bp.route('/api/health')
+@limiter.exempt
 def api_health():
     """Enhanced health check for SIEM monitoring"""
     # Trading engine status
@@ -146,6 +149,7 @@ def api_metrics():
 
 
 @health_bp.route('/api/debug/coins')
+@require_trading_auth
 def debug_coins():
     """Debug endpoint to see what coins are currently loaded"""
     try:

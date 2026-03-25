@@ -49,7 +49,7 @@ async function loadTicker() {
         const trendArrow = trend === 'IMPROVING' ? '↗' : trend === 'DETERIORATING' ? '↘' : '→';
 
         const gs = data.global_stats || {};
-        const btcDom   = gs.btc_dominance   ? `<span class="ticker-stat"><span class="ticker-stat__label">BTC DOM</span><span class="ticker-stat__value">${gs.btc_dominance}%</span></span>` : '';
+        const btcDom   = gs.btc_dominance   ? `<span class="ticker-stat"><span class="ticker-stat__label">BTC DOM</span><span class="ticker-stat__value">${escapeHtml(String(gs.btc_dominance))}%</span></span>` : '';
         const mcapChg  = gs.market_cap_change_24h !== undefined
             ? (() => {
                 const chg = gs.market_cap_change_24h;
@@ -65,7 +65,7 @@ async function loadTicker() {
             <span class="ticker-fng" style="border-left: 1px solid rgba(255,255,255,0.08); margin-left:4px; padding-left:10px;">
                 <span class="ticker-fng__label">F&G</span>
                 <span class="ticker-fng__value" style="color:${color};">${val}</span>
-                <span class="ticker-fng__cls" style="color:${color};">${cls} ${trendArrow}</span>
+                <span class="ticker-fng__cls" style="color:${color};">${escapeHtml(cls)} ${trendArrow}</span>
             </span>
         `;
 
