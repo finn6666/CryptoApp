@@ -25,8 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Fast retry: if market data isn't loaded yet, retry every 10s for up to 2 min
         startInitialRetry();
 
-        // Start auto-refresh timer (5 min interval)
-        startRefreshTimer();
+        // Start SSE stream (replaces setInterval polling for sidebar sections).
+        // Falls back to startRefreshTimer() automatically on error.
+        startDashboardSSE();
 
     } catch (error) {
         console.error('Error initializing dashboard:', error);

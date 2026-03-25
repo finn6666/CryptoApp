@@ -10,7 +10,7 @@ import re
 import logging
 import asyncio
 from functools import wraps
-from flask import Blueprint, jsonify, request, render_template, redirect
+from flask import Blueprint, jsonify, request, render_template, redirect, Response, stream_with_context
 from itsdangerous import SignatureExpired, BadSignature
 
 from extensions import limiter
@@ -722,6 +722,85 @@ def dashboard_summary():
         result['monitor'] = {}
 
     return jsonify(result), 200
+
+
+@trading_bp.route('/api/stream/dashboard')
+def stream_dashboard():
+    """SSE stream for the dashboard sidebar.
+    Sends one event containing all sidebar data then closes; the browser reconnects
+    after the retry interval. This keeps the Pi thread free between events while
+    eliminating the client-side setInterval soup.
+    Auth via ?key= query param — EventSource cannot send Authorization headers.
+    """
+    api_key = os.environ.get('TRADING_API_KEY')
+    if api_key:
+        provided = request.args.get('key', '')
+        if not provided or not hmac.compare_digest(provided, api_key):
+            return jsonify({'error': 'Invalid API key'}), 403
+
+    def generate():
+        payload = {}
+
+        # Portfolio summary (same as dashboard_summary)
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            tracker = get_portfolio_tracker()
+            live_prices = {}
+            if state.analyzer:
+                for coin in state.analyzer.coins:
+                    if coin.price:
+                        live_prices[coin.symbol.upper()] = coin.price
+            payload['portfolio'] = tracker.get_total_value(live_prices)
+        except Exception as e:
+            logger.warning(f"SSE stream — portfolio error: {e}")
+            payload['portfolio'] = {}
+
+        # Trading engine: status + pending proposals
+        try:
+            from ml.trading_engine import get_trading_engine
+            engine = get_trading_engine()
+            payload['trading'] = engine.get_status()
+            payload['pending_proposals'] = engine.get_pending_proposals()
+        except Exception as e:
+            logger.warning(f"SSE stream — trading error: {e}")
+            payload['trading'] = {}
+            payload['pending_proposals'] = []
+
+        # Scan loop: summary pill + detailed status for sidebar
+        try:
+            from ml.scan_loop import get_scan_loop
+            scanner = get_scan_loop()
+            scan_status = scanner.get_status()
+            payload['scanner'] = scan_status
+            payload['scan_detail'] = {
+                'status': scan_status,
+                'recent_logs': scanner.get_recent_logs(days=3),
+            }
+            payload['activity'] = {'entries': scanner.get_audit_trail(limit=20)}
+        except Exception as e:
+            logger.warning(f"SSE stream — scan error: {e}")
+            payload['scanner'] = {}
+            payload['scan_detail'] = {'status': {}, 'recent_logs': []}
+            payload['activity'] = {'entries': []}
+
+        # Market monitor
+        try:
+            from ml.market_monitor import get_market_monitor
+            payload['monitor'] = get_market_monitor().get_status()
+        except Exception as e:
+            logger.warning(f"SSE stream — monitor error: {e}")
+            payload['monitor'] = {}
+
+        yield f"retry: 30000\ndata: {_json.dumps(payload)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',   # prevent nginx from buffering the stream
+        }
+    )
 
 
 @trading_bp.route('/api/portfolio/sell-signals')
