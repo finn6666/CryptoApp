@@ -24,5 +24,20 @@ KillSignal=SIGINT
 MemoryMax=1G
 MemoryHigh=768M
 
+# Systemd hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/home/pi/CryptoApp/data /home/pi/CryptoApp/models /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+
 [Install]
 WantedBy=multi-user.target
