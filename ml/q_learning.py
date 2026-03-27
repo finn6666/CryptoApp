@@ -104,10 +104,23 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         or coin_data.get("attractiveness_score", 0) * 10
         or 0
     )
+    try:
+        gem_raw = float(gem_raw)
+    except (TypeError, ValueError):
+        gem_raw = 0.0
     gem = _gem_tier(gem_raw)
 
+    try:
+        mcap_val = float(coin_data.get("market_cap", 0) or 0)
+    except (TypeError, ValueError):
+        mcap_val = 0.0
+    try:
+        vol_val = float(coin_data.get("volume_24h", 0) or 0)
+    except (TypeError, ValueError):
+        vol_val = 0.0
+
     vol = _volume_mcap_tier(
-        coin_data.get("volume_24h", 0) / max(coin_data.get("market_cap", 1), 1)
+        vol_val / max(mcap_val, 1)
     )
 
     # weekly change: coin_to_dict uses 'price_change_7d', not 'percent_change_7d'
@@ -116,9 +129,13 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         or coin_data.get("percent_change_7d")
         or 0
     )
+    try:
+        weekly_pct = float(weekly_pct)
+    except (TypeError, ValueError):
+        weekly_pct = 0.0
     wk = _weekly_change_tier(weekly_pct)
 
-    mc = _mcap_tier(coin_data.get("market_cap", 0))
+    mc = _mcap_tier(mcap_val)
 
     # agent/screen confidence at scan time (differentiates high vs low conviction buys)
     conf_raw = (
@@ -126,6 +143,10 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         or coin_data.get("confidence")
         or 0
     )
+    try:
+        conf_raw = float(conf_raw)
+    except (TypeError, ValueError):
+        conf_raw = 0.0
     conf = _confidence_tier(conf_raw)
 
     return f"{gem}|{vol}|{wk}|{mc}|{conf}"

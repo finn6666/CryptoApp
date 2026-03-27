@@ -30,6 +30,21 @@ MONITOR_LOG_DIR = Path("data/monitor_logs")
 MONITOR_STATE_FILE = Path("data/monitor_state.json")
 
 
+def _to_float(val, default: float = 0.0) -> float:
+    """Safely convert a potentially £/$ formatted string value to float."""
+    if val is None:
+        return default
+    if isinstance(val, str):
+        try:
+            return float(val.replace('£', '').replace('$', '').replace(',', ''))
+        except ValueError:
+            return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass
 class PriceSnapshot:
     """A point-in-time price observation for a coin."""
@@ -233,10 +248,10 @@ class MarketMonitor:
                 if symbol in state.STABLECOINS:
                     continue
 
-                price = float(getattr(coin, "price", 0) or 0)
-                volume = float(getattr(coin, "volume_24h", 0) or getattr(coin, "total_volume", 0) or 0)
-                pct_1h = float(getattr(coin, "percent_change_1h", 0) or getattr(coin, "price_change_percentage_1h", 0) or 0)
-                pct_24h = float(getattr(coin, "percent_change_24h", 0) or getattr(coin, "price_change_percentage_24h", 0) or 0)
+                price = _to_float(getattr(coin, "price", None))
+                volume = _to_float(getattr(coin, "volume_24h", None) or getattr(coin, "total_volume", None))
+                pct_1h = _to_float(getattr(coin, "percent_change_1h", None) or getattr(coin, "price_change_percentage_1h", None))
+                pct_24h = _to_float(getattr(coin, "percent_change_24h", None) or getattr(coin, "price_change_percentage_24h", None))
 
                 if price <= 0:
                     continue
