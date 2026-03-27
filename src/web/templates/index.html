@@ -32,6 +32,7 @@
                     <div>Next: <span id="nextRefresh">-</span></div>
                 </div>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">Refresh</button>
+                <button class="btn" onclick="openAuthModal()" id="keyBtn" title="Set API key">Key</button>
             </div>
             <h1>Crypto Investment Dashboard</h1>
         </div>
@@ -206,6 +207,21 @@
         <div class="alert" id="tradeAlert" style="display:none;"><span id="tradeAlertMessage"></span></div>
 
     </div><!-- end container -->
+
+    <!-- API Key Modal -->
+    <div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:var(--surface,#1a1a2e);border:1px solid var(--border,#333);border-radius:12px;padding:28px 32px;width:360px;max-width:90vw;">
+            <h3 style="margin:0 0 8px;font-size:1rem;color:var(--text-primary,#fff);">API Key Required</h3>
+            <p style="margin:0 0 16px;font-size:0.8rem;color:var(--text-secondary,#aaa);">Enter your <code>TRADING_API_KEY</code> to view portfolio and trade data.</p>
+            <input id="authKeyInput" type="password" placeholder="Paste API key here"
+                style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg,#0d0d1a);border:1px solid var(--border,#333);border-radius:6px;color:var(--text-primary,#fff);font-size:0.85rem;outline:none;margin-bottom:12px;"
+                onkeydown="if(event.key==='Enter')saveApiKey()" />
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="btn" onclick="document.getElementById('authModal').style.display='none'">Cancel</button>
+                <button class="btn btn-gold" onclick="saveApiKey()">Save</button>
+            </div>
+        </div>
+    </div>
 
     <script>
     function toggleSidebarPanel(headerEl) {

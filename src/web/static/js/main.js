@@ -3,9 +3,35 @@
 // Global state
 let refreshing = false;
 
-// Initialize application
+// ─── API Key Modal ────────────────────────────────────────────
+function openAuthModal() {
+    const modal = document.getElementById('authModal');
+    const input = document.getElementById('authKeyInput');
+    if (!modal) return;
+    input.value = '';
+    modal.style.display = 'flex';
+    setTimeout(() => input.focus(), 50);
+}
+
+function saveApiKey() {
+    const input = document.getElementById('authKeyInput');
+    const key = input ? input.value.trim() : '';
+    if (!key) return;
+    setApiKey(key);
+    document.getElementById('authModal').style.display = 'none';
+    // Reload auth-gated sections now that key is set
+    loadOverviewCards();
+    initTradingSections();
+}
+
+// ─── Initialize application ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
     console.log('CryptoApp Dashboard initializing...');
+
+    // Show key modal if no API key stored
+    if (!getApiKey()) {
+        openAuthModal();
+    }
 
     try {
         // Live ticker across the top

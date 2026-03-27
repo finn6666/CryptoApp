@@ -11,9 +11,18 @@ function escapeHtml(str) {
 
 // ─── Auth ──────────────────────────────────────────────────
 
-/** Return stored API key (no prompt — key only needed for agent trade proposals). */
+/** Return stored API key from localStorage (persists across sessions). */
 function getApiKey() {
-    return sessionStorage.getItem('tradingApiKey');
+    return localStorage.getItem('tradingApiKey');
+}
+
+/** Persist API key to localStorage. */
+function setApiKey(key) {
+    if (key) {
+        localStorage.setItem('tradingApiKey', key.trim());
+    } else {
+        localStorage.removeItem('tradingApiKey');
+    }
 }
 
 /** Headers for authenticated GET requests. Returns {} if no key stored. */
