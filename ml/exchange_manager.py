@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
-from ml.error_handling import retry, alert_exchange_down, alert_trade_failure
+from ml.error_handling import retry, alert_exchange_down
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +431,6 @@ class ExchangeManager:
             }
         except Exception as e:
             logger.error(f"Order failed on {exchange_id}: {e}")
-            alert_trade_failure(symbol, str(e), {"exchange": exchange_id, "side": side})
             # Try next exchange
             exchanges = self.get_exchanges_for_coin(symbol)
             remaining = [eid for eid in exchanges if eid != exchange_id]

@@ -802,7 +802,7 @@ class TradingEngine:
         approve_url = f"{self.server_url}/api/trades/confirm/{approve_token}"
         reject_url = f"{self.server_url}/api/trades/confirm/{reject_token}"
 
-        subject = f"{'[SELL]' if proposal.side == 'sell' else '[Trade]'} Proposal: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
+        subject = f"{'[SELL]' if proposal.side == 'sell' else '[BUY]'} Proposal: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
 
         is_sell = proposal.side == "sell"
         header_gradient = "linear-gradient(90deg, #e53e3e, #c53030)" if is_sell else "linear-gradient(90deg, #667eea, #764ba2)"
@@ -814,7 +814,7 @@ class TradingEngine:
         if is_sell:
             sell_warning = """
                     <div style="background: rgba(229,62,62,0.15); border: 1px solid rgba(229,62,62,0.4); border-radius: 8px; padding: 12px; margin: 12px 0; font-size: 13px; color: #fc8181;">
-                        &#9888;&#65039; <strong>SELL order</strong> &#8212; This will liquidate your position. Review carefully before approving.
+                        <strong>SELL order</strong> &#8212; This will liquidate your position. Review carefully before approving.
                     </div>"""
 
         body = f"""
@@ -824,7 +824,7 @@ class TradingEngine:
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
                 <div style="background: {header_gradient}; padding: 16px 20px;">
                     <h2 style="margin: 0; color: white; font-size: 18px;">
-                        {'&#x1F7E2;' if proposal.side == 'buy' else '&#x1F534;'} {proposal.side.upper()} {display_name}
+                        {proposal.side.upper()} {display_name}
                     </h2>
                 </div>
                 
@@ -887,7 +887,9 @@ class TradingEngine:
         exec_price_str = f"{_ep:.{_exec_dp}f}"
 
         body = f"""
-        <html>        <head><meta charset="utf-8"></head>        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; padding: 20px;">
                 <h2 style="color: #48bb78; margin-top: 0;">Trade Executed</h2>
                 <table style="width: 100%; border-collapse: collapse;">
@@ -922,7 +924,7 @@ class TradingEngine:
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
                 <div style="background: linear-gradient(90deg, #e53e3e, #c53030); padding: 16px 20px;">
-                    <h2 style="margin: 0; color: white; font-size: 18px;">&#x274C; Trade Failed</h2>
+                    <h2 style="margin: 0; color: white; font-size: 18px;">FAILED: Trade Not Executed</h2>
                 </div>
                 <div style="padding: 20px;">
                     <table style="width: 100%; border-collapse: collapse;">

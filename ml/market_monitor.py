@@ -233,10 +233,10 @@ class MarketMonitor:
                 if symbol in state.STABLECOINS:
                     continue
 
-                price = getattr(coin, "price", 0) or 0
-                volume = getattr(coin, "volume_24h", 0) or getattr(coin, "total_volume", 0) or 0
-                pct_1h = getattr(coin, "percent_change_1h", 0) or getattr(coin, "price_change_percentage_1h", 0) or 0
-                pct_24h = getattr(coin, "percent_change_24h", 0) or getattr(coin, "price_change_percentage_24h", 0) or 0
+                price = float(getattr(coin, "price", 0) or 0)
+                volume = float(getattr(coin, "volume_24h", 0) or getattr(coin, "total_volume", 0) or 0)
+                pct_1h = float(getattr(coin, "percent_change_1h", 0) or getattr(coin, "price_change_percentage_1h", 0) or 0)
+                pct_24h = float(getattr(coin, "percent_change_24h", 0) or getattr(coin, "price_change_percentage_24h", 0) or 0)
 
                 if price <= 0:
                     continue

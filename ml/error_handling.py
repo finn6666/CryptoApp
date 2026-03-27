@@ -120,19 +120,35 @@ def send_error_alert(
         return False
 
     full_subject = f"[CryptoApp ALERT] {subject}"
-    full_body = (
-        f"{body}\n\n"
-        f"---\n"
-        f"Category: {category}\n"
-        f"Time: {datetime.utcnow().isoformat()}Z\n"
-        f"Host: {os.uname().nodename}\n"
-    )
+    body_escaped = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    host = os.uname().nodename
+    html_body = f"""<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+  <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
+    <div style="background: linear-gradient(90deg, #e53e3e, #c53030); padding: 16px 20px;">
+      <h2 style="margin: 0; color: white; font-size: 18px;">{subject}</h2>
+    </div>
+    <div style="padding: 20px;">
+      <p style="font-size: 14px; line-height: 1.6; margin: 0 0 16px;">{body_escaped}</p>
+      <div style="font-size: 11px; color: #a0aec0; border-top: 1px solid #2d3748; padding-top: 12px;">
+        Category: {category}<br>
+        Time: {timestamp}<br>
+        Host: {host}
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
 
     try:
-        msg = MIMEText(full_body)
+        from email.mime.multipart import MIMEMultipart
+        msg = MIMEMultipart("alternative")
         msg["Subject"] = full_subject
         msg["From"] = smtp_user
         msg["To"] = to_addr
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
         smtp_port = int(os.getenv("SMTP_PORT", "587"))
@@ -140,7 +156,7 @@ def send_error_alert(
         with smtplib.SMTP(smtp_host, smtp_port) as server:
             server.starttls()
             server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
+            server.sendmail(smtp_user, to_addr, msg.as_string())
 
         _last_alert_time[category] = now
         logger.info(f"Error alert sent: {full_subject}")

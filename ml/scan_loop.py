@@ -505,8 +505,8 @@ class ScanLoop:
             trade_decision = analysis.get("trade_decision", {})
 
             should_trade = trade_decision.get("should_trade", False)
-            conviction = trade_decision.get("trade_conviction", 0)
-            allocation_pct = trade_decision.get("trade_allocation_pct", 0)
+            conviction = int(trade_decision.get("trade_conviction", 0) or 0)
+            allocation_pct = float(trade_decision.get("trade_allocation_pct", 0) or 0)
             trade_reasoning = trade_decision.get("trade_reasoning", "")
             trade_side = trade_decision.get("trade_side", "buy")
 
@@ -520,8 +520,8 @@ class ScanLoop:
                     try:
                         parsed = _json.loads(json_match.group())
                         should_trade = parsed.get("should_trade", False)
-                        conviction = parsed.get("trade_conviction", parsed.get("conviction", 0))
-                        allocation_pct = parsed.get("trade_allocation_pct", parsed.get("suggested_allocation_pct", 0))
+                        conviction = int(parsed.get("trade_conviction", parsed.get("conviction", 0)) or 0)
+                        allocation_pct = float(parsed.get("trade_allocation_pct", parsed.get("suggested_allocation_pct", 0)) or 0)
                         trade_reasoning = parsed.get("trade_reasoning", parsed.get("reasoning", ""))
                         trade_side = parsed.get("trade_side", parsed.get("side", "buy"))
                     except _json.JSONDecodeError:
@@ -604,6 +604,13 @@ class ScanLoop:
                 )
 
                 outcome = "executed" if result.get("auto_approved") else "proposed"
+                # Auto-approved but execution failed — report as error
+                if result.get("auto_approved") and not result.get("success"):
+                    return {
+                        "outcome": "error",
+                        "proposed": False,
+                        "reason": result.get("error", "Trade execution failed"),
+                    }
                 return {
                     "outcome": outcome,
                     "proposed": result.get("success", False),
