@@ -269,11 +269,19 @@ async function toggleKillSwitch() {
     if (!isHalted && !confirm('This will HALT all trading and reject pending proposals. Continue?')) return;
 
     try {
-        await fetch('/api/trades/kill-switch', {
+        const res = await fetch('/api/trades/kill-switch', {
             method: 'POST',
             headers: authHeadersJson(),
             body: JSON.stringify({action})
         });
+        if (res.status === 401 || res.status === 403) {
+            showTradeAlert('Unauthorised — check your API key is set in browser storage', 'error');
+            return;
+        }
+        if (!res.ok) {
+            showTradeAlert('Server error — could not toggle kill switch', 'error');
+            return;
+        }
         showTradeAlert(isHalted ? 'Trading resumed' : 'Trading HALTED — all pending proposals rejected', isHalted ? 'success' : 'error');
         loadTradingStatus();
         loadPendingProposals();
