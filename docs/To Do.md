@@ -2,6 +2,11 @@
 
 ## Current To Do
 
+### Security / access
+- Apply firewall changes on Pi: restrict SSH to local network + Tailscale range only
+- Disable SSH password auth on Pi (`PasswordAuthentication no` in sshd_config)
+- Set up weekly security check systemd timer on Pi (deploy/cryptoapp-security.service + .timer)
+
 ### UI layout & visual polish
 - Text is showing a bit small on each coin (coin rating, current cost etc)
 - Last scan/refresh in corner looks weird
