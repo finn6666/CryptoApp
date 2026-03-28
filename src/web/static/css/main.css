@@ -2650,7 +2650,7 @@ body::before {
 /* Individual heatmap tile */
 .hm-tile {
     border-radius: 4px;
-    padding: 6px 8px;
+    padding: 8px 10px;
     cursor: pointer;
     transition: background 0.4s ease, opacity 0.15s, transform 0.15s;
     display: flex;
@@ -2659,7 +2659,7 @@ body::before {
     overflow: hidden;
     position: relative;
     min-width: 40px;
-    min-height: 55px;
+    min-height: 64px;
 }
 
 .hm-tile:hover {

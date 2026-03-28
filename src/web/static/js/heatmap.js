@@ -191,7 +191,7 @@ function _renderHeatmap(coins, holdingsMap) {
     rows.forEach((row, ri) => {
         const rowEl = document.createElement('div');
         // flex value proportional to row's total score so taller rows get more height
-        rowEl.style.cssText = `display:flex; flex:${rowTotals[ri] / totalScore * rows.length}; gap:2px; min-height:55px;`;
+        rowEl.style.cssText = `display:flex; flex:${rowTotals[ri] / totalScore * rows.length}; gap:2px; min-height:64px;`;
 
         row.forEach(coin => {
             const held = holdingsMap[coin.symbol];
@@ -209,7 +209,7 @@ function _renderHeatmap(coins, holdingsMap) {
             const symbolText  = held ? `&#9679; ${escapeHtml(coin.symbol)}` : escapeHtml(coin.symbol);
 
             const tile = document.createElement('div');
-            tile.className = 'hm-tile' + (coin.gem_score < 2 ? ' hm-tile--micro' : '');
+            tile.className = 'hm-tile' + (coin.gem_score < 3 ? ' hm-tile--micro' : '');
             // flex: gem_score makes tile width proportional within the row
             tile.style.cssText = [
                 `background:${bgColour}`,

@@ -69,7 +69,7 @@ async function loadDashboardSummary(prefetchedData = null) {
         _setText('sbScanProposals',s.total_proposals ?? s.proposals_made ?? 0);
 
         // Populate sidebar scan-status badge
-        const scanBadge = document.getElementById('sbScanStatusBadge');
+        const scanBadge = document.getElementById('scanStatusDetail');
         if (scanBadge) {
             const running   = s.scan_running ?? s.running ?? false;
             const scheduled = s.scheduler_running ?? s.scheduler_active ?? false;
