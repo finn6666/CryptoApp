@@ -1,6 +1,25 @@
 
 ## Current To Do
 
+### Security / Access
+- Apply firewall changes on Pi: restrict SSH to local network + Tailscale range only
+- Disable SSH password auth on Pi (`PasswordAuthentication no` in sshd_config)
+- Set up weekly security check systemd timer on Pi (`deploy/cryptoapp-security.service` + `.timer`)
+
+### UI / Dashboard
+- Text is showing a bit small on each coin (coin rating, current cost etc)
+- Last scan/refresh in corner looks weird
+- Scanner/scan now button on the side is a bit pointless
+- Want portfolio value and portfolio P&L on the right to be clear and easy to see
+- Collapse trade log on the right
+
+### Behaviour & UX
+- When I click on a tile/coin, just want very short analysis rather than what it's showing currently
+- On RL insights, want stuff that I can learn — trade patterns etc
+
+### System & Stability
+- Daily budget/budget remaining has been removed (bug — restore it)
+- Ensure the Pi isn't being overly extended
 
 ## Future Work
 
