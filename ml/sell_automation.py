@@ -498,6 +498,7 @@ class SellAutomation:
                         reason=f"Agent re-analysis recommends SELL: {reason_text}",
                         confidence=confidence,
                         recommendation="SELL",
+                        sell_quantity=quantity,
                     )
                     proposals.append({
                         "symbol": symbol,
