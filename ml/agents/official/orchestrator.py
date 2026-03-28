@@ -101,6 +101,7 @@ crypto_orchestrator = Agent(
 - Short-term price dips, sideways action, or reduced hype are NOT reasons to sell.
 - If upside looks genuinely short-lived (pure pump-and-dump, no real product, volume fading after initial spike with no follow-through), THEN flag for sell.
 - Patient holding through volatility is how low-cap investors capture 5-10x moves.
+- **HOLD Recheck Exception:** When the prompt includes an EXISTING POSITION block, if the trading_specialist returns conviction below 45% and the position is at a loss, the correct answer is SELL — not HOLD. A deteriorating thesis at a loss is a valid exit. Override the default HOLD bias in this specific scenario. Also override for stagnant positions (flat P&L, 14+ days held, no clear upcoming catalyst).
 
 **Key rules:**
 - Every summary must mention the coin's actual name and use case — never say "this project" or "the token"
@@ -128,6 +129,65 @@ crypto_orchestrator = Agent(
 # Using in-memory for now - can upgrade to VertexAI memory bank later
 memory_service = InMemoryMemoryService()
 session_service = InMemorySessionService()
+
+
+def _build_market_data_str(coin_data: Optional[Dict[str, Any]], symbol: str = "") -> str:
+    """Build a pipe-separated market data string for the analysis prompt."""
+    if not coin_data:
+        return "No data available."
+
+    lines = [
+        f"Name: {coin_data.get('name', symbol)}",
+        f"Price: £{coin_data.get('price', 'N/A')}",
+        f"24h: {coin_data.get('price_change_24h', 'N/A')}%",
+        f"7d: {coin_data.get('price_change_7d', 'N/A')}%",
+        f"Rank: #{coin_data.get('market_cap_rank', 'N/A')}",
+        f"MCap: £{coin_data.get('market_cap', 'N/A')}",
+        f"Vol: £{coin_data.get('volume_24h', 'N/A')}",
+        f"Score: {coin_data.get('attractiveness_score', 'N/A')}/100",
+    ]
+
+    p30d = coin_data.get('price_change_30d')
+    lines.append(f"30d: {p30d:.1f}%" if p30d is not None else "30d: N/A")
+
+    ath = coin_data.get('ath_change_pct')
+    lines.append(f"ATH dist: {ath:.1f}%" if ath is not None else "ATH dist: N/A")
+
+    return " | ".join(lines)
+
+
+def _build_position_context(coin_data: Optional[Dict[str, Any]]) -> str:
+    """
+    If coin_data represents an existing holding (has avg_entry_price), return a
+    formatted context block so agents can apply the recheck SELL override rules.
+    Returns empty string for fresh scan coins.
+    """
+    if not coin_data:
+        return ""
+    avg_entry = coin_data.get("avg_entry_price")
+    if avg_entry is None:
+        return ""
+
+    pnl_pct = coin_data.get("unrealised_pnl_pct")
+    hold_hours = coin_data.get("hold_hours")
+
+    # Compute hold_hours from first_buy_at if not directly present
+    if hold_hours is None:
+        first_buy_at = coin_data.get("first_buy_at")
+        if first_buy_at:
+            try:
+                from datetime import datetime
+                hold_hours = (datetime.now() - datetime.fromisoformat(first_buy_at)).total_seconds() / 3600
+            except Exception:
+                hold_hours = None
+
+    parts = [f"entry £{avg_entry:.6g}"]
+    if pnl_pct is not None:
+        parts.append(f"current P&L {pnl_pct:.1f}%")
+    if hold_hours is not None:
+        parts.append(f"held {hold_hours:.0f}h")
+
+    return f"\n\nEXISTING POSITION: {', '.join(parts)}"
 
 
 def _build_trade_history_context() -> str:
@@ -162,13 +222,27 @@ def _build_trade_history_context() -> str:
                 cost = h.get("total_cost_gbp", 0)
                 lines.append(f"    {sym}: qty {qty:.6g} @ £{entry:.6g} (cost £{cost:.4f})")
 
-        # Recent closed trades (last 5)
+        # Recent closed trades (last 10)
         if closed:
             lines.append("  Recent closed positions:")
-            for c in closed[:5]:
+            for c in closed[:10]:
                 outcome = "WIN" if c["won"] else "LOSS"
                 lines.append(
                     f"    {c['symbol']}: {outcome} £{c['realised_pnl_gbp']:+.4f}"
+                )
+
+            wins = sum(1 for c in closed[:10] if c.get("won", False))
+            losses = sum(1 for c in closed[:10] if not c.get("won", True))
+            lines.append(f"  Win/loss (last 10): {wins}W / {losses}L")
+
+            # Flag coins that have lost multiple times — avoid repeating mistakes
+            from collections import Counter
+            loss_symbols = [c["symbol"] for c in closed if not c.get("won", True)]
+            loss_counts = Counter(loss_symbols)
+            persistent_losers = [s for s, n in loss_counts.items() if n >= 2]
+            if persistent_losers:
+                lines.append(
+                    f"  AVOID repeated losers: {', '.join(persistent_losers)} — these patterns have lost multiple times"
                 )
 
         return "\n".join(lines)
@@ -210,27 +284,16 @@ async def analyze_crypto(
     
     runner = Runner(**runner_kwargs)
     
-    # Build concise prompt with market data
-    market_lines = []
-    if coin_data:
-        market_lines = [
-            f"Name: {coin_data.get('name', symbol)}",
-            f"Price: £{coin_data.get('price', 'N/A')}",
-            f"24h: {coin_data.get('price_change_24h', 'N/A')}%",
-            f"7d: {coin_data.get('price_change_7d', 'N/A')}%",
-            f"Rank: #{coin_data.get('market_cap_rank', 'N/A')}",
-            f"MCap: £{coin_data.get('market_cap', 'N/A')}",
-            f"Vol: £{coin_data.get('volume_24h', 'N/A')}",
-            f"Score: {coin_data.get('attractiveness_score', 'N/A')}/100",
-        ]
-    
-    market_data_str = " | ".join(market_lines) if market_lines else "No data available."
+    market_data_str = _build_market_data_str(coin_data, symbol)
 
     # Inject past trade performance so agents can learn from real outcomes
     trade_history_ctx = _build_trade_history_context()
     history_block = f"\n\n{trade_history_ctx}" if trade_history_ctx else ""
 
-    prompt = f"""Analyze {symbol}: {market_data_str}{history_block}
+    # Inject existing-position context so agents can apply the recheck override rules
+    position_block = _build_position_context(coin_data)
+
+    prompt = f"""Analyze {symbol}: {market_data_str}{position_block}{history_block}
 
 Give me the real story on {symbol} — what does this project actually do, why should anyone care, and is it worth a punt at this price? Coordinate your team (all 5 specialists) and be brutally honest. No generic filler.
 Use the past trading performance above (if present) to calibrate your confidence — avoid repeating losing patterns and double down on what has worked.

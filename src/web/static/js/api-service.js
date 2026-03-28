@@ -18,28 +18,28 @@ async function loadDashboardSummary(prefetchedData = null) {
             return { value: b !== null ? `£${Number(b).toFixed(2)}` : 'Active' };
         });
 
-        // Portfolio value + P&L pills
+        // Portfolio sidebar panel
         (() => {
             const p = data.portfolio || {};
             const pnl = p.unrealised_pnl_gbp ?? 0;
             const val = p.total_value_gbp ?? 0;
+            const cost = p.total_cost_gbp ?? 0;
 
-            const valEl = document.getElementById('pillPortfolioValue');
-            if (valEl) {
-                valEl.textContent = val ? `£${Number(val).toFixed(2)}` : '£0.00';
-                valEl.className = 'status-pill__value';
-            }
+            const valEl = document.getElementById('sidebarPortfolioValue');
+            if (valEl) valEl.textContent = `£${Number(val).toFixed(2)}`;
 
-            const pnlEl = document.getElementById('pillPnl');
+            const pnlEl = document.getElementById('sidebarPortfolioPnl');
             if (pnlEl) {
                 if (!val && !pnl) {
-                    pnlEl.textContent = '—';
-                    pnlEl.className = 'status-pill__sub';
+                    pnlEl.textContent = 'No open positions';
+                    pnlEl.className = 'portfolio-hero__pnl';
                 } else {
+                    const pnlPct = cost > 0 ? (pnl / cost) * 100 : null;
                     const sign = pnl >= 0 ? '+' : '';
-                    const cls  = pnl >= 0 ? 'positive' : 'negative';
-                    pnlEl.textContent = `${sign}£${Math.abs(pnl).toFixed(2)} P&L`;
-                    pnlEl.className = `status-pill__sub ${cls}`;
+                    let text = `${sign}£${Math.abs(pnl).toFixed(2)}`;
+                    if (pnlPct !== null) text += ` (${sign}${Math.abs(pnlPct).toFixed(1)}%)`;
+                    pnlEl.textContent = text;
+                    pnlEl.className = `portfolio-hero__pnl ${pnl >= 0 ? 'positive' : 'negative'}`;
                 }
             }
         })();
@@ -270,13 +270,10 @@ async function refreshData_afterAutoLoad() {
 
 async function forceRefresh() {
     if (refreshing) return;
-    
+
     const btn = document.getElementById('refreshBtn');
-    const originalText = btn.textContent;
-    
     refreshing = true;
-    btn.textContent = 'Refreshing...';
-    btn.disabled = true;
+    if (btn) { btn.textContent = 'Refreshing...'; btn.disabled = true; }
 
     try {
         const response = await fetch('/api/refresh', { method: 'POST', headers: authHeadersJson() });
@@ -293,8 +290,7 @@ async function forceRefresh() {
         showStatus(`Error: ${error.message}`, 'error');
     } finally {
         refreshing = false;
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) { btn.textContent = 'Refresh'; btn.disabled = false; }
     }
 }
 

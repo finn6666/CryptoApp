@@ -10,7 +10,7 @@ async function loadTradingStatus(data = null) {
             data = await response.json();
         }
 
-        document.getElementById('budgetRemaining').textContent = `£${data.remaining_today_gbp.toFixed(2)}`;
+        document.getElementById('budgetRemaining').textContent = `£${(data.remaining_today_gbp ?? 0).toFixed(2)}`;
         document.getElementById('tradesToday').textContent = data.trades_today || 0;
 
         const statusEl = document.getElementById('tradingStatus');
@@ -659,21 +659,25 @@ async function loadRlInsights() {
                 return { text, type: 'pattern', tag: 'PATTERN' };
             });
 
-        const ordered = [
-            ...categorised.filter(i => i.type === 'signal'),
-            ...categorised.filter(i => i.type === 'avoid'),
-            ...categorised.filter(i => i.type === 'pattern'),
-        ];
+        const sections = [
+            { type: 'signal',  label: "What's Working", items: categorised.filter(i => i.type === 'signal') },
+            { type: 'avoid',   label: 'What to Avoid',  items: categorised.filter(i => i.type === 'avoid') },
+            { type: 'pattern', label: 'Patterns',        items: categorised.filter(i => i.type === 'pattern') },
+        ].filter(s => s.items.length > 0);
+
+        const sectionsHtml = sections.map(({ type, label, items }) => `
+            <div class="rl-section rl-section--${type}">
+                <div class="rl-section__label">${label}</div>
+                <ul class="rl-list">
+                    ${items.map(({ text }) => `<li class="rl-list__item">${escapeHtml(text)}</li>`).join('')}
+                </ul>
+            </div>
+        `).join('');
 
         container.innerHTML = `
             ${recordHtml}
             ${patternHtml}
-            ${ordered.map(({ text, type, tag }) => `
-                <div class="rl-insight rl-insight--${type}">
-                    <span class="rl-tag rl-tag--${type}">${tag}</span>
-                    <span class="rl-text">${escapeHtml(text)}</span>
-                </div>
-            `).join('')}
+            ${sectionsHtml}
         `;
     } catch (e) {
         console.error('Error loading RL insights:', e);

@@ -43,12 +43,12 @@ function authHeadersJson() {
 function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
     const lastUpdatedEl = document.getElementById('lastUpdated');
     const nextRefreshEl = document.getElementById('nextRefresh');
-    
-    if (lastUpdated) {
+
+    if (lastUpdated && lastUpdatedEl) {
         const date = new Date(lastUpdated);
         const now = new Date();
         const minutesAgo = Math.floor((now - date) / 60000);
-        
+
         if (minutesAgo < 1) {
             lastUpdatedEl.textContent = 'Just now';
         } else if (minutesAgo < 60) {
@@ -58,11 +58,11 @@ function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
             lastUpdatedEl.textContent = `${hoursAgo}h ago`;
         }
     }
-    
-    if (cacheExpiresIn !== undefined && cacheExpiresIn !== null) {
+
+    if (cacheExpiresIn !== undefined && cacheExpiresIn !== null && nextRefreshEl) {
         const minutes = Math.floor(cacheExpiresIn / 60);
         const seconds = cacheExpiresIn % 60;
-        
+
         if (minutes > 0) {
             nextRefreshEl.textContent = `${minutes}m ${seconds}s`;
         } else {
