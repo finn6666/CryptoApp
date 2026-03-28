@@ -3403,26 +3403,6 @@ html, body {
     user-select: none;
 }
 
-.st-key-btn {
-    background: none;
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
-    font-size: 9px;
-    padding: 2px 7px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-left: auto;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-    line-height: 1.6;
-    transition: color 0.15s, border-color 0.15s;
-}
-
-.st-key-btn:hover {
-    color: var(--text-primary);
-    border-color: var(--accent-primary);
-}
-
 /* Main body fills remaining height, no page overflow */
 .dashboard-body {
     flex: 1;
