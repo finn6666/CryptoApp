@@ -121,7 +121,7 @@ class SellAutomation:
             elif p.status in ("rejected", "executed") and p.created_at:
                 try:
                     created = datetime.fromisoformat(p.created_at)
-                    if (datetime.utcnow() - created).total_seconds() < 3600:
+                    if (datetime.utcnow() - created).total_seconds() < 14400:  # 4h
                         pending_sell_triggers.setdefault(sym, set()).add(trigger_type)
                 except Exception:
                     pass
@@ -489,6 +489,23 @@ class SellAutomation:
                     engine = get_trading_engine()
                     current_price = live_prices.get(symbol, 0)
                     quantity = holding.get("quantity", 0)
+
+                    # Skip if a sell was recently rejected for this symbol
+                    # (e.g. volume minimum not met) — avoid hammering the exchange
+                    pending_for_sym: set = set()
+                    for p in engine.proposals.values():
+                        if p.side == "sell" and p.symbol == symbol and p.created_at:
+                            try:
+                                created = datetime.fromisoformat(p.created_at)
+                                if (datetime.utcnow() - created).total_seconds() < 14400:
+                                    pending_for_sym.add(p.status)
+                            except Exception:
+                                pass
+                    if "pending" in pending_for_sym or "rejected" in pending_for_sym:
+                        logger.info(
+                            f"{symbol}: skipping agent_recheck sell — recent proposal still active/rejected"
+                        )
+                        continue
 
                     prop = engine.propose_and_auto_execute(
                         symbol=symbol,
