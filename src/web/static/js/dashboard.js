@@ -12,29 +12,37 @@ async function loadOverviewCards() {
 
 // ─── Portfolio Summary ───────────────────────────────────────
 async function loadPortfolioCard() {
+    const valEl  = document.getElementById('sidebarPortfolioValue');
+    const pnlEl  = document.getElementById('sidebarPortfolioPnl');
+    const subEl  = document.getElementById('sidebarPortfolioSub');
+    const listEl = document.getElementById('sidebarHoldingsList');
+    if (!valEl) return;
+
     try {
         const res = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
+
+        if (res.status === 401) {
+            valEl.textContent = '—';
+            if (pnlEl) { pnlEl.textContent = 'Tap to set API key'; pnlEl.className = 'portfolio-card__pnl'; pnlEl.style.cursor = 'pointer'; pnlEl.onclick = () => openAuthModal(); }
+            return;
+        }
+
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
-        const summary = data.summary || {};
+        const summary  = data.summary  || {};
         const holdings = data.holdings || [];
 
         const totalValue = summary.total_value_gbp ?? 0;
-        const totalPnL = summary.unrealised_pnl_gbp ?? 0;
-        const totalCost = summary.total_cost_gbp ?? 0;
-        const pnlPct = totalCost > 0 ? ((totalPnL / totalCost) * 100) : null;
-
-        const valEl = document.getElementById('sidebarPortfolioValue');
-        const pnlEl = document.getElementById('sidebarPortfolioPnl');
-        const subEl = document.getElementById('sidebarPortfolioSub');
-
-        if (!valEl) return;
+        const totalPnL   = summary.unrealised_pnl_gbp ?? 0;
+        const totalCost  = summary.total_cost_gbp ?? 0;
+        const pnlPct     = totalCost > 0 ? (totalPnL / totalCost) * 100 : null;
 
         if (holdings.length === 0) {
             valEl.textContent = '£0.00';
-            if (pnlEl) { pnlEl.textContent = 'No open positions'; pnlEl.className = 'portfolio-card__pnl'; }
+            if (pnlEl) { pnlEl.textContent = 'No open positions'; pnlEl.className = 'portfolio-card__pnl'; pnlEl.onclick = null; }
             if (subEl) subEl.textContent = '';
+            if (listEl) listEl.style.display = 'none';
             return;
         }
 
@@ -42,19 +50,34 @@ async function loadPortfolioCard() {
 
         if (pnlEl) {
             const sign = totalPnL >= 0 ? '+' : '';
-            let pnlText = `${sign}£${Math.abs(Number(totalPnL)).toFixed(2)}`;
-            if (pnlPct !== null) pnlText += ` (${sign}${Math.abs(Number(pnlPct)).toFixed(1)}%)`;
-            pnlEl.textContent = pnlText;
+            let txt = `${sign}£${Math.abs(Number(totalPnL)).toFixed(2)}`;
+            if (pnlPct !== null) txt += ` (${sign}${Math.abs(Number(pnlPct)).toFixed(1)}%)`;
+            pnlEl.textContent = txt;
             pnlEl.className = 'portfolio-card__pnl ' + (totalPnL >= 0 ? 'positive' : 'negative');
+            pnlEl.onclick = null;
+            pnlEl.style.cursor = '';
         }
 
         if (subEl) subEl.textContent = `${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
+
+        if (listEl) {
+            listEl.style.display = '';
+            listEl.innerHTML = holdings.map(h => {
+                const pct = h.unrealised_pnl_pct ?? 0;
+                const val = h.current_value_gbp ?? 0;
+                const cls = pct >= 0 ? 'positive' : 'negative';
+                const sign = pct >= 0 ? '+' : '';
+                return `<div class="holding-row">
+                    <span class="holding-row__symbol">${escapeHtml(h.symbol)}</span>
+                    <span class="holding-row__value">£${Number(val).toFixed(2)}</span>
+                    <span class="holding-row__pnl ${cls}">${sign}${Number(pct).toFixed(1)}%</span>
+                </div>`;
+            }).join('');
+        }
     } catch (e) {
         console.warn('Portfolio card:', e.message);
-        const valEl = document.getElementById('sidebarPortfolioValue');
-        const pnlEl = document.getElementById('sidebarPortfolioPnl');
-        if (valEl) valEl.textContent = '—';
-        if (pnlEl) { pnlEl.textContent = 'Unavailable'; pnlEl.className = 'portfolio-card__pnl'; }
+        valEl.textContent = '—';
+        if (pnlEl) { pnlEl.textContent = 'Could not load'; pnlEl.className = 'portfolio-card__pnl'; }
     }
 }
 
