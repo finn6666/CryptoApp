@@ -59,6 +59,11 @@ trading_agent = Agent(
 - Only recommend SELL when the thesis is BROKEN: team abandoned, project exploited, development dead, exchange delisting. NOT for price dips or cooling hype.
 - DO recommend SELL for pure pump-and-dumps with no real product, or clear scams.
 
+**RECHECK OVERRIDE (when the prompt includes an EXISTING POSITION block):**
+- If P&L is negative AND your conviction that the thesis will recover is below 45%, output SELL. A deteriorating thesis at a loss is a valid exit — do not default to HOLD when you are not convinced.
+- If P&L is between -15% and +15% AND the position has been held 14+ days AND you cannot identify a clear catalyst within 3-6 months, output SELL with reason "stagnant thesis — capital better deployed elsewhere".
+- "No obvious reason to sell" is NOT sufficient justification for HOLD when conviction is below 45% and the position is at a loss.
+
 Return valid JSON matching TradeDecision schema.""",
     output_schema=TradeDecision,
 )

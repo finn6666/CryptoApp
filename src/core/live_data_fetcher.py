@@ -66,7 +66,7 @@ class LiveDataFetcher:
             'per_page': 250,
             'page': page,
             'sparkline': 'false',
-            'price_change_percentage': '24h,7d',
+            'price_change_percentage': '24h,7d,30d',
         }
         response = self.session.get(url, params=params, timeout=10)
         response.raise_for_status()
@@ -82,6 +82,8 @@ class LiveDataFetcher:
                 'total_volume': coin.get('total_volume'),
                 'price_change_percentage_24h': coin.get('price_change_percentage_24h'),
                 'price_change_percentage_7d': coin.get('price_change_percentage_7d_in_currency'),
+                'price_change_percentage_30d': coin.get('price_change_percentage_30d_in_currency'),
+                'ath_change_pct': coin.get('ath_change_percentage'),
             })
         return coins
 

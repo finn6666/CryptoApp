@@ -239,6 +239,8 @@ def coin_to_dict(coin, include_highlights=False):
         'volume_24h': safe_float(getattr(coin, 'total_volume', 0)),
         'price_change_24h': coin.price_change_24h or 0,
         'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
+        'price_change_30d': getattr(coin, 'price_change_percentage_30d', None),
+        'ath_change_pct': getattr(coin, 'ath_change_pct', None),
         'market_cap_rank': coin.market_cap_rank,
         'attractiveness_score': safe_float(getattr(coin, 'attractiveness_score', 0)),
     }
