@@ -203,6 +203,23 @@ class SellAutomation:
                 sell_fraction = trigger.get("sell_fraction", 1.0)
                 amount_gbp = current_price * quantity * sell_fraction
 
+                # ── Pre-check: skip if position is too small to meet exchange minimum ──
+                try:
+                    from ml.exchange_manager import get_exchange_manager
+                    min_gbp = get_exchange_manager().get_min_order_gbp(symbol)
+                    if min_gbp > 0 and amount_gbp < min_gbp:
+                        logger.info(
+                            f"{symbol}: skipping sell — position value £{amount_gbp:.4f} "
+                            f"below exchange minimum £{min_gbp:.4f}"
+                        )
+                        trigger = None
+                except Exception:
+                    pass
+
+            if trigger:
+                sell_fraction = trigger.get("sell_fraction", 1.0)
+                amount_gbp = current_price * quantity * sell_fraction
+
                 # ── Update tier state before proposing ──
                 if trigger["type"] == "profit_tier_1":
                     self._tiers_taken.setdefault(symbol, set()).add(1)
@@ -489,6 +506,20 @@ class SellAutomation:
                     engine = get_trading_engine()
                     current_price = live_prices.get(symbol, 0)
                     quantity = holding.get("quantity", 0)
+                    amount_gbp = current_price * quantity
+
+                    # Skip if position is too small to meet exchange minimum
+                    try:
+                        from ml.exchange_manager import get_exchange_manager
+                        min_gbp = get_exchange_manager().get_min_order_gbp(symbol)
+                        if min_gbp > 0 and amount_gbp < min_gbp:
+                            logger.info(
+                                f"{symbol}: skipping agent_recheck sell — position value "
+                                f"£{amount_gbp:.4f} below exchange minimum £{min_gbp:.4f}"
+                            )
+                            continue
+                    except Exception:
+                        pass
 
                     # Skip if a sell was recently rejected for this symbol
                     # (e.g. volume minimum not met) — avoid hammering the exchange
@@ -510,7 +541,7 @@ class SellAutomation:
                     prop = engine.propose_and_auto_execute(
                         symbol=symbol,
                         side="sell",
-                        amount_gbp=current_price * quantity,
+                        amount_gbp=amount_gbp,
                         current_price=current_price,
                         reason=f"Agent re-analysis recommends SELL: {reason_text}",
                         confidence=confidence,
