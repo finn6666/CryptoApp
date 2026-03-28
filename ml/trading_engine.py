@@ -43,6 +43,7 @@ class TradeProposal:
     order_id: Optional[str] = None
     error: Optional[str] = None
     sell_quantity: Optional[float] = None  # Exact coin qty to sell (bypasses amount→qty reconversion)
+    trade_mode: str = "accumulate"  # "accumulate" (hold weeks/months) or "swing" (tight exit, short hold)
 
     def __post_init__(self):
         if not self.created_at:
@@ -246,6 +247,7 @@ class TradingEngine:
         recommendation: str,
         coin_name: str = "",
         sell_quantity: Optional[float] = None,
+        trade_mode: str = "accumulate",
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -336,6 +338,7 @@ class TradingEngine:
             agent_recommendation=recommendation,
             coin_name=coin_name,
             sell_quantity=sell_quantity,
+            trade_mode=trade_mode,
         )
 
         self.proposals[proposal.id] = proposal
@@ -385,6 +388,7 @@ class TradingEngine:
         recommendation: str,
         coin_name: str = "",
         sell_quantity: Optional[float] = None,
+        trade_mode: str = "accumulate",
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -403,6 +407,7 @@ class TradingEngine:
             recommendation=recommendation,
             coin_name=coin_name,
             sell_quantity=sell_quantity,
+            trade_mode=trade_mode,
         )
 
         if not result.get("success"):
@@ -721,6 +726,7 @@ class TradingEngine:
                 proposal_id=proposal.id,
                 fee_gbp=fee_gbp,
                 coin_name=proposal.coin_name or "",
+                trade_mode=getattr(proposal, "trade_mode", "accumulate"),
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")
