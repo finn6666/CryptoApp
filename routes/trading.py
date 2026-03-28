@@ -1048,9 +1048,11 @@ def rl_insights():
             insights.append(f"Least promising pattern: {describe_state(worst['state'])}. These get a confidence penalty now.")
 
         # Recent outcomes
+        record = {"wins": 0, "losses": 0, "total": 0}
         if history:
             wins = [o for o in history if o.get('pnl_pct', 0) >= 0]
             losses_list = [o for o in history if o.get('pnl_pct', 0) < 0]
+            record = {"wins": len(wins), "losses": len(losses_list), "total": len(history)}
             if wins and not losses_list:
                 insights.append(f"Last {len(history)} outcomes have all been winners — nice.")
             elif losses_list and not wins:
@@ -1071,7 +1073,14 @@ def rl_insights():
                 elif pnl <= -10:
                     insights.append(f"{sym} took a {pnl:.1f}% hit. The system's learnt to be more careful with that type of setup.")
 
-        return jsonify({"insights": insights}), 200
+        # Structured best/worst patterns for frontend rendering
+        patterns = {}
+        if best and best.get('q_buy', 0) > 0:
+            patterns['best'] = {'label': describe_state(best['state']), 'q': best['q_buy']}
+        if worst and worst.get('q_buy', 0) < -0.1:
+            patterns['worst'] = {'label': describe_state(worst['state']), 'q': worst['q_buy']}
+
+        return jsonify({"insights": insights, "record": record, "patterns": patterns}), 200
     except Exception as e:
         logger.error(f"RL insights error: {e}")
         return jsonify({"insights": ["Couldn't load insights right now."]}), 200

@@ -72,7 +72,8 @@ function _packRows(coins, containerW, containerH) {
 
 let _activeTileSymbol = null;
 
-async function _showTileAnalysis(symbol, name, price) {
+function _showTileAnalysis(coin, holding) {
+    const { symbol, name, price, price_change_24h, gem_score, market_cap_rank } = coin;
     const heatmapCol = document.getElementById('heatmapColumn');
     if (!heatmapCol) return;
 
@@ -83,9 +84,29 @@ async function _showTileAnalysis(symbol, name, price) {
     }
     _activeTileSymbol = symbol;
 
-    // Remove existing panel
     const existing = document.getElementById('hmAnalysisPanel');
     if (existing) existing.remove();
+
+    const pct24h = price_change_24h || 0;
+    const changeStr = pct24h >= 0 ? `+${pct24h.toFixed(1)}%` : `${pct24h.toFixed(1)}%`;
+    const changeColour = _changeColour(pct24h);
+
+    const scoreColour = gem_score >= 7 ? 'var(--success)' : gem_score >= 4 ? 'var(--accent-gold)' : 'var(--error)';
+    const scoreLabel  = gem_score >= 7 ? 'Strong' : gem_score >= 4 ? 'Moderate' : 'Weak';
+    const rankStr     = market_cap_rank && market_cap_rank < 999 ? `#${market_cap_rank}` : '—';
+
+    let holdingHtml = '';
+    if (holding) {
+        const pnlPct = holding.unrealised_pnl_pct || 0;
+        const pnlGbp = holding.unrealised_pnl_gbp || 0;
+        const pnlColour = pnlPct >= 0 ? 'var(--success)' : 'var(--error)';
+        const pnlSign   = pnlPct >= 0 ? '+' : '';
+        holdingHtml = `
+            <div class="hm-stat-row">
+                <span class="hm-stat-label">Your position</span>
+                <span style="color:${pnlColour};font-weight:700;">${pnlSign}${pnlPct.toFixed(1)}% (${pnlSign}£${Math.abs(pnlGbp).toFixed(2)})</span>
+            </div>`;
+    }
 
     const panel = document.createElement('div');
     panel.id = 'hmAnalysisPanel';
@@ -93,46 +114,30 @@ async function _showTileAnalysis(symbol, name, price) {
     panel.innerHTML = `
         <div class="hm-analysis-header">
             <h3>${escapeHtml(symbol)} — ${escapeHtml(name)}</h3>
-            <button class="hm-analysis-close" onclick="_closeTileAnalysis()">✕</button>
+            <button class="hm-analysis-close" onclick="_closeTileAnalysis()">x</button>
         </div>
-        <div id="hmAnalysisBody" style="color: var(--text-secondary); font-size: 13px;">
-            Running agent analysis...
+        <div class="hm-stat-grid">
+            <div class="hm-stat-row">
+                <span class="hm-stat-label">Price</span>
+                <span>${_fmtPrice(price)}</span>
+            </div>
+            <div class="hm-stat-row">
+                <span class="hm-stat-label">24h</span>
+                <span style="color:${changeColour}">${changeStr}</span>
+            </div>
+            <div class="hm-stat-row">
+                <span class="hm-stat-label">Gem score</span>
+                <span style="color:${scoreColour}">${gem_score.toFixed(1)} — ${scoreLabel}</span>
+            </div>
+            <div class="hm-stat-row">
+                <span class="hm-stat-label">Market cap rank</span>
+                <span>${rankStr}</span>
+            </div>
+            ${holdingHtml}
         </div>
     `;
     heatmapCol.appendChild(panel);
     panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-    try {
-        const res = await fetch(`/api/agents/analyze/${encodeURIComponent(symbol)}`);
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-
-        const body = document.getElementById('hmAnalysisBody');
-        if (!body) return;
-
-        // Reuse the unified AI analysis renderer from ui-components.js if available
-        if (typeof generateUnifiedAIAnalysis === 'function') {
-            body.innerHTML = generateUnifiedAIAnalysis(symbol, price, data);
-        } else {
-            const rec = data.recommendation || 'N/A';
-            const conf = data.confidence || '—';
-            const summary = data.summary || data.analysis || 'No summary available.';
-            body.innerHTML = `
-                <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
-                    <span style="font-weight:700;color:var(--text-primary);">${escapeHtml(rec)}</span>
-                    <span style="color:var(--text-secondary);">Confidence: ${escapeHtml(String(conf))}</span>
-                </div>
-                <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">
-                    ${escapeHtml(String(summary))}
-                </div>
-            `;
-        }
-    } catch (err) {
-        const body = document.getElementById('hmAnalysisBody');
-        if (body) {
-            body.innerHTML = `<span style="color:var(--error);">Analysis unavailable: ${escapeHtml(err.message)}</span>`;
-        }
-    }
 }
 
 function _closeTileAnalysis() {
@@ -225,7 +230,7 @@ function _renderHeatmap(coins, holdingsMap) {
                 <div class="hm-tile__score">${scoreLabel}</div>
             `;
 
-            tile.addEventListener('click', () => _showTileAnalysis(coin.symbol, coin.name, coin.price));
+            tile.addEventListener('click', () => _showTileAnalysis(coin, held || null));
             rowEl.appendChild(tile);
         });
 
