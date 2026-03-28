@@ -73,6 +73,15 @@ def _confidence_tier(score: float) -> str:
     return "low"
 
 
+def _momentum_direction(pct_7d: float) -> str:
+    """Classify 7-day price change direction at entry time."""
+    if pct_7d > 5:
+        return "uptrend"
+    if pct_7d < -5:
+        return "downtrend"
+    return "flat"
+
+
 def _mcap_tier(mcap_gbp: float) -> str:
     if mcap_gbp >= 500_000_000:
         return "large"
@@ -149,7 +158,8 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         conf_raw = 0.0
     conf = _confidence_tier(conf_raw)
 
-    return f"{gem}|{vol}|{wk}|{mc}|{conf}"
+    momentum = _momentum_direction(weekly_pct)
+    return f"{gem}|{vol}|{wk}|{mc}|{conf}|{momentum}"
 
 
 # ─── Q-Learning Engine ────────────────────────────────────────
@@ -195,7 +205,7 @@ class QLearningTrader:
         )
         # Minimum visits a state needs before Q-learning can block/adjust trades.
         # Prevents one bad trade from poisoning an entire state class.
-        self.min_visits_to_act = int(os.environ.get("QL_MIN_VISITS", "5"))
+        self.min_visits_to_act = int(os.environ.get("QL_MIN_VISITS", "3"))
 
         # Q-table: state → {action → value}
         self.q_table: Dict[str, Dict[str, float]] = defaultdict(
@@ -548,10 +558,20 @@ class QLearningTrader:
             with open(Q_TABLE_FILE) as f:
                 data = json.load(f)
 
+            skipped_legacy = 0
             for state, actions in data.get("q_table", {}).items():
+                if state.count("|") != 5:
+                    skipped_legacy += 1
+                    continue
                 self.q_table[state] = actions
             for state, counts in data.get("visit_counts", {}).items():
+                if state.count("|") != 5:
+                    continue
                 self.visit_counts[state] = counts
+            if skipped_legacy:
+                logger.info(
+                    f"Q-table loaded: skipped {skipped_legacy} legacy state entries (dimension mismatch)"
+                )
 
             # Sanitize loss_memory: values inflated by checkpoint calls get capped
             raw_loss = data.get("loss_memory", {})
