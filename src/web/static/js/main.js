@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Single-call status strip + sidebar scanner stats
         await loadDashboardSummary();
 
+        // Accurate portfolio data from holdings endpoint
+        loadPortfolioCard();
+
         // Heatmap (independent — runs in parallel with init below)
         loadHeatmap();
 

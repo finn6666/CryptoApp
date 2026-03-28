@@ -40,9 +40,9 @@ class SellAutomation:
         self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-50.0"))
         self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "45.0"))
         self.enable_agent_recheck = os.getenv("SELL_AGENT_RECHECK", "true").lower() in ("1", "true", "yes")
-        # 12h recheck keeps close tabs on held positions while scan frequency is reduced.
-        # Each recheck = 6 Gemini calls per held coin, so with ~3 holdings = ~18 calls/12h.
-        self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "12"))
+        # 6h recheck keeps close tabs on held positions while scan frequency is reduced.
+        # Each recheck = 6 Gemini calls per held coin, so with ~3 holdings = ~18 calls/6h.
+        self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "6"))
 
         # Minimum hold period in hours before ANY sell trigger (except stop-loss) fires.
         # 72h lets positions ride out short-term volatility before evaluating exits.
@@ -64,6 +64,8 @@ class SellAutomation:
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
         self._last_recheck: Dict[str, str] = {}  # symbol → ISO timestamp
+        # Most recent agent conviction from recheck (stored for all outcomes, not just SELLs)
+        self._last_recheck_conviction: Dict[str, float] = {}
         # Track which profit tiers have already been taken per symbol
         self._tiers_taken: Dict[str, set] = {}
         # Per-symbol trailing stop override (tightens after each tier)
@@ -159,7 +161,10 @@ class SellAutomation:
             if symbol not in self._peak_prices or current_price > self._peak_prices[symbol]:
                 self._peak_prices[symbol] = current_price
 
-            trigger = self._evaluate_exit(symbol, current_price, entry_price, pnl_pct, hold_hours)
+            trigger = self._evaluate_exit(
+                symbol, current_price, entry_price, pnl_pct, hold_hours,
+                trade_mode=holding.get("trade_mode", "accumulate"),
+            )
 
             # Skip if there's already a pending/recent proposal for the same trigger type.
             # Tier triggers are also deduplicated via _tiers_taken.
@@ -170,6 +175,15 @@ class SellAutomation:
                         f"Sell trigger ({trigger['type']}) for {symbol} — already pending, skipping"
                     )
                     trigger = None
+
+            # ── Stagnation exit — check flat positions after extended hold ──
+            if not trigger:
+                conviction_val = self._last_recheck_conviction.get(symbol)
+                stagnation = self._check_stagnation(symbol, pnl_pct, hold_hours, conviction_val)
+                if stagnation:
+                    pending_for_sym = pending_sell_triggers.get(symbol, set())
+                    if stagnation["type"] not in pending_for_sym:
+                        trigger = stagnation
 
             # ── Q-learning: checkpoint unrealised P&L for open positions ──
             if not trigger:
@@ -264,6 +278,7 @@ class SellAutomation:
         entry_price: float,
         pnl_pct: float,
         hold_hours: float = 0.0,
+        trade_mode: str = "accumulate",
     ) -> Optional[Dict[str, Any]]:
         """Evaluate a single holding against exit triggers.
 
@@ -271,8 +286,17 @@ class SellAutomation:
         sell_fraction < 1.0 means a partial sell; 1.0 means full exit.
         Respects minimum hold period for all triggers except stop-loss.
         """
+        swing_enabled = os.getenv("SWING_TRADE_ENABLED", "false").lower() in ("1", "true", "yes")
+        if swing_enabled and trade_mode == "swing":
+            effective_min_hold = float(os.getenv("SWING_MIN_HOLD_HOURS", "8"))
+            effective_trailing_pct = float(os.getenv("SWING_TRAILING_STOP_PCT", "15.0"))
+            effective_tier1_pct = float(os.getenv("SWING_TIER1_PCT", "25.0"))
+        else:
+            effective_min_hold = self.min_hold_hours
+            effective_trailing_pct = self.trailing_stop_pct
+            effective_tier1_pct = self.tier1_pct
 
-        within_hold_period = hold_hours < self.min_hold_hours
+        within_hold_period = hold_hours < effective_min_hold
         tiers_taken = self._tiers_taken.get(symbol, set())
 
         # 1. Stop-loss — always fires regardless of hold period (capital protection)
@@ -293,7 +317,7 @@ class SellAutomation:
             return None
 
         # 2. Tier 1 — first partial take-profit, then switch to tighter trailing
-        if pnl_pct >= self.tier1_pct and 1 not in tiers_taken:
+        if pnl_pct >= effective_tier1_pct and 1 not in tiers_taken:
             return {
                 "type": "profit_tier_1",
                 "reason": (
@@ -333,7 +357,7 @@ class SellAutomation:
 
         # 5. Trailing stop — use tightened value if we're in runner mode after a tier
         peak = self._peak_prices.get(symbol, current_price)
-        trailing_pct = self._tightened_trailing.get(symbol, self.trailing_stop_pct)
+        trailing_pct = self._tightened_trailing.get(symbol, effective_trailing_pct)
         if peak > entry_price:
             drop_from_peak_pct = ((peak - current_price) / peak) * 100
             if drop_from_peak_pct >= trailing_pct:
@@ -349,6 +373,57 @@ class SellAutomation:
                 }
 
         return None
+
+    # ─── Stagnation & Drawdown Helpers ────────────────────────
+
+    def _check_stagnation(
+        self,
+        symbol: str,
+        pnl_pct: float,
+        hold_hours: float,
+        conviction: Optional[float],
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Detect positions going nowhere after an extended hold.
+        Criteria: held >SELL_STAGNATION_DAYS AND P&L within the flat window
+        AND most recent agent conviction below SELL_STAGNATION_CONVICTION_MAX.
+        Returns a trigger dict if all criteria are met, else None.
+        """
+        stagnation_days = float(os.getenv("SELL_STAGNATION_DAYS", "14"))
+        pnl_min = float(os.getenv("SELL_STAGNATION_PNL_MIN", "-15.0"))
+        pnl_max = float(os.getenv("SELL_STAGNATION_PNL_MAX", "15.0"))
+        conviction_max = float(os.getenv("SELL_STAGNATION_CONVICTION_MAX", "50.0"))
+
+        if hold_hours < stagnation_days * 24:
+            return None
+        if not (pnl_min <= pnl_pct <= pnl_max):
+            return None
+        if conviction is None:
+            # No recheck has run yet — do not fire on first check after 14 days
+            return None
+        if conviction >= conviction_max:
+            return None
+
+        return {
+            "type": "stagnation_exit",
+            "reason": (
+                f"Stagnation exit: held {hold_hours/24:.1f} days with P&L {pnl_pct:.1f}% "
+                f"(flat window {pnl_min}% to {pnl_max}%) and agent conviction "
+                f"{conviction:.0f}% below threshold {conviction_max}%. "
+                f"Capital redeployed to better opportunities."
+            ),
+            "confidence": 70,
+            "sell_fraction": 1.0,
+        }
+
+    def _needs_sharp_drawdown_recheck(self, symbol: str, pnl_pct: float) -> bool:
+        """
+        Returns True if a position has dropped sharply enough to bypass
+        the normal recheck throttle. Fires when P&L drops below
+        SELL_SHARP_DRAWDOWN_RECHECK_PCT but is still above the stop-loss.
+        """
+        threshold = float(os.getenv("SELL_SHARP_DRAWDOWN_RECHECK_PCT", "-20.0"))
+        return pnl_pct <= threshold and pnl_pct > self.stop_loss_pct
 
     # ─── Agent Re-analysis ────────────────────────────────────
 
@@ -367,12 +442,18 @@ class SellAutomation:
         for holding in holdings:
             symbol = holding["symbol"]
 
-            # Throttle: only recheck once per interval
+            # Throttle: only recheck once per interval (bypass on sharp drawdown)
             last = self._last_recheck.get(symbol)
             if last:
                 elapsed = (now - datetime.fromisoformat(last)).total_seconds() / 3600
                 if elapsed < self.recheck_interval_hours:
-                    continue
+                    pnl_for_sym = holding.get("unrealised_pnl_pct", 0) or 0
+                    if not self._needs_sharp_drawdown_recheck(symbol, pnl_for_sym):
+                        continue
+                    logger.info(
+                        f"{symbol}: bypassing recheck throttle — sharp drawdown "
+                        f"({pnl_for_sym:.1f}%)"
+                    )
 
             try:
                 import asyncio
@@ -391,6 +472,11 @@ class SellAutomation:
                 # always "Analysis completed" — never SELL — so we must read the
                 # actual trading decision from trade_decision.
                 trade_decision = result.get("trade_decision", {})
+                # Store conviction for ALL outcomes (HOLD and SELL) so stagnation
+                # detection has data even when the agent recommends holding.
+                recheck_conviction = trade_decision.get("trade_conviction")
+                if recheck_conviction is not None:
+                    self._last_recheck_conviction[symbol] = float(recheck_conviction)
                 should_sell = (
                     trade_decision.get("should_trade", False)
                     and trade_decision.get("trade_side", "buy").lower() == "sell"
@@ -455,6 +541,7 @@ class SellAutomation:
             state = {
                 "peak_prices": self._peak_prices,
                 "last_recheck": self._last_recheck,
+                "last_recheck_conviction": self._last_recheck_conviction,
                 "tiers_taken": {k: list(v) for k, v in self._tiers_taken.items()},
                 "tightened_trailing": self._tightened_trailing,
             }
@@ -477,6 +564,7 @@ class SellAutomation:
                 state = json.load(f)
             self._peak_prices = state.get("peak_prices", {})
             self._last_recheck = state.get("last_recheck", {})
+            self._last_recheck_conviction = state.get("last_recheck_conviction", {})
             self._tiers_taken = {
                 k: set(v) for k, v in state.get("tiers_taken", {}).items()
             }
