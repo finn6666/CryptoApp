@@ -603,6 +603,8 @@ async function loadRlInsights() {
         const response = await fetch('/api/rl/insights');
         const data = await response.json();
         const insights = data.insights || [];
+        const record   = data.record   || {};
+        const patterns = data.patterns || {};
         const container = document.getElementById('rlInsights');
 
         if (insights.length === 0) {
@@ -610,18 +612,53 @@ async function loadRlInsights() {
             return;
         }
 
-        // Categorise each insight so we can sort and label them
-        const categorised = insights.map(text => {
-            const lower = text.toLowerCase();
-            if (/loss|losses|underperform|worst|penalty|avoid|mistake/.test(lower)) {
-                return { text, type: 'avoid',   tag: 'AVOID'   };
-            } else if (/winner|winning|wins|promis|lean toward|worked|profit/.test(lower)) {
-                return { text, type: 'signal',  tag: 'SIGNAL'  };
-            }
-            return { text, type: 'pattern', tag: 'PATTERN' };
-        });
+        // ── Win/loss record header ──────────────────────────────
+        let recordHtml = '';
+        if (record.total > 0) {
+            const winRate = Math.round((record.wins / record.total) * 100);
+            recordHtml = `
+                <div class="rl-record">
+                    <span class="rl-record__item rl-record__item--win">${record.wins}W</span>
+                    <span class="rl-record__divider">/</span>
+                    <span class="rl-record__item rl-record__item--loss">${record.losses}L</span>
+                    <span class="rl-record__winrate">${winRate}% win rate</span>
+                </div>`;
+        }
 
-        // Signals first, then avoids, then patterns
+        // ── Best / worst patterns ───────────────────────────────
+        let patternHtml = '';
+        if (patterns.best || patterns.worst) {
+            patternHtml = '<div class="rl-patterns">';
+            if (patterns.best) {
+                patternHtml += `
+                    <div class="rl-pattern rl-pattern--best">
+                        <div class="rl-pattern__label">Best setup</div>
+                        <div class="rl-pattern__value">${escapeHtml(patterns.best.label)}</div>
+                    </div>`;
+            }
+            if (patterns.worst) {
+                patternHtml += `
+                    <div class="rl-pattern rl-pattern--worst">
+                        <div class="rl-pattern__label">Avoid</div>
+                        <div class="rl-pattern__value">${escapeHtml(patterns.worst.label)}</div>
+                    </div>`;
+            }
+            patternHtml += '</div>';
+        }
+
+        // ── Insight cards (filter out W/L record line — shown above) ──
+        const categorised = insights
+            .filter(text => !/^Recent record:/.test(text))
+            .map(text => {
+                const lower = text.toLowerCase();
+                if (/loss|losses|underperform|worst|penalty|avoid|mistake/.test(lower)) {
+                    return { text, type: 'avoid',   tag: 'AVOID'   };
+                } else if (/winner|winning|wins|promis|lean toward|worked|profit/.test(lower)) {
+                    return { text, type: 'signal',  tag: 'SIGNAL'  };
+                }
+                return { text, type: 'pattern', tag: 'PATTERN' };
+            });
+
         const ordered = [
             ...categorised.filter(i => i.type === 'signal'),
             ...categorised.filter(i => i.type === 'avoid'),
@@ -629,7 +666,8 @@ async function loadRlInsights() {
         ];
 
         container.innerHTML = `
-            <div class="rl-summary">${insights.length} insight${insights.length !== 1 ? 's' : ''} from recent trades</div>
+            ${recordHtml}
+            ${patternHtml}
             ${ordered.map(({ text, type, tag }) => `
                 <div class="rl-insight rl-insight--${type}">
                     <span class="rl-tag rl-tag--${type}">${tag}</span>

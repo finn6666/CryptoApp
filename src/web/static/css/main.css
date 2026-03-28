@@ -2748,6 +2748,30 @@ body::before {
     line-height: 1;
 }
 
+.hm-stat-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.hm-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.hm-stat-row:last-child {
+    border-bottom: none;
+}
+
+.hm-stat-label {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
 /* Sidebar column */
 .sidebar-column {
     display: flex;
@@ -2859,6 +2883,69 @@ body::before {
 
 .rl-text {
     flex: 1;
+}
+
+.rl-record {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.rl-record__item {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.rl-record__item--win  { color: var(--success); }
+.rl-record__item--loss { color: var(--error); }
+
+.rl-record__divider {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.rl-record__winrate {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.rl-patterns {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.rl-pattern {
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+.rl-pattern--best  { border-left: 3px solid var(--success); }
+.rl-pattern--worst { border-left: 3px solid var(--warning); }
+
+.rl-pattern__label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 3px;
+}
+
+.rl-pattern--best  .rl-pattern__label { color: var(--success); }
+.rl-pattern--worst .rl-pattern__label { color: var(--warning); }
+
+.rl-pattern__value {
+    font-size: 12px;
+    color: var(--text-primary);
 }
 
 /* Compact holdings list inside sidebar */
