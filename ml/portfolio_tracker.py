@@ -51,6 +51,7 @@ class PortfolioTracker:
         proposal_id: str = "",
         fee_gbp: float = 0.0,
         coin_name: str = "",
+        trade_mode: str = "accumulate",
     ) -> Dict[str, Any]:
         """
         Record a trade execution and update holdings.
@@ -69,6 +70,7 @@ class PortfolioTracker:
             "reasoning": reasoning,
             "confidence": confidence,
             "proposal_id": proposal_id,
+            "trade_mode": trade_mode,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -94,6 +96,9 @@ class PortfolioTracker:
                 h["total_fees_gbp"] = h.get("total_fees_gbp", 0) + fee_gbp
                 if coin_name and not h.get("coin_name"):
                     h["coin_name"] = coin_name
+                # Preserve original trade_mode — don't overwrite on subsequent buys
+                if "trade_mode" not in h:
+                    h["trade_mode"] = trade_mode
             else:
                 self.holdings[sym] = {
                     "symbol": sym,
@@ -107,6 +112,7 @@ class PortfolioTracker:
                     "trades": 1,
                     "total_fees_gbp": fee_gbp,
                     "coin_name": coin_name,
+                    "trade_mode": trade_mode,
                 }
         elif side.lower() == "sell":
             if sym in self.holdings:
@@ -224,6 +230,7 @@ class PortfolioTracker:
                 "first_buy_at": h.get("first_buy_at", ""),
                 "closed_at": h.get("closed_at", "") or h.get("last_sell_at", ""),
                 "exchange": h.get("exchange", ""),
+                "trade_mode": h.get("trade_mode", "accumulate"),
                 "won": h.get("realised_pnl_gbp", 0) > 0,
             })
         return sorted(closed, key=lambda x: x.get("closed_at", ""), reverse=True)

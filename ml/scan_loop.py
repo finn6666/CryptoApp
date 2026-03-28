@@ -398,6 +398,7 @@ class ScanLoop:
                     )
                     coin["screen_confidence"] = confidence
                     coin["screen_note"] = one_liner
+                    coin["play_type"] = result.get("play_type", "accumulate")
                     passed.append(coin)
                 else:
                     logger.info(
@@ -590,6 +591,12 @@ class ScanLoop:
                     f"computed_alloc={sized_pct:.1f}%, amount=£{amount:.2f}"
                 )
 
+                # Determine trade mode from quick screen classification
+                swing_enabled = os.getenv("SWING_TRADE_ENABLED", "false").lower() in ("1", "true", "yes")
+                trade_mode = "swing" if (swing_enabled and coin_data.get("play_type") == "swing") else "accumulate"
+                if trade_mode == "swing":
+                    logger.info(f"[Scan] {symbol}: swing trade mode activated")
+
                 # Use auto-execute for scheduled scans so trades don't
                 # sit waiting for manual approval overnight.
                 result = engine.propose_and_auto_execute(
@@ -601,6 +608,7 @@ class ScanLoop:
                     confidence=conviction,
                     recommendation=analysis.get("recommendation", "BUY"),
                     coin_name=coin_data.get("name", ""),
+                    trade_mode=trade_mode,
                 )
 
                 outcome = "executed" if result.get("auto_approved") else "proposed"
