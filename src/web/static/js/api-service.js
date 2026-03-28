@@ -14,7 +14,7 @@ async function loadDashboardSummary(prefetchedData = null) {
         _updatePill('pillBudget', () => {
             const t = data.trading || {};
             if (t.kill_switch) return { value: 'HALTED', cls: 'warning' };
-            const b = t.remaining_budget ?? t.budget_remaining ?? t.daily_budget ?? null;
+            const b = t.remaining_today_gbp ?? t.remaining_budget ?? t.budget_remaining ?? t.daily_budget ?? null;
             return { value: b !== null ? `£${Number(b).toFixed(2)}` : 'Active' };
         });
 

@@ -66,7 +66,7 @@ function renderHealthPage(data) {
         html += `
             <div class="health-metric"><span class="health-metric-label">Active</span><span class="health-metric-value">${trading.active ? 'Yes' : 'No'}</span></div>
             <div class="health-metric"><span class="health-metric-label">Kill Switch</span><span class="health-metric-value" style="color:${trading.kill_switch ? 'var(--error)' : 'var(--success)'}">${trading.kill_switch ? 'ON' : 'Off'}</span></div>
-            <div class="health-metric"><span class="health-metric-label">Budget Remaining</span><span class="health-metric-value">£${Number(trading.budget_remaining || 0).toFixed(2)}</span></div>
+            <div class="health-metric"><span class="health-metric-label">Budget Remaining</span><span class="health-metric-value">£${Number(trading.remaining_today_gbp || trading.budget_remaining || 0).toFixed(2)}</span></div>
             <div class="health-metric"><span class="health-metric-label">Trades Today</span><span class="health-metric-value">${trading.trades_today || 0}</span></div>`;
         if (trading.pending_proposals > 0) {
             html += `<div class="health-metric"><span class="health-metric-label">Pending Proposals</span><span class="health-metric-value" style="color:var(--warning)">${trading.pending_proposals}</span></div>`;

@@ -140,6 +140,12 @@ def cache_analysis(symbol: str, result: dict):
     """Store an analysis result in the cache (Redis + disk)."""
     result["_cached_at"] = time.time()
     agent_analysis_cache[symbol] = result
+    # Prune stale entries so the cache doesn't grow unboundedly between restarts
+    now = time.time()
+    expired = [k for k, v in agent_analysis_cache.items()
+               if now - v.get("_cached_at", 0) > CACHE_EXPIRY_SECONDS]
+    for k in expired:
+        del agent_analysis_cache[k]
     save_analysis_cache()
     # Also store in Redis if available
     try:

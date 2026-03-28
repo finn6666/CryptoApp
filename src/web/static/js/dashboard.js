@@ -60,7 +60,7 @@ async function loadTradingCard() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
-        const budget = data.remaining_budget ?? data.budget_remaining ?? data.daily_budget ?? null;
+        const budget = data.remaining_today_gbp ?? data.remaining_budget ?? data.budget_remaining ?? data.daily_budget ?? null;
         const active = data.active_trades ?? data.open_trades ?? 0;
         const killSwitch = data.kill_switch ?? data.kill_switch_active ?? false;
 
@@ -76,7 +76,7 @@ async function loadTradingCard() {
         }
 
         if (budget !== null) {
-            valEl.textContent = `$${Number(budget).toFixed(2)}`;
+            valEl.textContent = `£${Number(budget).toFixed(2)}`;
         } else {
             valEl.textContent = 'Active';
         }

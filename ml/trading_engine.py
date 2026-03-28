@@ -1052,6 +1052,15 @@ class TradingEngine:
 
     def _save_state(self):
         """Save engine state to disk (atomic write to prevent corruption)."""
+        # Prune expired/rejected proposals older than 7 days to prevent unbounded growth
+        cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        self.proposals = {
+            k: v for k, v in self.proposals.items()
+            if v.status == "pending" or v.created_at > cutoff
+        }
+        # Keep only the last 500 trades in memory (full history lives on disk)
+        if len(self.trade_history) > 500:
+            self.trade_history = self.trade_history[-500:]
         state = {
             "proposals": {k: asdict(v) for k, v in self.proposals.items()},
             "trade_history": self.trade_history,

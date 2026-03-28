@@ -629,6 +629,13 @@ class MarketMonitor:
             now = datetime.utcnow()
 
             try:
+                # ── Prune stale alert cooldowns (prevents unbounded growth) ──
+                max_cooldown_min = max(self.alert_cooldown_min, self.buy_analysis_cooldown_min)
+                stale_cutoff = now - timedelta(minutes=max_cooldown_min + 60)
+                self._alert_cooldowns = {
+                    k: v for k, v in self._alert_cooldowns.items() if v > stale_cutoff
+                }
+
                 # ── Data refresh (every 15 min) ──
                 if self._minutes_since(self._last_data_refresh) >= self.data_refresh_interval:
                     self._last_data_refresh = now
