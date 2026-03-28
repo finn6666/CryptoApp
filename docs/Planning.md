@@ -1,8 +1,16 @@
 
 ## Current To Do
 
-### Security / Access
-- Apply firewall changes on Pi: restrict SSH to local network + Tailscale range only
+### Action needed — resume live trading
+1. SSH to Pi: `grep TRADING_API_KEY ~/CryptoApp/.env` — copy the key
+2. Open dashboard in browser → F12 → Console → run:
+   `localStorage.setItem('tradingApiKey', 'PASTE_KEY_HERE')`
+3. Click **Resume** on the dashboard to re-enable trading
+
+### Action needed — Pi security hardening (do on Pi)
+1. Restrict SSH firewall: `sudo ufw delete allow 22 && sudo ufw allow from 192.168.0.0/16 to any port 22 && sudo ufw allow from 100.64.0.0/10 to any port 22 && sudo ufw reload`
+2. Disable SSH password auth: `sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config && sudo systemctl restart ssh`
+3. Set up weekly security check timer: `sudo cp ~/CryptoApp/deploy/cryptoapp-security.service /etc/systemd/system/ && sudo cp ~/CryptoApp/deploy/cryptoapp-security.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable --now cryptoapp-security.timer`
 
 ## Future Work
 
