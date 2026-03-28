@@ -9,7 +9,7 @@
  */
 function _tileColour(pct) {
     if (!pct) return 'hsl(220, 15%, 18%)';          // neutral dark
-    const intensity = Math.min(Math.abs(pct) / 8, 1); // full intensity at ±8%
+    const intensity = Math.min(Math.abs(pct) / 5, 1); // full intensity at ±5%
     const sat = Math.round(50 + intensity * 35);      // 50–85%
     const lgt = Math.round(16 + intensity * 18);      // 16–34%
     return pct > 0 ? `hsl(120, ${sat}%, ${lgt}%)` : `hsl(0, ${sat}%, ${lgt}%)`;

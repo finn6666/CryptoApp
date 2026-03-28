@@ -18,16 +18,31 @@ async function loadDashboardSummary(prefetchedData = null) {
             return { value: b !== null ? `£${Number(b).toFixed(2)}` : 'Active' };
         });
 
-        // Portfolio P&L pill
-        _updatePill('pillPnl', () => {
+        // Portfolio value + P&L pills
+        (() => {
             const p = data.portfolio || {};
             const pnl = p.unrealised_pnl_gbp ?? 0;
             const val = p.total_value_gbp ?? 0;
-            const sign = pnl >= 0 ? '+' : '';
-            const cls  = pnl >= 0 ? 'positive' : 'negative';
-            if (!val && !pnl) return { value: '£0.00' };
-            return { value: `${sign}£${Math.abs(pnl).toFixed(2)}`, cls };
-        });
+
+            const valEl = document.getElementById('pillPortfolioValue');
+            if (valEl) {
+                valEl.textContent = val ? `£${Number(val).toFixed(2)}` : '£0.00';
+                valEl.className = 'status-pill__value';
+            }
+
+            const pnlEl = document.getElementById('pillPnl');
+            if (pnlEl) {
+                if (!val && !pnl) {
+                    pnlEl.textContent = '—';
+                    pnlEl.className = 'status-pill__sub';
+                } else {
+                    const sign = pnl >= 0 ? '+' : '';
+                    const cls  = pnl >= 0 ? 'positive' : 'negative';
+                    pnlEl.textContent = `${sign}£${Math.abs(pnl).toFixed(2)} P&L`;
+                    pnlEl.className = `status-pill__sub ${cls}`;
+                }
+            }
+        })();
 
         // Scanner pill
         _updatePill('pillScanner', () => {
