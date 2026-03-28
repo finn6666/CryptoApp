@@ -36,24 +36,12 @@
                 <a href="/health-dashboard" class="site-nav__link">Health</a>
             </nav>
             <div class="status-strip">
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Daily Budget</div>
-                        <div class="status-pill__value" id="pillBudget">—</div>
-                    </div>
-                </div>
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Scanner</div>
-                        <div class="status-pill__value" id="pillScanner">—</div>
-                    </div>
-                </div>
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Monitor</div>
-                        <div class="status-pill__value" id="pillMonitor">—</div>
-                    </div>
-                </div>
+                <span class="st-item"><span class="st-label">Budget</span><span class="st-val" id="pillBudget">—</span></span>
+                <span class="st-sep">·</span>
+                <span class="st-item"><span class="st-val" id="pillScanner">—</span></span>
+                <span class="st-sep">·</span>
+                <span class="st-item"><span class="st-val" id="pillMonitor">—</span></span>
+                <button class="st-key-btn" onclick="openAuthModal()" title="Set API key">Key</button>
             </div>
         </div>
 
@@ -90,18 +78,11 @@
                 <span id="globalStats" style="display:none;"></span>
                 <span id="marketHeadlines" style="display:none;"></span>
 
-                <!-- Portfolio Summary Panel -->
-                <div class="sidebar-panel panel-open">
-                    <div class="sidebar-panel__header open" onclick="toggleSidebarPanel(this)">
-                        <div class="sidebar-panel__title">Portfolio</div>
-                        <span class="sidebar-panel__toggle">▾</span>
-                    </div>
-                    <div class="sidebar-panel__body open">
-                        <div class="portfolio-hero">
-                            <div class="portfolio-hero__value" id="sidebarPortfolioValue">£0.00</div>
-                            <div class="portfolio-hero__pnl" id="sidebarPortfolioPnl">—</div>
-                        </div>
-                    </div>
+                <!-- Portfolio Summary Card -->
+                <div class="portfolio-card">
+                    <div class="portfolio-card__value" id="sidebarPortfolioValue">£0.00</div>
+                    <div class="portfolio-card__pnl" id="sidebarPortfolioPnl">—</div>
+                    <div class="portfolio-card__sub" id="sidebarPortfolioSub"></div>
                 </div>
 
                 <!-- Live Trading Panel (open) -->

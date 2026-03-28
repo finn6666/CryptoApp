@@ -2785,29 +2785,39 @@ body::before {
     min-width: 0;
 }
 
-/* Portfolio hero — prominent value + P&L in sidebar */
-.portfolio-hero {
+/* Portfolio summary card */
+.portfolio-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
     text-align: center;
-    padding: 10px 0 6px;
 }
 
-.portfolio-hero__value {
-    font-size: 30px;
+.portfolio-card__value {
+    font-size: 26px;
     font-weight: 700;
     color: var(--text-primary);
     line-height: 1.1;
     letter-spacing: -0.5px;
 }
 
-.portfolio-hero__pnl {
-    font-size: 16px;
+.portfolio-card__pnl {
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-secondary);
-    margin-top: 6px;
+    margin-top: 5px;
 }
 
-.portfolio-hero__pnl.positive { color: var(--success); }
-.portfolio-hero__pnl.negative { color: var(--error); }
+.portfolio-card__pnl.positive { color: var(--success); }
+.portfolio-card__pnl.negative { color: var(--error); }
+
+.portfolio-card__sub {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-top: 3px;
+    opacity: 0.7;
+}
 
 /* Sidebar panel (collapsible section card) */
 .sidebar-panel {
@@ -3357,23 +3367,60 @@ html, body {
     margin: 0 !important;
 }
 
-/* Status strip fills remaining topbar width */
+/* Compact inline status strip */
 .status-strip {
     display: flex;
-    gap: 6px;
+    align-items: center;
+    gap: 7px;
+    flex: 1;
 }
 
-.status-pill {
-    padding: 6px 10px !important;
-    min-width: 0 !important;
+.st-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
-.status-pill__label {
-    font-size: 9px !important;
+.st-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    font-weight: 500;
 }
 
-.status-pill__value {
-    font-size: 13px !important;
+.st-val {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.st-val.positive { color: var(--success); }
+.st-val.warning  { color: var(--warning); }
+.st-val.negative { color: var(--error); }
+
+.st-sep {
+    font-size: 11px;
+    color: var(--border);
+    user-select: none;
+}
+
+.st-key-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: auto;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    line-height: 1.6;
+    transition: color 0.15s, border-color 0.15s;
+}
+
+.st-key-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--accent-primary);
 }
 
 /* Main body fills remaining height, no page overflow */
