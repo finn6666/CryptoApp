@@ -1,23 +1,6 @@
 
 ## Current To Do
 
-### UI layout & visual polish
-- Text is showing a bit small on each coin (coin rating, current cost etc)
-- Last scan/refresh in corner looks weird
-- Scanner/scan now button on the side is a bit pointless
-- Want portfolio value and portfolio P&L on the right to be clear and easy to see
-- Collapse trade log on the right
-- Want the coins rag/tiles to be graded on P & L rather than the coins rating
-
-### Behaviour & UX changes
-- When I click on a tile/coin, just want very short analysis rather than what it's showing currently
-- On RL insights, want stuff that I can learn e.g. trade patterns etc
-
-### System & stability
-- Daily budget/budget remaining has been removed (bug — restore it)
-- Ensure the Pi isn't being overly extended
-
-
 
 ## Future Work
 
