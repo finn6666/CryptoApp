@@ -28,8 +28,7 @@
         <div class="header">
             <div class="refresh-controls">
                 <div class="refresh-status">
-                    <div>Last: <span id="lastUpdated">Loading...</span></div>
-                    <div>Next: <span id="nextRefresh">-</span></div>
+                    Last: <span id="lastUpdated">Loading...</span> &middot; Next: <span id="nextRefresh">—</span>
                 </div>
                 <button class="btn" onclick="forceRefresh()" id="refreshBtn">Refresh</button>
                 <button class="btn" onclick="openAuthModal()" id="keyBtn" title="Set API key">Key</button>
@@ -52,8 +51,9 @@
                 </div>
                 <div class="status-pill">
                     <div class="status-pill__body">
-                        <div class="status-pill__label">Portfolio P&L</div>
-                        <div class="status-pill__value" id="pillPnl">—</div>
+                        <div class="status-pill__label">Portfolio</div>
+                        <div class="status-pill__value" id="pillPortfolioValue">—</div>
+                        <div class="status-pill__sub" id="pillPnl">—</div>
                     </div>
                 </div>
                 <div class="status-pill">
@@ -140,10 +140,10 @@
                         </div>
                         <div id="executedSection">
                             <div class="sidebar-section-label" style="display: flex; justify-content: space-between; align-items: center;">
-                                Trade Log
+                                <span style="cursor:pointer;" onclick="toggleTradeLog()">Trade Log <span id="tradeLogToggleIcon">▾</span></span>
                                 <button onclick="loadTradeLog(); loadExecutedTrades();" class="btn-ghost">Refresh</button>
                             </div>
-                            <div id="tradeLogUnified" class="trade-log-scroll">
+                            <div id="tradeLogUnified" class="trade-log-scroll" style="display:none;">
                                 <p class="empty-state">No trades yet.</p>
                             </div>
                         </div>
@@ -158,7 +158,6 @@
                             <span id="scanStatusDetail" class="status-badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
                         </div>
                         <div class="sidebar-panel__actions">
-                            <button id="scanNowBtn" onclick="triggerScan(); event.stopPropagation();" class="btn-ghost btn-ghost--accent">Scan Now</button>
                             <span class="sidebar-panel__toggle">▾</span>
                         </div>
                     </div>
@@ -182,6 +181,7 @@
                             </div>
                         </div>
                         <div id="scanResultMsg" class="scan-result" style="display: none;"></div>
+                        <button id="scanNowBtn" onclick="triggerScan()" class="btn-ghost btn-ghost--accent" style="width:100%;margin-top:8px;">Scan Now</button>
                     </div>
                 </div>
 
@@ -231,6 +231,14 @@
         headerEl.classList.toggle('open', !isOpen);
         body.classList.toggle('open', !isOpen);
         panel.classList.toggle('panel-open', !isOpen);
+    }
+    function toggleTradeLog() {
+        const log = document.getElementById('tradeLogUnified');
+        const icon = document.getElementById('tradeLogToggleIcon');
+        if (!log) return;
+        const hidden = log.style.display === 'none';
+        log.style.display = hidden ? '' : 'none';
+        if (icon) icon.textContent = hidden ? '▴' : '▾';
     }
     </script>
 

@@ -108,20 +108,12 @@ body::before {
 
 .refresh-status {
     background: var(--secondary-bg);
-    padding: 8px 12px;
+    padding: 6px 12px;
     border-radius: 8px;
     font-size: 0.75rem;
     color: var(--text-secondary);
     border: 1px solid var(--border);
-    line-height: 1.4;
-}
-
-.refresh-status div {
-    margin-bottom: 2px;
-}
-
-.refresh-status div:last-child {
-    margin-bottom: 0;
+    white-space: nowrap;
 }
 
 /* ===== BUTTONS ===== */
@@ -2592,6 +2584,19 @@ body::before {
 .status-pill__value.negative { color: var(--error); }
 .status-pill__value.warning  { color: var(--warning); }
 
+.status-pill__sub {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+}
+
+.status-pill__sub.positive { color: var(--success); }
+.status-pill__sub.negative { color: var(--error); }
+
 /* Main two-column body */
 .dashboard-body {
     display: grid;
@@ -2645,7 +2650,7 @@ body::before {
 /* Individual heatmap tile */
 .hm-tile {
     border-radius: 4px;
-    padding: 6px 8px;
+    padding: 8px 10px;
     cursor: pointer;
     transition: background 0.4s ease, opacity 0.15s, transform 0.15s;
     display: flex;
@@ -2654,7 +2659,7 @@ body::before {
     overflow: hidden;
     position: relative;
     min-width: 40px;
-    min-height: 55px;
+    min-height: 64px;
 }
 
 .hm-tile:hover {
@@ -2675,7 +2680,7 @@ body::before {
 }
 
 .hm-tile__symbol {
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
     color: rgba(255,255,255,0.95);
     line-height: 1.2;
@@ -2685,7 +2690,7 @@ body::before {
 }
 
 .hm-tile__price {
-    font-size: 9px;
+    font-size: 11px;
     color: rgba(255,255,255,0.75);
     line-height: 1.3;
     white-space: nowrap;
@@ -2694,13 +2699,13 @@ body::before {
 }
 
 .hm-tile__change {
-    font-size: 9px;
+    font-size: 11px;
     font-weight: 600;
     line-height: 1.3;
 }
 
 .hm-tile__score {
-    font-size: 9px;
+    font-size: 10px;
     color: rgba(255,255,255,0.65);
     line-height: 1.3;
 }
