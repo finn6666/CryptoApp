@@ -179,8 +179,17 @@ function _renderHeatmap(coins, holdingsMap) {
             });
         }
     }
-    // API returns coins sorted by gem_score desc — kept so largest tiles are top-left
+    // Sort all coins by display % descending (biggest gainers top-left)
     const allCoins = [...extraCoins, ...coins];
+    allCoins.sort((a, b) => {
+        const pctA = (holdingsMap[a.symbol]?.unrealised_pnl_pct !== undefined && holdingsMap[a.symbol]?.unrealised_pnl_pct !== null)
+            ? holdingsMap[a.symbol].unrealised_pnl_pct
+            : (a.price_change_24h || 0);
+        const pctB = (holdingsMap[b.symbol]?.unrealised_pnl_pct !== undefined && holdingsMap[b.symbol]?.unrealised_pnl_pct !== null)
+            ? holdingsMap[b.symbol].unrealised_pnl_pct
+            : (b.price_change_24h || 0);
+        return pctB - pctA;
+    });
 
     // Pack into treemap rows: each row fills 100% width, tile widths proportional within row
     const containerW = grid.parentElement ? grid.parentElement.offsetWidth  || 800 : 800;
