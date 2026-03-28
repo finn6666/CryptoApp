@@ -79,9 +79,13 @@
 
                 <!-- Portfolio Summary Card -->
                 <div class="portfolio-card">
-                    <div class="portfolio-card__value" id="sidebarPortfolioValue">£0.00</div>
+                    <div class="portfolio-card__header">
+                        <span class="portfolio-card__label">Portfolio</span>
+                        <span class="portfolio-card__sub" id="sidebarPortfolioSub"></span>
+                    </div>
+                    <div class="portfolio-card__value" id="sidebarPortfolioValue">—</div>
                     <div class="portfolio-card__pnl" id="sidebarPortfolioPnl">—</div>
-                    <div class="portfolio-card__sub" id="sidebarPortfolioSub"></div>
+                    <div class="portfolio-card__holdings" id="sidebarHoldingsList" style="display:none;"></div>
                 </div>
 
                 <!-- Live Trading Panel (open) -->
@@ -97,9 +101,6 @@
                         </div>
                     </div>
                     <div class="sidebar-panel__body open">
-                        <div id="configWarning" class="config-warning" style="display: none;">
-                            Setup required: add Kraken API keys and SMTP credentials to <code>.env</code>
-                        </div>
                         <div class="sidebar-stats-grid sidebar-stats-grid--3">
                             <div class="sidebar-stat">
                                 <div class="sidebar-stat__value" id="totalTrades">0</div>

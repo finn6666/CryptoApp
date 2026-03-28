@@ -234,8 +234,8 @@ function _renderHeatmap(coins, holdingsMap) {
 
             tile.innerHTML = `
                 <div class="hm-tile__symbol">${symbolText}</div>
-                <div class="hm-tile__price">${priceStr}</div>
                 <div class="hm-tile__change" style="color:${displayColor}">${displayStr}</div>
+                <div class="hm-tile__price">${priceStr}</div>
                 <div class="hm-tile__score">${scoreLabel}</div>
             `;
 
