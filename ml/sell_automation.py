@@ -246,6 +246,7 @@ class SellAutomation:
                     reason=trigger["reason"],
                     confidence=trigger["confidence"],
                     recommendation="SELL",
+                    sell_quantity=quantity * sell_fraction,
                 )
                 outcome = "auto-executed" if result.get("auto_approved") else "proposed"
                 partial_label = f" ({sell_fraction*100:.0f}%)" if sell_fraction < 1.0 else ""
