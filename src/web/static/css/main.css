@@ -3530,7 +3530,7 @@ html, body {
 .sidebar-panel.panel-open .sidebar-panel__body.open {
     flex: 1;
     min-height: 0;
-    overflow: hidden;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
 }

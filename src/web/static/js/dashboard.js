@@ -58,22 +58,27 @@ async function loadPortfolioCard() {
             pnlEl.style.cursor = '';
         }
 
-        if (subEl) subEl.textContent = `${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
-
         if (listEl) {
-            listEl.style.display = '';
-            const sortedHoldings = [...holdings].sort((a, b) => (b.unrealised_pnl_pct ?? 0) - (a.unrealised_pnl_pct ?? 0));
-            listEl.innerHTML = sortedHoldings.map(h => {
-                const pct = h.unrealised_pnl_pct ?? 0;
-                const val = h.current_value_gbp ?? 0;
-                const cls = pct >= 0 ? 'positive' : 'negative';
-                const sign = pct >= 0 ? '+' : '';
-                return `<div class="holding-row">
-                    <span class="holding-row__symbol">${escapeHtml(h.symbol)}</span>
-                    <span class="holding-row__value">£${Number(val).toFixed(2)}</span>
-                    <span class="holding-row__pnl ${cls}">${sign}${Number(pct).toFixed(1)}%</span>
-                </div>`;
-            }).join('');
+            const activeHoldings = holdings.filter(h => (h.current_value_gbp ?? 0) > 0.01);
+            if (activeHoldings.length === 0) {
+                listEl.style.display = 'none';
+                if (subEl) subEl.textContent = 'No open positions';
+            } else {
+                listEl.style.display = '';
+                if (subEl) subEl.textContent = `${activeHoldings.length} position${activeHoldings.length !== 1 ? 's' : ''}`;
+                const sortedHoldings = [...activeHoldings].sort((a, b) => (b.unrealised_pnl_pct ?? 0) - (a.unrealised_pnl_pct ?? 0));
+                listEl.innerHTML = sortedHoldings.map(h => {
+                    const pct = h.unrealised_pnl_pct ?? 0;
+                    const val = h.current_value_gbp ?? 0;
+                    const cls = pct >= 0 ? 'positive' : 'negative';
+                    const sign = pct >= 0 ? '+' : '';
+                    return `<div class="holding-row">
+                        <span class="holding-row__symbol">${escapeHtml(h.symbol)}</span>
+                        <span class="holding-row__value">£${Number(val).toFixed(2)}</span>
+                        <span class="holding-row__pnl ${cls}">${sign}${Number(pct).toFixed(1)}%</span>
+                    </div>`;
+                }).join('');
+            }
         }
     } catch (e) {
         console.warn('Portfolio card:', e.message);
