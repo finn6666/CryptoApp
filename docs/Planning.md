@@ -1,7 +1,9 @@
 
 ## Current To Do
 
-- Whole portfolio is showing on the right and not letting anything else come through, anyway to amend this for the better?
+- Whole portfolio is showing on the right and not letting anything else come through, amend this, ask questions if needed
+- Tiles are still arranged in coin order, i would like them arranged in percentage increase/decresae order from what i bought them, ive asked for this a few times now so something is going wrong
+- The button to kill trading has gone
 
 ## Future Work
 
