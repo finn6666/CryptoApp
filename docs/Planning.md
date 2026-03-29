@@ -1,9 +1,7 @@
 
 ## Current To Do
-
-- Whole portfolio is showing on the right and not letting anything else come through, amend this, ask questions if needed
-- Tiles are still arranged in coin order, i would like them arranged in percentage increase/decresae order from what i bought them, ive asked for this a few times now so something is going wrong
-- The button to kill trading has gone
+- Remove unneeded workbranches
+- RL insights are all templated text, anyway we can make them each a bit more personal?
 
 ## Future Work
 
