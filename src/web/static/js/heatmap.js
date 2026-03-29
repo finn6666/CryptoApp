@@ -179,16 +179,20 @@ function _renderHeatmap(coins, holdingsMap) {
             });
         }
     }
-    // Sort all coins by display % descending (biggest gainers top-left)
+    // Sort: held coins first (by P&L% from purchase desc), then non-held (by 24h change desc)
     const allCoins = [...extraCoins, ...coins];
     allCoins.sort((a, b) => {
-        const pctA = (holdingsMap[a.symbol]?.unrealised_pnl_pct !== undefined && holdingsMap[a.symbol]?.unrealised_pnl_pct !== null)
-            ? holdingsMap[a.symbol].unrealised_pnl_pct
-            : (a.price_change_24h || 0);
-        const pctB = (holdingsMap[b.symbol]?.unrealised_pnl_pct !== undefined && holdingsMap[b.symbol]?.unrealised_pnl_pct !== null)
-            ? holdingsMap[b.symbol].unrealised_pnl_pct
-            : (b.price_change_24h || 0);
-        return pctB - pctA;
+        const heldA = holdingsMap[a.symbol];
+        const heldB = holdingsMap[b.symbol];
+        // Held coins always come before non-held
+        if (heldA && !heldB) return -1;
+        if (!heldA && heldB) return 1;
+        // Both held: sort by P&L% from purchase descending
+        if (heldA && heldB) {
+            return (heldB.unrealised_pnl_pct ?? 0) - (heldA.unrealised_pnl_pct ?? 0);
+        }
+        // Both non-held: sort by 24h change descending
+        return (b.price_change_24h || 0) - (a.price_change_24h || 0);
     });
 
     // Pack into treemap rows: each row fills 100% width, tile widths proportional within row

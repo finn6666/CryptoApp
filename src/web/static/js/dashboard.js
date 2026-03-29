@@ -62,7 +62,8 @@ async function loadPortfolioCard() {
 
         if (listEl) {
             listEl.style.display = '';
-            listEl.innerHTML = holdings.map(h => {
+            const sortedHoldings = [...holdings].sort((a, b) => (b.unrealised_pnl_pct ?? 0) - (a.unrealised_pnl_pct ?? 0));
+            listEl.innerHTML = sortedHoldings.map(h => {
                 const pct = h.unrealised_pnl_pct ?? 0;
                 const val = h.current_value_gbp ?? 0;
                 const cls = pct >= 0 ? 'positive' : 'negative';
