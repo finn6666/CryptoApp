@@ -222,9 +222,17 @@ function _renderHeatmap(coins, holdingsMap) {
 
             const displayStr  = pct >= 0 ? `+${pct.toFixed(1)}%` : `${pct.toFixed(1)}%`;
             const displayColor = _changeColour(pct);
-            const scoreLabel  = String(coin.gem_score);
+            const scoreLabel  = coin.gem_score.toFixed(1);
             const priceStr    = (held && held.current_price) ? _fmtPrice(held.current_price) : _fmtPrice(coin.price);
             const symbolText  = held ? `&#9679; ${escapeHtml(coin.symbol)}` : escapeHtml(coin.symbol);
+
+            // For held coins: show GBP P&L amount below the percentage
+            let pnlHtml = '';
+            if (held) {
+                const pnlGbp  = held.unrealised_pnl_gbp ?? 0;
+                const pnlSign = pnlGbp >= 0 ? '+' : '';
+                pnlHtml = `<div class="hm-tile__pnl" style="color:${displayColor}">${pnlSign}£${Math.abs(pnlGbp).toFixed(2)}</div>`;
+            }
 
             const tile = document.createElement('div');
             tile.className = 'hm-tile' + (coin.gem_score < 3 ? ' hm-tile--micro' : '');
@@ -232,13 +240,14 @@ function _renderHeatmap(coins, holdingsMap) {
             tile.style.cssText = [
                 `background:${bgColour}`,
                 `flex:${coin.gem_score}`,
-                held ? 'outline:2px solid rgba(255,255,255,0.5);outline-offset:-2px' : '',
+                held ? 'outline:2px solid rgba(255,255,255,0.55);outline-offset:-2px' : '',
             ].filter(Boolean).join(';');
             tile.title = `${coin.symbol} — ${coin.name}\n${held ? `P&L: ${displayStr}` : `24h: ${displayStr}`}\nPrice: ${priceStr}`;
 
             tile.innerHTML = `
                 <div class="hm-tile__symbol">${symbolText}</div>
                 <div class="hm-tile__change" style="color:${displayColor}">${displayStr}</div>
+                ${pnlHtml}
                 <div class="hm-tile__price">${priceStr}</div>
                 <div class="hm-tile__score">${scoreLabel}</div>
             `;

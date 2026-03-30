@@ -8,7 +8,19 @@
  */
 async function loadDashboardSummary(prefetchedData = null) {
     try {
-        const data = prefetchedData || await fetch('/api/dashboard-summary', { headers: authHeaders() }).then(r => r.json());
+        let data;
+        if (prefetchedData) {
+            data = prefetchedData;
+        } else {
+            const ctrl = new AbortController();
+            const timeout = setTimeout(() => ctrl.abort(), 5000);
+            try {
+                const res = await fetch('/api/dashboard-summary', { headers: authHeaders(), signal: ctrl.signal });
+                data = await res.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
 
         // Budget pill
         _updatePill('pillBudget', () => {

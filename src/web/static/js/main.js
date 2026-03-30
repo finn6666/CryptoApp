@@ -37,13 +37,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Live ticker across the top
         startTicker();
 
-        // Single-call status strip + sidebar scanner stats
-        await loadDashboardSummary();
-
-        // Accurate portfolio data from holdings endpoint
+        // Fire all initial loads in parallel — don't block the page on any single call
+        loadDashboardSummary();
         loadPortfolioCard();
-
-        // Heatmap (independent — runs in parallel with init below)
         loadHeatmap();
 
         // Init trading/portfolio/scanning sidebar sections

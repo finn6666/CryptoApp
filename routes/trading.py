@@ -1017,13 +1017,20 @@ def rl_insights():
 
         # Loss memory — which coins keep underperforming (show top 3 worst)
         losses = stats.get('loss_memory', {})
-        loss_coins = [sym for sym, count in sorted(losses.items(), key=lambda x: -x[1]) if count > 0][:3]
+        loss_coins = [(sym, count) for sym, count in sorted(losses.items(), key=lambda x: -x[1]) if count > 0][:3]
         if loss_coins:
             if len(loss_coins) == 1:
-                insights.append(f"{loss_coins[0]} keeps sitting in the red. The system's getting more cautious about buying similar setups.")
+                sym, cnt = loss_coins[0]
+                msg = (
+                    f"{sym} has lost money every time we've touched it — the system now requires a much stronger signal before buying it again."
+                    if cnt >= 3 else
+                    f"{sym} has underperformed twice. The system is treating it with more scepticism."
+                )
+                insights.append(msg)
             else:
-                coin_list = ', '.join(loss_coins[:-1]) + ' and ' + loss_coins[-1]
-                insights.append(f"{coin_list} have been the worst underperformers. The system's penalising these and will need stronger signals before buying similar coins again.")
+                names = [s for s, _ in loss_coins]
+                coin_list = ', '.join(names[:-1]) + ' and ' + names[-1]
+                insights.append(f"{coin_list} have consistently lost money. The system is applying a buy penalty to all of them until they show a genuine reversal.")
 
         # Best/worst known patterns
         best = stats.get('best_state')
@@ -1043,9 +1050,14 @@ def rl_insights():
             return s
 
         if best and best.get('q_buy', 0) > 0:
-            insights.append(f"Most promising pattern so far: {describe_state(best['state'])}. The system will lean towards buying these.")
+            q = best['q_buy']
+            label = describe_state(best['state'])
+            strength = "very strong" if q > 0.5 else "solid" if q > 0.2 else "emerging"
+            insights.append(f"Strongest pattern ({strength} signal): {label}. Q-value is {q:.2f} — the system actively looks for these.")
         if worst and worst.get('q_buy', 0) < -0.1:
-            insights.append(f"Least promising pattern: {describe_state(worst['state'])}. These get a confidence penalty now.")
+            q = abs(worst['q_buy'])
+            label = describe_state(worst['state'])
+            insights.append(f"Pattern to avoid: {label}. Confidence penalty of {q:.2f} applied — the system needs a very strong reason to buy these.")
 
         # Recent outcomes
         record = {"wins": 0, "losses": 0, "total": 0}
@@ -1053,12 +1065,33 @@ def rl_insights():
             wins = [o for o in history if o.get('pnl_pct', 0) >= 0]
             losses_list = [o for o in history if o.get('pnl_pct', 0) < 0]
             record = {"wins": len(wins), "losses": len(losses_list), "total": len(history)}
+
+            # Average win / loss %
+            avg_win  = sum(o['pnl_pct'] for o in wins)       / len(wins)       if wins       else 0
+            avg_loss = sum(o['pnl_pct'] for o in losses_list) / len(losses_list) if losses_list else 0
+
             if wins and not losses_list:
-                insights.append(f"Last {len(history)} outcomes have all been winners — nice.")
+                avg_str = f", averaging +{avg_win:.1f}% each" if len(wins) > 1 else ""
+                insights.append(f"Last {len(history)} closed trades have all been profitable{avg_str}.")
             elif losses_list and not wins:
-                insights.append(f"Last {len(history)} outcomes were all losses. The system is adjusting its strategy to avoid repeating the same mistakes.")
+                avg_str = f", averaging {avg_loss:.1f}% each" if len(losses_list) > 1 else ""
+                insights.append(f"Last {len(history)} trades all closed in the red{avg_str}. The system is tightening its criteria.")
             else:
-                insights.append(f"Recent record: {len(wins)}W / {len(losses_list)}L from the last {len(history)} trades.")
+                win_rate = round(len(wins) / len(history) * 100)
+                avg_parts = [f"+{avg_win:.1f}% avg win" if wins else None,
+                             f"{avg_loss:.1f}% avg loss" if losses_list else None]
+                avg_str = ' / '.join(p for p in avg_parts if p)
+                insights.append(f"Last {len(history)} trades: {len(wins)}W / {len(losses_list)}L ({win_rate}% win rate). {avg_str}.")
+
+            # Best and worst single trades from the full history
+            all_history = ql.get_outcome_history(limit=50)
+            if len(all_history) >= 3:
+                best_trade  = max(all_history, key=lambda o: o.get('pnl_pct', 0))
+                worst_trade = min(all_history, key=lambda o: o.get('pnl_pct', 0))
+                if best_trade.get('pnl_pct', 0) >= 20:
+                    insights.append(f"Best trade on record: {best_trade.get('symbol', '?')} at +{best_trade['pnl_pct']:.1f}%.")
+                if worst_trade.get('pnl_pct', 0) <= -20:
+                    insights.append(f"Worst trade on record: {worst_trade.get('symbol', '?')} at {worst_trade['pnl_pct']:.1f}%.")
 
             # Call out notable recent trades (dedupe by symbol)
             seen_symbols = set()
@@ -1068,10 +1101,14 @@ def rl_insights():
                     continue
                 seen_symbols.add(sym)
                 pnl = o.get('pnl_pct', 0)
-                if pnl >= 10:
-                    insights.append(f"{sym} was a solid win at +{pnl:.1f}%. Reinforcing that pattern.")
-                elif pnl <= -10:
-                    insights.append(f"{sym} took a {pnl:.1f}% hit. The system's learnt to be more careful with that type of setup.")
+                if pnl >= 25:
+                    insights.append(f"{sym} was a strong win at +{pnl:.1f}%. That pattern is getting reinforced.")
+                elif 10 <= pnl < 25:
+                    insights.append(f"{sym} closed up +{pnl:.1f}%.")
+                elif pnl <= -25:
+                    insights.append(f"{sym} lost {pnl:.1f}%. The system has marked that setup as high-risk.")
+                elif -25 < pnl <= -10:
+                    insights.append(f"{sym} closed at {pnl:.1f}%.")
 
         # Structured best/worst patterns for frontend rendering
         patterns = {}
