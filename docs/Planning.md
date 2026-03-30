@@ -1,9 +1,33 @@
 
-## Current To Do
-- Remove unneeded workbranches
-- RL insights are all templated text, anyway we can make them each a bit more personal?
 
 ## Future Work
+
+---
+
+### Continuous trading: Claude agent layer
+
+Keep ADK intact but add a scheduled Claude Code agent that runs every 1-2h as a lighter portfolio manager between deep scans.
+
+**Architecture:**
+- ADK scan loop (every 12h) — coin discovery, 5-agent analysis, new buys. Unchanged.
+- Claude agent (every 1-2h via `/schedule`) — portfolio review, held coin monitoring, approve/reject pending proposals, trigger targeted re-analysis on specific coins
+
+Both layers share the same trading engine, budget, kill switch, and approval flow.
+
+**What the Claude agent does each run:**
+1. `GET /api/portfolio/holdings` — check held coin P&L and hold duration
+2. `GET /api/market/conditions` — overall sentiment
+3. `GET /api/trades/pending` — proposals needing a decision
+4. Reason and act: sell anything? Approve/reject proposals? Anything moving unusually?
+5. Optionally propose a buy directly via a new `POST /api/claude/propose` endpoint
+
+**Backend changes needed (small):**
+- `POST /api/claude/propose` — accepts `{symbol, side, reasoning, confidence}`, routes through normal budget/approval/email flow. No ADK analysis, just Claude's direct reasoning.
+- `GET /api/claude/context` — compact single-call summary of portfolio + recent activity so the agent doesn't need to hit multiple endpoints
+
+**Frontend:** no changes needed.
+
+**Setup:** use the `/schedule` skill to create the recurring agent with a crafted prompt giving it the Pi URL, API key from env, and conservative instructions (flag rather than auto-buy unless very high conviction).
 
 ---
 
