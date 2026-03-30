@@ -71,6 +71,8 @@ function _packRows(coins, containerW, containerH) {
 // ─── Analysis panel ───────────────────────────────────────────
 
 let _activeTileSymbol = null;
+let _currentHoldingsMap = {};
+let _currentCoins = [];
 
 function _showTileAnalysis(coin, holding) {
     const { symbol, name, price, price_change_24h, gem_score, market_cap_rank } = coin;
@@ -246,7 +248,10 @@ function _renderHeatmap(coins, holdingsMap) {
                 <div class="hm-tile__score">${scoreLabel}</div>
             `;
 
-            tile.addEventListener('click', () => _showTileAnalysis(coin, held || null));
+            // Look up holding at click time (not capture time) so the panel
+            // always reflects the latest loaded holdings regardless of which
+            // render pass the tile was created in.
+            tile.addEventListener('click', () => _showTileAnalysis(coin, _currentHoldingsMap[coin.symbol] || null));
             rowEl.appendChild(tile);
         });
 
@@ -288,9 +293,17 @@ async function loadHeatmap() {
             if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
         }
 
-        // Only re-render if we actually have holdings to show
-        if (Object.keys(holdingsMap).length > 0) {
-            _renderHeatmap(coins, holdingsMap);
+        // Store globally so click handlers always use the latest data
+        _currentHoldingsMap = holdingsMap;
+        _currentCoins = coins;
+
+        // Re-render with P&L overlaid (always, so colours + ordering update)
+        _renderHeatmap(coins, holdingsMap);
+
+        // If the analysis panel is open, refresh it with the now-loaded position
+        if (_activeTileSymbol) {
+            const openCoin = coins.find(c => c.symbol === _activeTileSymbol);
+            if (openCoin) _showTileAnalysis(openCoin, holdingsMap[_activeTileSymbol] || null);
         }
     } catch (err) {
         if (grid) {
