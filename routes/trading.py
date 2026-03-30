@@ -618,14 +618,20 @@ def portfolio_holdings():
                         if coin.symbol.upper() not in live_prices:
                             live_prices[coin.symbol.upper()] = coin.price
 
-            # 3) Fallback: fetch from exchange for any still missing
+            # 3) Fallback: fetch from exchange for any still missing (4s timeout)
             missing = [h["symbol"] for h in holdings_raw if h["symbol"] not in live_prices]
             if missing:
                 try:
+                    import concurrent.futures
                     from ml.exchange_manager import get_exchange_manager
                     mgr = get_exchange_manager()
-                    exchange_prices = mgr.get_live_prices_gbp(missing)
-                    live_prices.update(exchange_prices)
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                        future = ex.submit(mgr.get_live_prices_gbp, missing)
+                        try:
+                            exchange_prices = future.result(timeout=4)
+                            live_prices.update(exchange_prices)
+                        except concurrent.futures.TimeoutError:
+                            logger.warning(f"Exchange price fetch timed out for {missing}")
                 except Exception as e:
                     logger.warning(f"Exchange price fetch failed: {e}")
 

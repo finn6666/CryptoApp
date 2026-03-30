@@ -73,6 +73,7 @@ function _packRows(coins, containerW, containerH) {
 let _activeTileSymbol = null;
 let _currentHoldingsMap = {};
 let _currentCoins = [];
+let _holdingsReady = false;
 
 function _showTileAnalysis(coin, holding) {
     const { symbol, name, price, price_change_24h, gem_score, market_cap_rank } = coin;
@@ -107,6 +108,12 @@ function _showTileAnalysis(coin, holding) {
             <div class="hm-stat-row">
                 <span class="hm-stat-label">Your position</span>
                 <span style="color:${pnlColour};font-weight:700;">${pnlSign}${pnlPct.toFixed(1)}% (${pnlSign}£${Math.abs(pnlGbp).toFixed(2)})</span>
+            </div>`;
+    } else if (!_holdingsReady) {
+        holdingHtml = `
+            <div class="hm-stat-row">
+                <span class="hm-stat-label">Your position</span>
+                <span style="color:var(--text-secondary)">Loading...</span>
             </div>`;
     }
 
@@ -282,6 +289,7 @@ async function loadHeatmap() {
         const coins = heatmapData.coins || [];
 
         // Render with empty holdings first so tiles appear without waiting
+        _holdingsReady = false;
         _renderHeatmap(coins, {});
         _heatmapLoaded = true;
 
@@ -296,6 +304,7 @@ async function loadHeatmap() {
         // Store globally so click handlers always use the latest data
         _currentHoldingsMap = holdingsMap;
         _currentCoins = coins;
+        _holdingsReady = true;
 
         // Re-render with P&L overlaid (always, so colours + ordering update)
         _renderHeatmap(coins, holdingsMap);
