@@ -2740,12 +2740,17 @@ body::before {
 
 /* AI analysis overlay (click tile) */
 .hm-analysis-panel {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 12px 12px;
+    padding: 14px 16px;
+    z-index: 10;
     animation: slideIn 0.2s ease;
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
 }
 
 .hm-analysis-header {

@@ -618,20 +618,45 @@ def portfolio_holdings():
                         if coin.symbol.upper() not in live_prices:
                             live_prices[coin.symbol.upper()] = coin.price
 
-            # 3) Fallback: fetch from exchange for any still missing (4s timeout)
+            # 3) Fallback: fetch from exchange for any still missing — parallel per-symbol
             missing = [h["symbol"] for h in holdings_raw if h["symbol"] not in live_prices]
             if missing:
                 try:
                     import concurrent.futures
                     from ml.exchange_manager import get_exchange_manager
                     mgr = get_exchange_manager()
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                        future = ex.submit(mgr.get_live_prices_gbp, missing)
+
+                    def _fetch_one(sym):
                         try:
-                            exchange_prices = future.result(timeout=4)
-                            live_prices.update(exchange_prices)
-                        except concurrent.futures.TimeoutError:
-                            logger.warning(f"Exchange price fetch timed out for {missing}")
+                            result = mgr.find_best_pair(sym)
+                            if not result:
+                                return sym, None
+                            exchange_id, pair = result
+                            exchange = mgr.get_exchange(exchange_id)
+                            if not exchange:
+                                return sym, None
+                            ticker = mgr._fetch_ticker_with_retry(exchange, pair)
+                            price = ticker.get("last") or ticker.get("close")
+                            if not price:
+                                return sym, None
+                            quote = pair.split("/")[1] if "/" in pair else "GBP"
+                            if quote == "GBP":
+                                return sym, price
+                            fx_rate = mgr._get_fx_rate("GBP", quote, exchange)
+                            return sym, (price / fx_rate if fx_rate else None)
+                        except Exception:
+                            return sym, None
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+                        done, _ = concurrent.futures.wait(
+                            {pool.submit(_fetch_one, s): s for s in missing},
+                            timeout=6,
+                            return_when=concurrent.futures.ALL_COMPLETED,
+                        )
+                        for f in done:
+                            sym, price = f.result()
+                            if price:
+                                live_prices[sym.upper()] = price
                 except Exception as e:
                     logger.warning(f"Exchange price fetch failed: {e}")
 

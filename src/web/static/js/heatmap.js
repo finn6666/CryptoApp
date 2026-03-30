@@ -77,8 +77,8 @@ let _holdingsReady = false;
 
 function _showTileAnalysis(coin, holding) {
     const { symbol, name, price, price_change_24h, gem_score, market_cap_rank } = coin;
-    const heatmapCol = document.getElementById('heatmapColumn');
-    if (!heatmapCol) return;
+    const container = document.querySelector('.heatmap-container');
+    if (!container) return;
 
     // Toggle off if clicking same tile
     if (_activeTileSymbol === symbol) {
@@ -145,8 +145,7 @@ function _showTileAnalysis(coin, holding) {
             ${holdingHtml}
         </div>
     `;
-    heatmapCol.appendChild(panel);
-    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    container.appendChild(panel);
 }
 
 function _closeTileAnalysis() {
@@ -274,45 +273,39 @@ async function loadHeatmap() {
     const grid = document.getElementById('heatmapGrid');
     if (!grid) return;
 
-    // Only show loading placeholder on first load — avoids flicker on auto-refresh
+    // Show loading placeholder on first load only
     if (!_heatmapLoaded) {
-        grid.innerHTML = '<div class="heatmap-loading">Loading heatmap…</div>';
+        grid.innerHTML = '<div class="heatmap-loading">Loading heatmap&hellip;</div>';
     }
 
     try {
-        // Two-pass render: show tiles immediately from the fast endpoint,
-        // then patch in P&L data once the (slower) holdings call resolves.
-        const heatmapRes = await fetch('/api/heatmap-data');
+        // Fetch coin data and holdings in parallel — render once when both are ready
+        const [heatmapRes, holdingsRes] = await Promise.all([
+            fetch('/api/heatmap-data'),
+            fetch('/api/portfolio/holdings', { headers: authHeaders() }).catch(() => null),
+        ]);
+
         const heatmapData = await heatmapRes.json();
         if (heatmapData.error) throw new Error(heatmapData.error);
 
-        const coins = heatmapData.coins || [];
-
-        // Render with empty holdings first so tiles appear without waiting
-        _holdingsReady = false;
-        _renderHeatmap(coins, {});
-        _heatmapLoaded = true;
-
-        // Then fetch holdings and re-render with P&L overlaid
-        const holdingsRes = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
-        const holdingsData = await holdingsRes.json().catch(() => ({}));
+        const holdingsData = holdingsRes ? await holdingsRes.json().catch(() => ({})) : {};
         const holdingsMap = {};
         for (const h of holdingsData.holdings || []) {
             if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
         }
 
-        // Store globally so click handlers always use the latest data
+        // Store globals and render once — no layout shift from a second pass
         _currentHoldingsMap = holdingsMap;
-        _currentCoins = coins;
+        _currentCoins = heatmapData.coins || [];
         _holdingsReady = true;
 
-        // Re-render with P&L overlaid (always, so colours + ordering update)
-        _renderHeatmap(coins, holdingsMap);
+        _renderHeatmap(_currentCoins, _currentHoldingsMap);
+        _heatmapLoaded = true;
 
-        // If the analysis panel is open, refresh it with the now-loaded position
+        // If the analysis panel is open, refresh it with current data
         if (_activeTileSymbol) {
-            const openCoin = coins.find(c => c.symbol === _activeTileSymbol);
-            if (openCoin) _showTileAnalysis(openCoin, holdingsMap[_activeTileSymbol] || null);
+            const openCoin = _currentCoins.find(c => c.symbol === _activeTileSymbol);
+            if (openCoin) _showTileAnalysis(openCoin, _currentHoldingsMap[_activeTileSymbol] || null);
         }
     } catch (err) {
         if (grid) {
