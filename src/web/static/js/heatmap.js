@@ -179,20 +179,14 @@ function _renderHeatmap(coins, holdingsMap) {
             });
         }
     }
-    // Sort: held coins first (by P&L% from purchase desc), then non-held (by 24h change desc)
+    // Sort all tiles by their display % descending (held coins use P&L%, others use 24h change)
     const allCoins = [...extraCoins, ...coins];
     allCoins.sort((a, b) => {
         const heldA = holdingsMap[a.symbol];
         const heldB = holdingsMap[b.symbol];
-        // Held coins always come before non-held
-        if (heldA && !heldB) return -1;
-        if (!heldA && heldB) return 1;
-        // Both held: sort by P&L% from purchase descending
-        if (heldA && heldB) {
-            return (heldB.unrealised_pnl_pct ?? 0) - (heldA.unrealised_pnl_pct ?? 0);
-        }
-        // Both non-held: sort by 24h change descending
-        return (b.price_change_24h || 0) - (a.price_change_24h || 0);
+        const pctA = heldA ? (heldA.unrealised_pnl_pct ?? 0) : (a.price_change_24h || 0);
+        const pctB = heldB ? (heldB.unrealised_pnl_pct ?? 0) : (b.price_change_24h || 0);
+        return pctB - pctA;
     });
 
     // Pack into treemap rows: each row fills 100% width, tile widths proportional within row
@@ -230,7 +224,7 @@ function _renderHeatmap(coins, holdingsMap) {
             let pnlHtml = '';
             if (held) {
                 const pnlGbp  = held.unrealised_pnl_gbp ?? 0;
-                const pnlSign = pnlGbp >= 0 ? '+' : '';
+                const pnlSign = pnlGbp >= 0 ? '+' : '-';
                 pnlHtml = `<div class="hm-tile__pnl" style="color:${displayColor}">${pnlSign}£${Math.abs(pnlGbp).toFixed(2)}</div>`;
             }
 
@@ -274,23 +268,30 @@ async function loadHeatmap() {
     }
 
     try {
-        const [heatmapRes, holdingsRes] = await Promise.all([
-            fetch('/api/heatmap-data'),
-            fetch('/api/portfolio/holdings', { headers: authHeaders() }),
-        ]);
-        const heatmapData  = await heatmapRes.json();
-        const holdingsData = await holdingsRes.json().catch(() => ({}));
-
+        // Two-pass render: show tiles immediately from the fast endpoint,
+        // then patch in P&L data once the (slower) holdings call resolves.
+        const heatmapRes = await fetch('/api/heatmap-data');
+        const heatmapData = await heatmapRes.json();
         if (heatmapData.error) throw new Error(heatmapData.error);
 
-        // Build holdings map: symbol → holding (active positions only)
+        const coins = heatmapData.coins || [];
+
+        // Render with empty holdings first so tiles appear without waiting
+        _renderHeatmap(coins, {});
+        _heatmapLoaded = true;
+
+        // Then fetch holdings and re-render with P&L overlaid
+        const holdingsRes = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
+        const holdingsData = await holdingsRes.json().catch(() => ({}));
         const holdingsMap = {};
         for (const h of holdingsData.holdings || []) {
             if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
         }
 
-        _renderHeatmap(heatmapData.coins || [], holdingsMap);
-        _heatmapLoaded = true;
+        // Only re-render if we actually have holdings to show
+        if (Object.keys(holdingsMap).length > 0) {
+            _renderHeatmap(coins, holdingsMap);
+        }
     } catch (err) {
         if (grid) {
             grid.innerHTML = `<div class="heatmap-loading" style="color:var(--error);">Heatmap unavailable: ${escapeHtml(err.message)}</div>`;
