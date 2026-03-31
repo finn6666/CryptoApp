@@ -663,10 +663,8 @@ class ExchangeManager:
 
             return {"ok": True}
         except Exception as e:
-            # If balance check fails, log but allow the order to proceed
-            # (the exchange will reject if funds are truly insufficient)
-            logger.warning(f"Balance check failed on {exchange_id} (proceeding anyway): {e}")
-            return {"ok": True}
+            logger.warning(f"Balance check failed on {exchange_id} — blocking order: {e}")
+            return {"ok": False, "error": f"Balance check failed: {e}"}
 
     def _auto_convert_gbp(
         self, exchange, exchange_id: str, target_currency: str,

@@ -234,7 +234,7 @@ async function loadMonitorCard() {
 // ─── Exchange Status ─────────────────────────────────────────
 async function loadExchangeCard() {
     try {
-        const res = await fetch('/api/exchanges/status');
+        const res = await fetch('/api/exchanges/status', { headers: authHeaders() });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 

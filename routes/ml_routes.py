@@ -151,6 +151,7 @@ def debug_ml_system():
 # ─── Agent Analysis ───────────────────────────────────────────────
 
 @ml_bp.route('/api/agents/analyze/<symbol>')
+@require_trading_auth
 def analyze_with_agents(symbol):
     if not state.official_adk_available:
         return jsonify({'error': 'ADK not available'}), 503
@@ -202,6 +203,7 @@ def get_agent_metrics():
 # ─── Portfolio ───────────────────────────────────────────────
 
 @ml_bp.route('/api/portfolio/analyze')
+@require_trading_auth
 def analyze_portfolio():
     if not state.official_adk_available:
         return jsonify({'error': 'ADK not available'}), 503

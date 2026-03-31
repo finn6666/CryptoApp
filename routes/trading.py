@@ -189,7 +189,7 @@ def confirm_trade(token):
                                 border: 1px solid #2d3748; max-width: 400px;">
                         <h2 style="margin: 0 0 8px; color: #48bb78;">Trade Approved &amp; Executed</h2>
                         <p style="color: #a0aec0; margin: 0 0 16px;">
-                            {result.get('side', '').upper()} {result.get('quantity', 0):.6f} {result.get('symbol', '')}
+                            {_html.escape(result.get('side', '').upper())} {result.get('quantity', 0):.6f} {_html.escape(result.get('symbol', ''))}
                             @ £{result.get('price', 0):.6f}
                         </p>
                         <p style="color: #a0aec0; font-size: 13px;">Amount: £{result.get('amount_gbp', 0):.4f}</p>
@@ -227,14 +227,16 @@ def confirm_trade(token):
 
 def _error_page(title: str, message: str) -> str:
     """Render a simple branded error page — never leaks internal details."""
+    safe_title = _html.escape(str(title))
+    safe_message = _html.escape(str(message))
     return f"""
     <html>
     <body style="font-family: -apple-system, sans-serif; background: #0d0d14; color: #e2e8f0;
                  display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
         <div style="text-align: center; background: #151520; padding: 40px; border-radius: 16px;
                     border: 1px solid #2d3748; max-width: 400px;">
-            <h2 style="margin: 0 0 8px; color: #ecc94b;">{title}</h2>
-            <p style="color: #a0aec0;">{message}</p>
+            <h2 style="margin: 0 0 8px; color: #ecc94b;">{safe_title}</h2>
+            <p style="color: #a0aec0;">{safe_message}</p>
             <a href="/trades" style="display: inline-block; margin-top: 16px; padding: 10px 24px;
                                      background: #667eea; color: white; text-decoration: none;
                                      border-radius: 8px;">View Trades</a>
@@ -517,6 +519,7 @@ def scan_now():
 
 
 @trading_bp.route('/api/trades/scan-status')
+@require_trading_auth
 def scan_status():
     """Get scan loop status and recent scan results."""
     try:
@@ -532,12 +535,13 @@ def scan_status():
 
 
 @trading_bp.route('/api/trades/audit-trail')
+@require_trading_auth
 def audit_trail():
     """Get recent audit trail entries."""
     try:
         from ml.scan_loop import get_scan_loop
         scanner = get_scan_loop()
-        limit = request.args.get('limit', 100, type=int)
+        limit = min(request.args.get('limit', 100, type=int), 500)
         return jsonify({"entries": scanner.get_audit_trail(limit=limit)}), 200
     except Exception as e:
         logger.error(f"Audit trail error: {e}")
@@ -700,12 +704,13 @@ def portfolio_holdings():
 
 
 @trading_bp.route('/api/portfolio/history')
+@require_trading_auth
 def portfolio_history():
     """Get full trade log with outcomes."""
     try:
         from ml.portfolio_tracker import get_portfolio_tracker
         tracker = get_portfolio_tracker()
-        limit = request.args.get('limit', 50, type=int)
+        limit = min(request.args.get('limit', 50, type=int), 500)
         return jsonify({"trades": tracker.get_trade_history(limit=limit)}), 200
     except Exception as e:
         logger.error(f"Portfolio history error: {e}")
@@ -717,6 +722,7 @@ def portfolio_history():
 # ========================================
 
 @trading_bp.route('/api/dashboard-summary')
+@require_trading_auth
 def dashboard_summary():
     """Aggregate portfolio, trading, scanner, and monitor into one call.
     Replaces 5 parallel card fetches with a single request.
@@ -844,6 +850,7 @@ def stream_dashboard():
 
 
 @trading_bp.route('/api/portfolio/sell-signals')
+@require_trading_auth
 def portfolio_sell_signals():
     """Check current holdings for sell signals (profit targets / stop losses)."""
     try:
@@ -865,6 +872,7 @@ def portfolio_sell_signals():
 
 
 @trading_bp.route('/api/portfolio/performance')
+@require_trading_auth
 def portfolio_performance():
     """Aggregated performance metrics — win rate, average return, best/worst trades."""
     try:
@@ -877,6 +885,7 @@ def portfolio_performance():
 
 
 @trading_bp.route('/api/portfolio/closed')
+@require_trading_auth
 def portfolio_closed():
     """Get all fully-sold (closed) positions with outcomes."""
     try:
@@ -889,6 +898,7 @@ def portfolio_closed():
 
 
 @trading_bp.route('/api/portfolio/monthly-review')
+@require_trading_auth
 def monthly_review():
     """Month-by-month trading performance breakdown."""
     try:
@@ -961,6 +971,7 @@ def monthly_review():
 # ========================================
 
 @trading_bp.route('/api/exchanges/status')
+@require_trading_auth
 def exchange_status():
     """Get multi-exchange status, connectivity, and tradeable pair counts."""
     try:

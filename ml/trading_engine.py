@@ -145,8 +145,7 @@ class TradingEngine:
         # Token signing for approve/reject links
         secret = os.getenv('SECRET_KEY')
         if not secret:
-            logger.error('SECRET_KEY not set — trade approval tokens will be insecure!')
-            secret = os.urandom(32).hex()  # random per-instance; tokens won't survive restarts
+            raise RuntimeError('SECRET_KEY is not set — refusing to start without it. Set SECRET_KEY in .env.')
         self._serializer = URLSafeTimedSerializer(secret, salt='trade-approval')
 
         # Load persisted state

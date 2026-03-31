@@ -11,17 +11,17 @@ function escapeHtml(str) {
 
 // ─── Auth ──────────────────────────────────────────────────
 
-/** Return stored API key from localStorage (persists across sessions). */
+/** Return stored API key from sessionStorage (cleared on tab close). */
 function getApiKey() {
-    return localStorage.getItem('tradingApiKey');
+    return sessionStorage.getItem('tradingApiKey');
 }
 
-/** Persist API key to localStorage. */
+/** Persist API key to sessionStorage. */
 function setApiKey(key) {
     if (key) {
-        localStorage.setItem('tradingApiKey', key.trim());
+        sessionStorage.setItem('tradingApiKey', key.trim());
     } else {
-        localStorage.removeItem('tradingApiKey');
+        sessionStorage.removeItem('tradingApiKey');
     }
 }
 
