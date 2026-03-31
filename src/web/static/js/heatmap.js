@@ -288,7 +288,7 @@ async function loadHeatmap() {
         const heatmapData = await heatmapRes.json();
         if (heatmapData.error) throw new Error(heatmapData.error);
 
-        const holdingsData = holdingsRes ? await holdingsRes.json().catch(() => ({})) : {};
+        const holdingsData = holdingsRes && holdingsRes.ok ? await holdingsRes.json().catch(() => ({})) : {};
         const holdingsMap = {};
         for (const h of holdingsData.holdings || []) {
             if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
@@ -297,7 +297,9 @@ async function loadHeatmap() {
         // Store globals and render once — no layout shift from a second pass
         _currentHoldingsMap = holdingsMap;
         _currentCoins = heatmapData.coins || [];
-        _holdingsReady = true;
+        // Only mark ready if holdings fetch actually succeeded — keeps "Loading..." visible
+        // for held coins instead of silently suppressing the position row on auth failure.
+        _holdingsReady = !!(holdingsRes && holdingsRes.ok);
 
         _renderHeatmap(_currentCoins, _currentHoldingsMap);
         _heatmapLoaded = true;

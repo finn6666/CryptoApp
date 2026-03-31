@@ -183,7 +183,9 @@ class PortfolioTracker:
         """Get total portfolio value and P&L summary."""
         holdings = self.get_holdings(live_prices)
 
-        total_cost = sum(h.get("total_cost_gbp", 0) for h in holdings)
+        # Use position_cost_gbp (avg_entry * qty) not total_cost_gbp which
+        # never decrements on sells and would inflate the P&L percentage denominator.
+        total_cost = sum(h.get("position_cost_gbp", 0) for h in holdings)
         total_value = sum(h.get("current_value_gbp", 0) for h in holdings)
         total_unrealised = sum(h.get("unrealised_pnl_gbp", 0) for h in holdings)
         total_realised = sum(

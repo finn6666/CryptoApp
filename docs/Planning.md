@@ -1,8 +1,6 @@
 ## Current Work
 
-- Page doesn't refresh correctly
-- Porfolio value is wrong
-- 'Your position' is stil not there on most of the coins when i click on them
+
 ## Future Work
 
 ---

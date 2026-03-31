@@ -103,6 +103,7 @@ function startDashboardSSE() {
             if (typeof loadPendingProposals  === 'function') loadPendingProposals(d.pending_proposals ?? null);
             if (typeof loadScanStatusDetail  === 'function') loadScanStatusDetail(d.scan_detail ?? null);
             if (typeof loadActivityLog       === 'function') loadActivityLog(d.activity ?? null);
+            if (typeof loadPortfolioCard     === 'function') loadPortfolioCard();
         } catch (e) {
             console.warn('SSE parse error:', e);
         }

@@ -241,6 +241,7 @@ async function refreshData() {
         loadDashboardSummary(),
         loadMarketConditions(),
         loadHeatmap(),
+        loadPortfolioCard(),
     ]);
 }
 
@@ -251,6 +252,7 @@ async function refreshData_afterAutoLoad() {
         loadDashboardSummary(),
         loadMarketConditions(),
         loadHeatmap(),
+        loadPortfolioCard(),
     ]);
 }
 
