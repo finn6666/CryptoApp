@@ -620,32 +620,35 @@ def portfolio_holdings():
 
             # 3) Fallback: fetch from exchange for any still missing — parallel per-symbol
             missing = [h["symbol"] for h in holdings_raw if h["symbol"] not in live_prices]
+            ticker_changes = {}  # sym -> 24h change % captured from exchange tickers
             if missing:
                 try:
                     import concurrent.futures
                     from ml.exchange_manager import get_exchange_manager
                     mgr = get_exchange_manager()
 
+                    # Returns (sym, price_gbp, change_24h_pct) — change_24h_pct may be None
                     def _fetch_one(sym):
                         try:
                             result = mgr.find_best_pair(sym)
                             if not result:
-                                return sym, None
+                                return sym, None, None
                             exchange_id, pair = result
                             exchange = mgr.get_exchange(exchange_id)
                             if not exchange:
-                                return sym, None
+                                return sym, None, None
                             ticker = mgr._fetch_ticker_with_retry(exchange, pair)
                             price = ticker.get("last") or ticker.get("close")
                             if not price:
-                                return sym, None
+                                return sym, None, None
+                            change_pct = ticker.get("percentage")  # 24h % from exchange
                             quote = pair.split("/")[1] if "/" in pair else "GBP"
                             if quote == "GBP":
-                                return sym, price
+                                return sym, price, change_pct
                             fx_rate = mgr._get_fx_rate("GBP", quote, exchange)
-                            return sym, (price / fx_rate if fx_rate else None)
+                            return sym, (price / fx_rate if fx_rate else None), change_pct
                         except Exception:
-                            return sym, None
+                            return sym, None, None
 
                     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
                         done, _ = concurrent.futures.wait(
@@ -654,9 +657,11 @@ def portfolio_holdings():
                             return_when=concurrent.futures.ALL_COMPLETED,
                         )
                         for f in done:
-                            sym, price = f.result()
+                            sym, price, change_pct = f.result()
                             if price:
                                 live_prices[sym.upper()] = price
+                            if change_pct is not None:
+                                ticker_changes[sym.upper()] = change_pct
                 except Exception as e:
                     logger.warning(f"Exchange price fetch failed: {e}")
 
@@ -669,7 +674,8 @@ def portfolio_holdings():
         holdings = tracker.get_holdings(live_prices)
         summary = tracker.get_total_value(live_prices)
 
-        # Enrich holdings with name + 24h/7d price changes from analyzer data
+        # Enrich holdings with name + 24h/7d price changes
+        # Priority: analyzer data (CoinGecko) → exchange ticker 24h change
         if state.analyzer:
             coin_lookup = {c.symbol.upper(): c for c in state.analyzer.coins}
             for h in holdings:
@@ -679,6 +685,9 @@ def portfolio_holdings():
                     h["price_change_7d"] = coin.price_change_7d
                     if not h.get("coin_name"):
                         h["coin_name"] = coin.name
+                elif h.get("price_change_24h") is None:
+                    # Fall back to exchange ticker 24h % captured during price fetch
+                    h["price_change_24h"] = ticker_changes.get(h["symbol"])
         # coin_name already stored in holdings for any trades recorded after this fix
 
         return jsonify({

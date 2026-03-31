@@ -104,10 +104,12 @@ function _showTileAnalysis(coin, holding) {
         const pnlGbp = holding.unrealised_pnl_gbp || 0;
         const pnlColour = pnlPct >= 0 ? 'var(--success)' : 'var(--error)';
         const pnlSign   = pnlPct >= 0 ? '+' : '';
+        // Use more decimal places for small GBP values
+        const gbpDp = Math.abs(pnlGbp) < 0.01 ? 6 : Math.abs(pnlGbp) < 1 ? 4 : 2;
         holdingHtml = `
             <div class="hm-stat-row">
                 <span class="hm-stat-label">Your position</span>
-                <span style="color:${pnlColour};font-weight:700;">${pnlSign}${pnlPct.toFixed(1)}% (${pnlSign}£${Math.abs(pnlGbp).toFixed(2)})</span>
+                <span style="color:${pnlColour};font-weight:700;">${pnlSign}${pnlPct.toFixed(2)}% (${pnlSign}£${Math.abs(pnlGbp).toFixed(gbpDp)})</span>
             </div>`;
     } else if (!_holdingsReady) {
         holdingHtml = `
@@ -137,10 +139,6 @@ function _showTileAnalysis(coin, holding) {
             <div class="hm-stat-row">
                 <span class="hm-stat-label">Gem score</span>
                 <span style="color:${scoreColour}">${gem_score.toFixed(1)} — ${scoreLabel}</span>
-            </div>
-            <div class="hm-stat-row">
-                <span class="hm-stat-label">Market cap rank</span>
-                <span>${rankStr}</span>
             </div>
             ${holdingHtml}
         </div>
