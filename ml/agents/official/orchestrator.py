@@ -57,7 +57,7 @@ class CryptoAnalysisOutput(BaseModel):
 crypto_orchestrator = Agent(
     name="crypto_orchestrator",
     description="Master cryptocurrency analyst coordinating specialist agents",
-    model="gemini-3-flash-preview",
+    model=os.getenv("ORCHESTRATOR_MODEL", "gemini-2.0-flash-lite"),
     instruction="""You coordinate 5 specialist agents to analyze cryptocurrencies and decide whether to trade. Primary focus is low-cap coins (under £1, sub-$100M mcap) for their asymmetric upside, but DO NOT dismiss mid-cap or higher-priced coins if the setup is genuinely compelling — a strong opportunity is a strong opportunity regardless of price.
 
 **Team:** sentiment_specialist, research_specialist, technical_specialist, risk_specialist, trading_specialist
