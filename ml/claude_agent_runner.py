@@ -132,10 +132,10 @@ Rules:
 
 def analyse_with_gemini(ctx: dict) -> dict:
     """Send context to Gemini and get structured portfolio analysis."""
-    import google.generativeai as genai  # type: ignore
+    from google import genai  # type: ignore
+    from google.genai import types  # type: ignore
 
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel(AGENT_MODEL)
+    client = genai.Client(api_key=GOOGLE_API_KEY)
 
     context_str = json.dumps(ctx, indent=2, default=str)
     prompt = (
@@ -146,9 +146,13 @@ def analyse_with_gemini(ctx: dict) -> dict:
     )
 
     logger.info("Calling Gemini model %s for portfolio analysis", AGENT_MODEL)
-    response = model.generate_content(
-        [{"role": "user", "parts": [_SYSTEM_PROMPT + "\n\n" + prompt]}],
-        generation_config={"temperature": 0.2, "response_mime_type": "application/json"},
+    response = client.models.generate_content(
+        model=AGENT_MODEL,
+        contents=_SYSTEM_PROMPT + "\n\n" + prompt,
+        config=types.GenerateContentConfig(
+            temperature=0.2,
+            response_mime_type="application/json",
+        ),
     )
 
     text = response.text.strip()

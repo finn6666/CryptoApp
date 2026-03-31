@@ -17,10 +17,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=pi
-WorkingDirectory=/home/pi/CryptoApp
-EnvironmentFile=/home/pi/CryptoApp/.env
-ExecStart=/home/pi/CryptoApp/.venv/bin/python -m ml.claude_agent_runner
+User=finnbryant
+WorkingDirectory=/home/finnbryant/CryptoApp
+EnvironmentFile=/home/finnbryant/CryptoApp/.env
+ExecStart=/home/finnbryant/CryptoApp/.venv/bin/python -m ml.claude_agent_runner
 StandardOutput=journal
 StandardError=journal
 
