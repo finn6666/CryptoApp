@@ -127,6 +127,9 @@ def api_health():
         },
         'system': system_metrics,
         'uptime_hours': round((time.time() - state.start_time) / 3600, 2),
+        'gemini_budget': (lambda b: b.get_status())(
+            __import__('services.gemini_budget', fromlist=['get_gemini_budget']).get_gemini_budget()
+        ),
     }), 200
 
 

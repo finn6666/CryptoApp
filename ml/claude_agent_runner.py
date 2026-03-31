@@ -145,6 +145,12 @@ def analyse_with_gemini(ctx: dict) -> dict:
         "Output only valid JSON — no markdown fences, no explanation outside the JSON."
     )
 
+    from services.gemini_budget import get_gemini_budget, BudgetExceededError
+    try:
+        get_gemini_budget().check_and_record("claude_runner")
+    except BudgetExceededError as _be:
+        raise RuntimeError(f"Gemini daily budget exceeded: {_be}") from _be
+
     logger.info("Calling Gemini model %s for portfolio analysis", AGENT_MODEL)
     response = client.models.generate_content(
         model=AGENT_MODEL,

@@ -486,6 +486,13 @@ class SellAutomation:
                     self._last_drawdown_recheck[symbol] = now.isoformat()
 
             try:
+                from services.gemini_budget import get_gemini_budget, BudgetExceededError
+                try:
+                    get_gemini_budget().check_and_record("agent_recheck")
+                except BudgetExceededError as _be:
+                    logger.warning("%s: skipping agent_recheck — Gemini budget exceeded: %s", symbol, _be)
+                    continue
+
                 import asyncio
                 from ml.agents.official.orchestrator import analyze_crypto
 

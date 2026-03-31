@@ -383,6 +383,13 @@ class ScanLoop:
             symbol = coin["symbol"]
 
             try:
+                from services.gemini_budget import get_gemini_budget, BudgetExceededError
+                try:
+                    get_gemini_budget().check_and_record("quick_screen")
+                except BudgetExceededError as _be:
+                    logger.warning("[Scan %s] Gemini budget exceeded — stopping quick screen: %s", scan_id, _be)
+                    break
+
                 from ml.agents.official.quick_screen import quick_screen_coin
                 result = state.run_async(
                     quick_screen_coin(symbol, coin, trade_ctx)
@@ -445,12 +452,20 @@ class ScanLoop:
                             "reason": f"Recent analysis ({age_hours:.1f}h ago) found no trade — reusing result",
                         }
 
-        # Check budget before spending API credits
+        # Check trading budget before spending API credits
         if engine.is_budget_exhausted():
             return {"outcome": "skipped", "reason": "Daily budget exhausted", "proposed": False}
 
         if engine.kill_switch:
             return {"outcome": "skipped", "reason": "Kill switch active", "proposed": False}
+
+        # Check Gemini API cost budget
+        try:
+            from services.gemini_budget import get_gemini_budget, BudgetExceededError
+            get_gemini_budget().check_and_record("full_analysis")
+        except BudgetExceededError as _be:
+            logger.warning("[Scan] Gemini budget exceeded — skipping %s: %s", symbol, _be)
+            return {"outcome": "skipped", "reason": "Gemini daily budget exceeded", "proposed": False}
 
         # Run ADK orchestrator analysis (Gemini)
         analysis = None
