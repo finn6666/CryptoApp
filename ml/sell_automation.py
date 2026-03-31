@@ -43,6 +43,9 @@ class SellAutomation:
         # 6h recheck keeps close tabs on held positions while scan frequency is reduced.
         # Each recheck = 6 Gemini calls per held coin, so with ~3 holdings = ~18 calls/6h.
         self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "6"))
+        # Minimum cooldown for sharp-drawdown bypasses — prevents re-analysing every
+        # coin every 5-min market-monitor cycle when the whole portfolio is in drawdown.
+        self.drawdown_recheck_min_hours = float(os.getenv("SELL_DRAWDOWN_RECHECK_MIN_HOURS", "2.0"))
 
         # Minimum hold period in hours before ANY sell trigger (except stop-loss) fires.
         # 72h lets positions ride out short-term volatility before evaluating exits.
@@ -64,6 +67,7 @@ class SellAutomation:
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
         self._last_recheck: Dict[str, str] = {}  # symbol → ISO timestamp
+        self._last_drawdown_recheck: Dict[str, str] = {}  # symbol → ISO timestamp (sharp drawdown bypass)
         # Most recent agent conviction from recheck (stored for all outcomes, not just SELLs)
         self._last_recheck_conviction: Dict[str, float] = {}
         # Track which profit tiers have already been taken per symbol
@@ -468,10 +472,18 @@ class SellAutomation:
                     pnl_for_sym = holding.get("unrealised_pnl_pct", 0) or 0
                     if not self._needs_sharp_drawdown_recheck(symbol, pnl_for_sym):
                         continue
+                    # Enforce a minimum cooldown even for drawdown bypasses to
+                    # prevent re-analysing every holding every 5-min monitor tick.
+                    last_dd = self._last_drawdown_recheck.get(symbol)
+                    if last_dd:
+                        dd_elapsed = (now - datetime.fromisoformat(last_dd)).total_seconds() / 3600
+                        if dd_elapsed < self.drawdown_recheck_min_hours:
+                            continue
                     logger.info(
                         f"{symbol}: bypassing recheck throttle — sharp drawdown "
                         f"({pnl_for_sym:.1f}%)"
                     )
+                    self._last_drawdown_recheck[symbol] = now.isoformat()
 
             try:
                 import asyncio
