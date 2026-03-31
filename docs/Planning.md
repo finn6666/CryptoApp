@@ -24,13 +24,13 @@ Both layers share the same trading engine, budget, kill switch, and approval flo
 4. Reason and act: sell anything? Approve/reject proposals? Anything moving unusually?
 5. Optionally propose a buy directly via a new `POST /api/claude/propose` endpoint
 
-**Backend changes needed (small):**
-- `POST /api/claude/propose` — accepts `{symbol, side, reasoning, confidence}`, routes through normal budget/approval/email flow. No ADK analysis, just Claude's direct reasoning.
-- `GET /api/claude/context` — compact single-call summary of portfolio + recent activity so the agent doesn't need to hit multiple endpoints
+**Backend changes (DONE):**
+- `POST /api/claude/propose` — accepts `{symbol, side, reasoning, confidence}`, fetches live price, routes through `propose_and_auto_execute()`. Confidence drives allocation (55-69% -> 40% budget, 70%+ -> up to 100%). Min conviction 55%.
+- `GET /api/claude/context` — compact single-call snapshot: holdings + P&L, budget, kill switch, pending proposals, market conditions, recent audit trail.
 
 **Frontend:** no changes needed.
 
-**Setup:** use the `/schedule` skill to create the recurring agent with a crafted prompt giving it the Pi URL, API key from env, and conservative instructions (flag rather than auto-buy unless very high conviction).
+**TODO:** use the `/schedule` skill to create the recurring agent with a crafted prompt giving it the Pi URL, API key from env, and conservative instructions (flag rather than auto-buy unless very high conviction).
 
 ---
 
