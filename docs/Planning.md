@@ -1,6 +1,7 @@
 ## Current Work
 
-
+- Some of the tiles (coins) have a white line border while otheres don't
+- Check if the site can be optimized at all
 ## Future Work
 
 ---
