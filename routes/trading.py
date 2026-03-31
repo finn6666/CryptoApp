@@ -1310,3 +1310,212 @@ def cache_status():
     except Exception as e:
         logger.error(f"Cache status error: {e}")
         return jsonify({'success': False, 'error': 'Failed to get cache status'}), 500
+
+
+# ========================================
+# Claude Agent Routes
+# ========================================
+
+@trading_bp.route('/api/claude/propose', methods=['POST'])
+@limiter.limit('20 per hour')
+@require_trading_auth
+def claude_propose():
+    """
+    Propose a trade from the Claude agent layer.
+    Accepts {symbol, side, reasoning, confidence} — fetches live price and
+    routes through propose_and_auto_execute() (respects BUY_AUTO_APPROVE).
+    Confidence drives allocation: 55-69% -> 40% of budget, 70%+ -> up to 100%.
+    """
+    try:
+        from ml.trading_engine import get_trading_engine, compute_allocation_pct
+        from ml.exchange_manager import get_exchange_manager
+        engine = get_trading_engine()
+
+        data = request.json
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+
+        # ── Validate required fields ──
+        for field_name in ('symbol', 'side', 'reasoning', 'confidence'):
+            if field_name not in data:
+                return jsonify({"error": f"Missing field: {field_name}"}), 400
+
+        symbol = str(data['symbol']).upper().strip()
+        if not symbol or len(symbol) > 20:
+            return jsonify({"error": "Invalid symbol"}), 400
+
+        side = str(data['side']).lower().strip()
+        if side not in ('buy', 'sell'):
+            return jsonify({"error": "side must be 'buy' or 'sell'"}), 400
+
+        reasoning = str(data['reasoning']).strip()
+        if not reasoning:
+            return jsonify({"error": "reasoning is required"}), 400
+
+        try:
+            confidence = int(data['confidence'])
+        except (ValueError, TypeError):
+            return jsonify({"error": "confidence must be an integer"}), 400
+        if not 0 <= confidence <= 100:
+            return jsonify({"error": "confidence must be 0-100"}), 400
+
+        # ── Safety: require minimum conviction for buys ──
+        if side == 'buy' and confidence < 55:
+            return jsonify({
+                "success": False,
+                "error": f"Confidence {confidence}% is below minimum threshold (55%) for buys",
+            }), 400
+
+        if engine.kill_switch:
+            return jsonify({"success": False, "error": "Trading is halted (kill switch active)"}), 400
+
+        # ── Fetch live price from exchange ──
+        mgr = get_exchange_manager()
+        current_price = None
+        try:
+            best = mgr.find_best_pair(symbol)
+            if best:
+                exchange_id, pair = best
+                exchange = mgr.get_exchange(exchange_id)
+                if exchange:
+                    ticker = mgr._fetch_ticker_with_retry(exchange, pair)
+                    raw_price = ticker.get("last") or ticker.get("close")
+                    if raw_price:
+                        quote = pair.split("/")[1] if "/" in pair else "GBP"
+                        if quote == "GBP":
+                            current_price = float(raw_price)
+                        else:
+                            fx = mgr._get_fx_rate("GBP", quote, exchange)
+                            if fx:
+                                current_price = float(raw_price) / fx
+        except Exception as e:
+            logger.warning(f"Claude propose — price fetch failed for {symbol}: {e}")
+
+        if not current_price or current_price <= 0:
+            return jsonify({"error": f"Could not fetch live price for {symbol}"}), 400
+
+        # ── Calculate amount based on confidence and remaining budget ──
+        remaining = engine.get_remaining_budget()
+        if side == 'buy':
+            alloc_pct = compute_allocation_pct(confidence, 0, {"symbol": symbol})
+            amount_gbp = round(remaining * (alloc_pct / 100), 2)
+        else:
+            # Sells: use sell_quantity from holdings if available
+            sell_qty = data.get('sell_quantity')
+            amount_gbp = round(current_price * float(sell_qty), 2) if sell_qty else round(remaining * 0.5, 2)
+
+        result = engine.propose_and_auto_execute(
+            symbol=symbol,
+            side=side,
+            amount_gbp=amount_gbp,
+            current_price=current_price,
+            reason=reasoning[:500],
+            confidence=confidence,
+            recommendation="BUY" if side == "buy" else "SELL",
+            coin_name=data.get("coin_name", ""),
+            sell_quantity=data.get("sell_quantity"),
+        )
+        return jsonify(result), 200 if result.get("success") else 400
+
+    except Exception as e:
+        logger.error(f"Claude propose error: {e}")
+        return jsonify({"error": "Failed to create Claude trade proposal"}), 500
+
+
+@trading_bp.route('/api/claude/context')
+@require_trading_auth
+def claude_context():
+    """
+    Compact single-call context snapshot for the Claude agent.
+    Returns portfolio holdings, pending proposals, budget, market conditions,
+    and recent activity — everything needed for a portfolio review in one request.
+    """
+    ctx = {}
+
+    # ── Portfolio holdings with P&L ──
+    try:
+        from ml.portfolio_tracker import get_portfolio_tracker
+        tracker = get_portfolio_tracker()
+        live_prices = {}
+        if state.analyzer:
+            for coin in state.analyzer.coins:
+                if coin.price:
+                    live_prices[coin.symbol.upper()] = coin.price
+        holdings = tracker.get_holdings(live_prices)
+        summary = tracker.get_total_value(live_prices)
+        ctx['holdings'] = [
+            {
+                'symbol': h['symbol'],
+                'coin_name': h.get('coin_name', ''),
+                'quantity': h.get('quantity'),
+                'avg_entry_price': h.get('avg_entry_price'),
+                'current_price': h.get('current_price'),
+                'current_value_gbp': h.get('current_value_gbp'),
+                'unrealised_pnl_pct': h.get('unrealised_pnl_pct'),
+                'unrealised_pnl_gbp': h.get('unrealised_pnl_gbp'),
+                'first_buy': h.get('first_buy'),
+                'price_change_24h': h.get('price_change_24h'),
+            }
+            for h in holdings
+        ]
+        ctx['portfolio_summary'] = summary
+    except Exception as e:
+        logger.warning(f"Claude context — portfolio error: {e}")
+        ctx['holdings'] = []
+        ctx['portfolio_summary'] = {}
+
+    # ── Trading engine: budget + kill switch + pending proposals ──
+    try:
+        from ml.trading_engine import get_trading_engine
+        engine = get_trading_engine()
+        status = engine.get_status()
+        ctx['budget'] = {
+            'daily_budget_gbp': status.get('daily_budget_gbp'),
+            'spent_today_gbp': status.get('spent_today_gbp'),
+            'remaining_gbp': status.get('remaining_budget_gbp'),
+        }
+        ctx['kill_switch'] = status.get('kill_switch_active', False)
+        ctx['pending_proposals'] = engine.get_pending_proposals()
+    except Exception as e:
+        logger.warning(f"Claude context — trading error: {e}")
+        ctx['budget'] = {}
+        ctx['kill_switch'] = False
+        ctx['pending_proposals'] = []
+
+    # ── Market conditions (derived from analyzer coin data) ──
+    try:
+        all_coins = state.analyzer.get_all_coins() if state.analyzer else []
+        if all_coins:
+            total = len(all_coins)
+            avg_change = sum(c.price_change_24h or 0 for c in all_coins) / max(total, 1)
+            gainers = sum(1 for c in all_coins if (c.price_change_24h or 0) > 5)
+            losers = sum(1 for c in all_coins if (c.price_change_24h or 0) < -5)
+            ctx['market'] = {
+                'avg_change_24h': round(avg_change, 2),
+                'gainers_over_5pct': gainers,
+                'losers_over_5pct': losers,
+                'total_coins_tracked': total,
+            }
+        else:
+            ctx['market'] = {}
+    except Exception as e:
+        logger.warning(f"Claude context — market error: {e}")
+        ctx['market'] = {}
+
+    # ── Recent activity (last 10 audit trail entries) ──
+    try:
+        from ml.scan_loop import get_scan_loop
+        scanner = get_scan_loop()
+        scan_status = scanner.get_status()
+        ctx['scan'] = {
+            'last_scan': scan_status.get('last_scan'),
+            'next_scan': scan_status.get('next_scan'),
+            'scan_enabled': scan_status.get('enabled'),
+        }
+        ctx['recent_activity'] = scanner.get_audit_trail(limit=10)
+    except Exception as e:
+        logger.warning(f"Claude context — scan error: {e}")
+        ctx['scan'] = {}
+        ctx['recent_activity'] = []
+
+    return jsonify(ctx), 200
