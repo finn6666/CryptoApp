@@ -1,0 +1,14 @@
+# CryptoApp Claude agent runner timer — fires every 90 minutes
+# Offset by 45 minutes from the hour so it interleaves the 12h deep scans
+
+[Unit]
+Description=CryptoApp Claude Agent Runner Timer
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=90min
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target
