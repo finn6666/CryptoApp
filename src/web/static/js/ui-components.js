@@ -176,16 +176,6 @@ function generateUnifiedAIAnalysis(coin, coinId) {
 }
 
 
-// Format price in GBP
-function formatPrice(price) {
-    if (!price || price === 0) return 'N/A';
-    const n = Number(price);
-    if (n >= 0.01)         return `£${n.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 4})}`;
-    if (n >= 0.000001)     return `£${n.toFixed(6)}`;
-    const decimals = -Math.floor(Math.log10(n)) + 2;
-    return `£${n.toFixed(Math.min(decimals, 12))}`;
-}
-
 // Toggle functions
 function toggleAISentiment(coinId) {
     const content = document.getElementById(`ai-sentiment-${coinId}`);

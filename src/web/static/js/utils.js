@@ -77,6 +77,36 @@ function startRefreshTimer() {
     }, 300000); // 5 minutes — fallback when SSE is unavailable
 }
 
+// ─── Portfolio Holdings Cache ───────────────────────────────
+// Deduplicates concurrent calls to /api/portfolio/holdings.
+// loadPortfolioCard (SSE-driven, ~30s) and loadHeatmap (60s interval)
+// both need this data — the cache prevents double-fetching when they fire close together.
+
+let _holdingsCache = { data: null, expiry: 0, promise: null };
+
+async function fetchPortfolioHoldings() {
+    const now = Date.now();
+    if (_holdingsCache.data && now < _holdingsCache.expiry) return _holdingsCache.data;
+    if (_holdingsCache.promise) return _holdingsCache.promise;
+
+    _holdingsCache.promise = fetch('/api/portfolio/holdings', { headers: authHeaders() })
+        .then(r => {
+            if (!r.ok) { const err = new Error('HTTP ' + r.status); err.status = r.status; throw err; }
+            return r.json();
+        })
+        .then(data => {
+            _holdingsCache.data = data;
+            _holdingsCache.expiry = Date.now() + 30000; // 30s TTL
+            _holdingsCache.promise = null;
+            return data;
+        })
+        .catch(e => {
+            _holdingsCache.promise = null;
+            throw e;
+        });
+    return _holdingsCache.promise;
+}
+
 // ─── SSE Dashboard Stream ───────────────────────────────────
 // Replaces the setInterval soup in initTradingSections().
 // The server sends one event with all sidebar data then closes;

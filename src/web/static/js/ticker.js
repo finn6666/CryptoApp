@@ -76,5 +76,5 @@ async function loadTicker() {
 
 function startTicker() {
     loadTicker();
-    _tickerInterval = setInterval(loadTicker, 120000); // refresh every 2 min
+    _tickerInterval = setInterval(loadTicker, 600000); // refresh every 10 min
 }

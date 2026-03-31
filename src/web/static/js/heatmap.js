@@ -219,6 +219,7 @@ function _renderHeatmap(coins, holdingsMap) {
             const tile = document.createElement('div');
             tile.className = 'hm-tile' + (coin.gem_score < 3 ? ' hm-tile--micro' : '');
             // flex: gem_score makes tile width proportional within the row
+            tile.dataset.symbol = coin.symbol;
             tile.style.cssText = [
                 `background:${bgColour}`,
                 `flex:${coin.gem_score}`,
@@ -232,11 +233,6 @@ function _renderHeatmap(coins, holdingsMap) {
                 <div class="hm-tile__price">${priceStr}</div>
                 <div class="hm-tile__score">${scoreLabel}</div>
             `;
-
-            // Look up holding at click time (not capture time) so the panel
-            // always reflects the latest loaded holdings regardless of which
-            // render pass the tile was created in.
-            tile.addEventListener('click', () => _showTileAnalysis(coin, _currentHoldingsMap[coin.symbol] || null));
             rowEl.appendChild(tile);
         });
 
@@ -247,10 +243,24 @@ function _renderHeatmap(coins, holdingsMap) {
 // ─── Public API ───────────────────────────────────────────────
 
 let _heatmapLoaded = false;
+let _heatmapListenerAdded = false;
+
+function _initHeatmapListener(grid) {
+    if (_heatmapListenerAdded) return;
+    grid.addEventListener('click', (e) => {
+        const tile = e.target.closest('.hm-tile');
+        if (!tile) return;
+        const symbol = tile.dataset.symbol;
+        const coin = _currentCoins.find(c => c.symbol === symbol);
+        if (coin) _showTileAnalysis(coin, _currentHoldingsMap[symbol] || null);
+    });
+    _heatmapListenerAdded = true;
+}
 
 async function loadHeatmap() {
     const grid = document.getElementById('heatmapGrid');
     if (!grid) return;
+    _initHeatmapListener(grid);
 
     // Show loading placeholder on first load only
     if (!_heatmapLoaded) {
@@ -259,15 +269,12 @@ async function loadHeatmap() {
 
     try {
         // Fetch coin data and holdings in parallel — render once when both are ready
-        const [heatmapRes, holdingsRes] = await Promise.all([
-            fetch('/api/heatmap-data'),
-            fetch('/api/portfolio/holdings', { headers: authHeaders() }).catch(() => null),
+        const [heatmapData, holdingsData] = await Promise.all([
+            fetch('/api/heatmap-data').then(r => r.json()),
+            fetchPortfolioHoldings().catch(() => ({})),
         ]);
-
-        const heatmapData = await heatmapRes.json();
         if (heatmapData.error) throw new Error(heatmapData.error);
 
-        const holdingsData = holdingsRes && holdingsRes.ok ? await holdingsRes.json().catch(() => ({})) : {};
         const holdingsMap = {};
         for (const h of holdingsData.holdings || []) {
             if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
@@ -293,7 +300,7 @@ async function loadHeatmap() {
         // Store globals and render once — no layout shift from a second pass
         _currentHoldingsMap = holdingsMap;
         _currentCoins = displayCoins;
-        _holdingsReady = !!(holdingsRes && holdingsRes.ok);
+        _holdingsReady = true;
 
         _renderHeatmap(_currentCoins, _currentHoldingsMap);
         _heatmapLoaded = true;

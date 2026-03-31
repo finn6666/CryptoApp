@@ -19,15 +19,7 @@ async function loadPortfolioCard() {
     if (!valEl) return;
 
     try {
-        const res = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
-
-        if (res.status === 401) {
-            valEl.textContent = '—';
-            if (pnlEl) { pnlEl.textContent = 'Tap to set API key'; pnlEl.className = 'portfolio-card__pnl'; pnlEl.style.cursor = 'pointer'; pnlEl.onclick = () => openAuthModal(); }
-            return;
-        }
-
-        const data = await res.json();
+        const data = await fetchPortfolioHoldings();
         if (data.error) throw new Error(data.error);
 
         const summary  = data.summary  || {};
@@ -81,9 +73,14 @@ async function loadPortfolioCard() {
             }
         }
     } catch (e) {
-        console.warn('Portfolio card:', e.message);
-        valEl.textContent = '—';
-        if (pnlEl) { pnlEl.textContent = 'Could not load'; pnlEl.className = 'portfolio-card__pnl'; }
+        if (e.status === 401) {
+            valEl.textContent = '—';
+            if (pnlEl) { pnlEl.textContent = 'Tap to set API key'; pnlEl.className = 'portfolio-card__pnl'; pnlEl.style.cursor = 'pointer'; pnlEl.onclick = () => openAuthModal(); }
+        } else {
+            console.warn('Portfolio card:', e.message);
+            valEl.textContent = '—';
+            if (pnlEl) { pnlEl.textContent = 'Could not load'; pnlEl.className = 'portfolio-card__pnl'; }
+        }
     }
 }
 
