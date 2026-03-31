@@ -1,7 +1,8 @@
 ## Current Work
 
 - Some of the tiles (coins) have a white line border while otheres don't
-- Check if the site can be optimized at all
+- Check if the frontend can be optimized at all
+- Refresh takes a while to load
 ## Future Work
 
 ---

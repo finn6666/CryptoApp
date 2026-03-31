@@ -186,25 +186,6 @@ function formatPrice(price) {
     return `£${n.toFixed(Math.min(decimals, 12))}`;
 }
 
-// Get score class and label
-function getScoreInfo(score) {
-    const displayScore = score || 0;
-    const scorePercentage = (displayScore / 10) * 100;
-    
-    let scoreClass = 'score-low';
-    let scoreLabel = 'Low Potential';
-    
-    if (displayScore >= 8) {
-        scoreClass = 'score-high';
-        scoreLabel = 'High Potential';
-    } else if (displayScore >= 6) {
-        scoreClass = 'score-medium';
-        scoreLabel = 'Medium Potential';
-    }
-    
-    return { displayScore, scorePercentage, scoreClass, scoreLabel };
-}
-
 // Toggle functions
 function toggleAISentiment(coinId) {
     const content = document.getElementById(`ai-sentiment-${coinId}`);

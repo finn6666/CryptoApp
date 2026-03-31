@@ -85,34 +85,6 @@ function _setText(id, val) {
     if (el) el.textContent = val;
 }
 
-async function loadMarketConditions() {
-    try {
-        const response = await fetch('/api/market/conditions');
-        const data = await response.json();
-
-        if (data.error) {
-            console.warn('Market conditions unavailable:', data.error);
-            return;
-        }
-
-        // If data isn't loaded yet, auto-trigger a refresh
-        if (data.opportunity_level === 'UNKNOWN') {
-            try {
-                const refreshRes = await fetch('/api/refresh', { method: 'POST', headers: authHeadersJson() });
-                const refreshData = await refreshRes.json();
-                if (refreshData.success) {
-                    setTimeout(() => refreshData_afterAutoLoad(), 2000);
-                }
-            } catch (e) {
-                console.warn('Auto-refresh failed:', e);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error loading market conditions:', error);
-    }
-}
-
 async function loadMLStatus() {
     try {
         const response = await fetch('/api/ml/status');
@@ -239,18 +211,6 @@ async function trainMLModel() {
 async function refreshData() {
     await Promise.all([
         loadDashboardSummary(),
-        loadMarketConditions(),
-        loadHeatmap(),
-        loadPortfolioCard(),
-    ]);
-}
-
-// Called after auto-refresh succeeds — reloads entire dashboard
-async function refreshData_afterAutoLoad() {
-    console.log('Data became available — reloading entire dashboard...');
-    await Promise.all([
-        loadDashboardSummary(),
-        loadMarketConditions(),
         loadHeatmap(),
         loadPortfolioCard(),
     ]);

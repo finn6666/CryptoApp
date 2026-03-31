@@ -156,9 +156,8 @@ function _closeTileAnalysis() {
 
 /**
  * Render heatmap tiles.
- * holdingsMap = { SYMBOL: holdingObject } for currently held coins.
- * Held coins are highlighted with a white border and display P&L instead of 24h change.
- * Held coins missing from the analyzer data are prepended as extra tiles.
+ * coins = held coins only, each enriched with gem_score from heatmap data.
+ * holdingsMap = { SYMBOL: holdingObject } for P&L display.
  */
 function _renderHeatmap(coins, holdingsMap) {
     holdingsMap = holdingsMap || {};
@@ -166,32 +165,15 @@ function _renderHeatmap(coins, holdingsMap) {
     if (!grid) return;
 
     if (!coins || coins.length === 0) {
-        grid.innerHTML = '<div class="heatmap-loading">No coin data yet — trigger a scan to populate the heatmap.</div>';
+        grid.innerHTML = '<div class="heatmap-loading">No holdings yet — buy some coins to see your portfolio heatmap.</div>';
         return;
     }
 
-    // Prepend held coins that aren't already in the analyzer list
-    const inHeatmap = new Set(coins.map(c => c.symbol));
-    const extraCoins = [];
-    for (const [sym, h] of Object.entries(holdingsMap)) {
-        if (!inHeatmap.has(sym)) {
-            extraCoins.push({
-                symbol: sym,
-                name: h.coin_name || sym,
-                price: h.current_price || h.avg_entry_price || 0,
-                price_change_24h: h.price_change_24h || 0,
-                gem_score: 5,
-                market_cap_rank: 999,
-            });
-        }
-    }
-    // Sort all tiles by their display % descending (held coins use P&L%, others use 24h change)
-    const allCoins = [...extraCoins, ...coins];
+    // Sort by P&L % descending
+    const allCoins = [...coins];
     allCoins.sort((a, b) => {
-        const heldA = holdingsMap[a.symbol];
-        const heldB = holdingsMap[b.symbol];
-        const pctA = heldA ? (heldA.unrealised_pnl_pct ?? 0) : (a.price_change_24h || 0);
-        const pctB = heldB ? (heldB.unrealised_pnl_pct ?? 0) : (b.price_change_24h || 0);
+        const pctA = holdingsMap[a.symbol]?.unrealised_pnl_pct ?? 0;
+        const pctB = holdingsMap[b.symbol]?.unrealised_pnl_pct ?? 0;
         return pctB - pctA;
     });
 
@@ -240,8 +222,7 @@ function _renderHeatmap(coins, holdingsMap) {
             tile.style.cssText = [
                 `background:${bgColour}`,
                 `flex:${coin.gem_score}`,
-                held ? 'outline:2px solid rgba(255,255,255,0.55);outline-offset:-2px' : '',
-            ].filter(Boolean).join(';');
+            ].join(';');
             tile.title = `${coin.symbol} — ${coin.name}\n${held ? `P&L: ${displayStr}` : `24h: ${displayStr}`}\nPrice: ${priceStr}`;
 
             tile.innerHTML = `
@@ -292,11 +273,26 @@ async function loadHeatmap() {
             if ((h.quantity || 0) > 0) holdingsMap[h.symbol] = h;
         }
 
+        // Build display list from holdings only, enriched with gem_score from heatmap data
+        const heatmapBySymbol = {};
+        for (const c of heatmapData.coins || []) {
+            heatmapBySymbol[c.symbol] = c;
+        }
+        const displayCoins = Object.entries(holdingsMap).map(([sym, h]) => {
+            const hc = heatmapBySymbol[sym];
+            return {
+                symbol: sym,
+                name: hc?.name || h.coin_name || sym,
+                price: h.current_price || h.avg_entry_price || 0,
+                price_change_24h: h.price_change_24h || 0,
+                gem_score: hc ? hc.gem_score : 5,
+                market_cap_rank: hc?.market_cap_rank || 999,
+            };
+        });
+
         // Store globals and render once — no layout shift from a second pass
         _currentHoldingsMap = holdingsMap;
-        _currentCoins = heatmapData.coins || [];
-        // Only mark ready if holdings fetch actually succeeded — keeps "Loading..." visible
-        // for held coins instead of silently suppressing the position row on auth failure.
+        _currentCoins = displayCoins;
         _holdingsReady = !!(holdingsRes && holdingsRes.ok);
 
         _renderHeatmap(_currentCoins, _currentHoldingsMap);
