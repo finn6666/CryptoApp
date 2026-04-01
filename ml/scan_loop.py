@@ -615,11 +615,17 @@ class ScanLoop:
                     f"computed_alloc={sized_pct:.1f}%, amount=£{amount:.2f}"
                 )
 
-                # Determine trade mode from quick screen classification
+                # Determine trade mode: swing for quick-screen swing plays or bull-market regime.
+                # Long-term holds (accumulate) keep wide trailing stops (45%) and 72h hold period.
+                # Swing positions use tighter exits (SWING_* env vars) — set per-position at entry.
                 swing_enabled = os.getenv("SWING_TRADE_ENABLED", "false").lower() in ("1", "true", "yes")
-                trade_mode = "swing" if (swing_enabled and coin_data.get("play_type") == "swing") else "accumulate"
+                swing_on_bull = os.getenv("SWING_BULL_REGIME", "true").lower() in ("1", "true", "yes")
+                is_swing_play = coin_data.get("play_type") == "swing"
+                is_bull_regime = regime == "bull" and swing_on_bull
+                trade_mode = "swing" if (swing_enabled and (is_swing_play or is_bull_regime)) else "accumulate"
                 if trade_mode == "swing":
-                    logger.info(f"[Scan] {symbol}: swing trade mode activated")
+                    swing_reason = "quick-screen play_type" if is_swing_play else "bull market regime"
+                    logger.info(f"[Scan] {symbol}: swing trade mode ({swing_reason})")
 
                 # Portfolio concentration guard: require higher conviction when
                 # the book is already crowded to avoid low-quality add-ons.
