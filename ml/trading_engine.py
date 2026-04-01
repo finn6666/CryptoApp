@@ -534,9 +534,15 @@ class TradingEngine:
                 quote_currency = symbol_pair.split("/")[1] if "/" in symbol_pair else "GBP"
                 amount_in_quote = proposal.amount_gbp
                 if quote_currency != "GBP":
-                    # Approximate GBP → quote conversion
-                    approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
-                    fx_rate = approx_fx.get(quote_currency, 1.27)
+                    fx_rate = None
+                    try:
+                        from ml.exchange_manager import get_exchange_manager
+                        fx_rate = get_exchange_manager()._get_fx_rate("GBP", quote_currency, exchange)
+                    except Exception:
+                        pass
+                    if not fx_rate:
+                        approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
+                        fx_rate = approx_fx.get(quote_currency, 1.27)
                     amount_in_quote = proposal.amount_gbp * fx_rate
                     logger.info(f"Legacy FX: £{proposal.amount_gbp:.4f} → {amount_in_quote:.4f} {quote_currency} (rate {fx_rate})")
 
@@ -696,6 +702,7 @@ class TradingEngine:
                 amount_gbp=proposal.amount_gbp,
                 max_amount_gbp=remaining,
                 quantity=proposal.sell_quantity,
+                expected_price=proposal.price_at_proposal,
             )
             if result.get("success"):
                 return result
@@ -771,8 +778,14 @@ class TradingEngine:
                 return 0
 
             quote = pair.split("/")[1] if "/" in pair else "GBP"
-            approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
-            fx_rate = approx_fx.get(quote, 1.0) if quote != "GBP" else 1.0
+            fx_rate = 1.0
+            if quote != "GBP":
+                try:
+                    from ml.exchange_manager import get_exchange_manager
+                    fx_rate = get_exchange_manager()._get_fx_rate("GBP", quote, exchange) or 1.0
+                except Exception:
+                    approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
+                    fx_rate = approx_fx.get(quote, 1.0)
 
             min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
             min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
@@ -1075,6 +1088,12 @@ class TradingEngine:
             "trade_history": self.trade_history,
             "daily_budgets": {k: asdict(v) for k, v in self.daily_budgets.items()},
             "kill_switch": self.kill_switch,
+            "last_buy_proposal_time": (
+                self._last_buy_proposal_time.isoformat() if self._last_buy_proposal_time else None
+            ),
+            "last_sell_proposal_time": (
+                self._last_sell_proposal_time.isoformat() if self._last_sell_proposal_time else None
+            ),
         }
         state_file = self.data_dir / "trading_state.json"
         tmp = state_file.with_suffix(".tmp")
@@ -1106,6 +1125,18 @@ class TradingEngine:
 
             self.trade_history = state.get("trade_history", [])
             self.kill_switch = state.get("kill_switch", False)
+
+            # Restore per-side cooldown timers so they survive restarts
+            for attr, key in [
+                ("_last_buy_proposal_time", "last_buy_proposal_time"),
+                ("_last_sell_proposal_time", "last_sell_proposal_time"),
+            ]:
+                raw = state.get(key)
+                if raw:
+                    try:
+                        setattr(self, attr, datetime.fromisoformat(raw))
+                    except Exception:
+                        pass
 
             for did, ddata in state.get("daily_budgets", {}).items():
                 self.daily_budgets[did] = DailyBudget(**ddata)

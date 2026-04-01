@@ -581,7 +581,16 @@ class ScanLoop:
             except Exception as e:
                 logger.debug(f"Q-learning adjustment skipped: {e}")
 
-            if should_trade and conviction >= 45:
+            # Adjust conviction threshold by market regime
+            regime = self._get_market_regime()
+            regime_thresholds = {"bull": 40, "neutral": 45, "bear": 60}
+            conviction_threshold = regime_thresholds[regime]
+            if regime != "neutral":
+                logger.info(
+                    f"[Scan] {symbol}: market regime={regime}, conviction threshold={conviction_threshold}%"
+                )
+
+            if should_trade and conviction >= conviction_threshold:
                 remaining = engine.get_remaining_budget()
                 if remaining < engine.min_useful_budget_gbp:
                     return {"outcome": "skipped", "proposed": False, "reason": "Daily budget exhausted"}
@@ -611,6 +620,29 @@ class ScanLoop:
                 trade_mode = "swing" if (swing_enabled and coin_data.get("play_type") == "swing") else "accumulate"
                 if trade_mode == "swing":
                     logger.info(f"[Scan] {symbol}: swing trade mode activated")
+
+                # Portfolio concentration guard: require higher conviction when
+                # the book is already crowded to avoid low-quality add-ons.
+                try:
+                    from ml.portfolio_tracker import get_portfolio_tracker
+                    open_positions = len(get_portfolio_tracker().get_holdings({}))
+                    concentration_limit = int(os.getenv("SCAN_CONCENTRATION_LIMIT", "5"))
+                    concentration_min_conviction = int(os.getenv("SCAN_CONCENTRATION_MIN_CONVICTION", "65"))
+                    if open_positions >= concentration_limit and conviction < concentration_min_conviction:
+                        logger.info(
+                            f"[Scan] {symbol}: skipping — {open_positions} open positions and "
+                            f"conviction {conviction}% < concentration minimum {concentration_min_conviction}%"
+                        )
+                        return {
+                            "outcome": "skipped",
+                            "proposed": False,
+                            "reason": (
+                                f"Portfolio concentration limit reached ({open_positions} positions); "
+                                f"need {concentration_min_conviction}%+ conviction, got {conviction}%"
+                            ),
+                        }
+                except Exception as e:
+                    logger.debug(f"Portfolio concentration check failed: {e}")
 
                 # Use auto-execute for scheduled scans so trades don't
                 # sit waiting for manual approval overnight.
@@ -652,6 +684,29 @@ class ScanLoop:
         except Exception as e:
             logger.error(f"Trade decision extraction failed for {symbol}: {e}")
             return {"outcome": "error", "reason": str(e), "proposed": False}
+
+    # ─── Market Regime ────────────────────────────────────────
+
+    def _get_market_regime(self) -> str:
+        """
+        Classify current market regime from BTC 7-day performance.
+        Returns 'bull', 'bear', or 'neutral'.
+        Used to dynamically adjust the conviction threshold per scan.
+        """
+        try:
+            import services.app_state as state
+            if state.analyzer and state.analyzer.coins:
+                for coin in state.analyzer.coins:
+                    if getattr(coin, "symbol", "").upper() in ("BTC", "WBTC"):
+                        pct = float(getattr(coin, "price_change_7d", 0) or 0)
+                        if pct > 10:
+                            return "bull"
+                        if pct < -10:
+                            return "bear"
+                        return "neutral"
+        except Exception:
+            pass
+        return "neutral"
 
     # ─── Audit Trail ──────────────────────────────────────────
 

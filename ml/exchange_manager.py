@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 PAIRS_CACHE_FILE = Path("data/exchange_pairs_cache.json")
 PAIRS_CACHE_TTL = 3600 * 6  # 6 hours
 
+FX_RATE_TTL_SECONDS = 3600  # Refresh live FX rates every hour
+
 
 class ExchangeManager:
     """
@@ -35,7 +37,7 @@ class ExchangeManager:
         self._exchanges: Dict[str, Any] = {}
         self._pairs: Dict[str, set] = {}  # exchange_id → set of "BASE/QUOTE" pairs
         self._coin_exchange_map: Dict[str, List[str]] = {}  # symbol → [exchange_ids]
-        self._fx_cache: Dict[str, float] = {}  # FX rate cache (per session)
+        self._fx_cache: Dict[str, Tuple[float, float]] = {}  # FX rate cache: key → (rate, fetched_at)
 
         # Exchange priority from env (comma-separated)
         priority_str = os.getenv("EXCHANGE_PRIORITY", "kraken")
@@ -283,6 +285,7 @@ class ExchangeManager:
         amount_gbp: float,
         max_amount_gbp: float = None,
         quantity: float = None,
+        expected_price: float = None,
     ) -> Dict[str, Any]:
         """
         Execute an order on the best available exchange.
@@ -323,6 +326,19 @@ class ExchangeManager:
                     "success": False,
                     "error": f"No current price available for {pair} on {exchange_id} (ticker returned None)",
                 }
+
+            # Slippage guard: reject if price has moved too far since the proposal
+            if expected_price and expected_price > 0:
+                slippage_pct = abs(current_price - expected_price) / expected_price * 100
+                max_slippage = float(os.getenv("MAX_SLIPPAGE_PCT", "3.0"))
+                if slippage_pct > max_slippage:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Slippage {slippage_pct:.1f}% exceeds limit {max_slippage:.1f}% "
+                            f"(expected £{expected_price:.6f}, current £{current_price:.6f})"
+                        ),
+                    }
 
             # Convert GBP amount to quote currency if pair isn't GBP-quoted
             quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
@@ -556,14 +572,19 @@ class ExchangeManager:
         """
         Get exchange rate from one fiat/stable to another.
         Uses the exchange's own ticker data (e.g. GBP/USD pair).
-        Falls back to hardcoded approximate rates if no direct pair exists.
+        Caches live rates for FX_RATE_TTL_SECONDS; falls back to approximate
+        rates only when the exchange cannot provide a live price.
         """
         if from_currency == to_currency:
             return 1.0
 
         cache_key = f"{from_currency}/{to_currency}"
+
+        # Return cached rate if still fresh
         if cache_key in self._fx_cache:
-            return self._fx_cache[cache_key]
+            cached_rate, fetched_at = self._fx_cache[cache_key]
+            if time.time() - fetched_at < FX_RATE_TTL_SECONDS:
+                return cached_rate
 
         # Try direct pair on exchange (e.g. GBP/USD)
         for direct_pair in [f"{from_currency}/{to_currency}", f"{to_currency}/{from_currency}"]:
@@ -573,30 +594,36 @@ class ExchangeManager:
                     rate = ticker.get("last", 0)
                     if rate and rate > 0:
                         if direct_pair.startswith(from_currency):
-                            self._fx_cache[cache_key] = rate
+                            self._fx_cache[cache_key] = (rate, time.time())
                             return rate
                         else:
-                            self._fx_cache[cache_key] = 1.0 / rate
-                            return 1.0 / rate
+                            inv = 1.0 / rate
+                            self._fx_cache[cache_key] = (inv, time.time())
+                            return inv
             except Exception:
                 continue
 
-        # Fallback: approximate rates (GBP base)
+        # Return stale cached rate rather than falling back to hardcoded approximation
+        if cache_key in self._fx_cache:
+            stale_rate, _ = self._fx_cache[cache_key]
+            logger.warning(f"Using stale FX rate for {cache_key} (live fetch failed)")
+            return stale_rate
+
+        # Last resort: approximate rates (GBP base)
         approx_rates = {
             "GBP/USD": 1.27, "GBP/USDT": 1.27, "GBP/USDC": 1.27,
             "GBP/EUR": 1.17, "GBP/BTC": 0.000012,
         }
         if cache_key in approx_rates:
             rate = approx_rates[cache_key]
-            self._fx_cache[cache_key] = rate
+            self._fx_cache[cache_key] = (rate, time.time())
             logger.warning(f"Using approximate FX rate: {cache_key} = {rate}")
             return rate
 
-        # Try inverse
         inverse_key = f"{to_currency}/{from_currency}"
         if inverse_key in approx_rates:
             rate = 1.0 / approx_rates[inverse_key]
-            self._fx_cache[cache_key] = rate
+            self._fx_cache[cache_key] = (rate, time.time())
             logger.warning(f"Using approximate FX rate (inverse): {cache_key} = {rate:.6f}")
             return rate
 
@@ -802,7 +829,7 @@ class ExchangeManager:
             quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
             fx_rate = 1.0
             if quote_currency != "GBP":
-                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange) or 1.27
+                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange) or 1.0
 
             # Minimum from quantity limit
             min_qty = self._get_min_order_quantity(exchange, pair)

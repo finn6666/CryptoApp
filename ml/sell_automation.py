@@ -14,6 +14,7 @@ All profit/trailing triggers respect a minimum 72h hold period.
 Tier thresholds and fractions are configurable via env vars (SELL_TIER1_PCT, etc.).
 """
 
+import asyncio
 import os
 import logging
 from datetime import datetime, timedelta
@@ -124,8 +125,9 @@ class SellAutomation:
                 pending_sell_triggers.setdefault(sym, set()).add(trigger_type)
             elif p.status in ("rejected", "executed") and p.created_at:
                 try:
+                    cooldown_secs = float(os.getenv("SELL_PROPOSAL_COOLDOWN_HOURS", "4")) * 3600
                     created = datetime.fromisoformat(p.created_at)
-                    if (datetime.utcnow() - created).total_seconds() < 14400:  # 4h
+                    if (datetime.utcnow() - created).total_seconds() < cooldown_secs:
                         pending_sell_triggers.setdefault(sym, set()).add(trigger_type)
                 except Exception:
                     pass
@@ -145,7 +147,8 @@ class SellAutomation:
 
             # Skip dust positions — not worth selling if below exchange minimum
             holding_value_gbp = current_price * quantity
-            if holding_value_gbp < 0.50:
+            dust_min_gbp = float(os.getenv("SELL_DUST_MIN_GBP", "0.50"))
+            if holding_value_gbp < dust_min_gbp:
                 logger.debug(f"Skipping {symbol}: dust position worth £{holding_value_gbp:.4f}")
                 continue
 
@@ -224,25 +227,6 @@ class SellAutomation:
                 sell_fraction = trigger.get("sell_fraction", 1.0)
                 amount_gbp = current_price * quantity * sell_fraction
 
-                # ── Update tier state before proposing ──
-                if trigger["type"] == "profit_tier_1":
-                    self._tiers_taken.setdefault(symbol, set()).add(1)
-                    self._tightened_trailing[symbol] = self.tier1_trailing_pct
-                    logger.info(
-                        f"{symbol}: Tier 1 taken — trailing stop tightened to {self.tier1_trailing_pct}%"
-                    )
-                elif trigger["type"] == "profit_tier_2":
-                    self._tiers_taken.setdefault(symbol, set()).add(2)
-                    self._tightened_trailing[symbol] = self.tier2_trailing_pct
-                    logger.info(
-                        f"{symbol}: Tier 2 taken — trailing stop tightened to {self.tier2_trailing_pct}%"
-                    )
-                elif sell_fraction >= 1.0:
-                    # Full exit — clear all tier/peak state for this symbol
-                    self._tiers_taken.pop(symbol, None)
-                    self._tightened_trailing.pop(symbol, None)
-                    self._peak_prices.pop(symbol, None)
-
                 # ── Q-learning: record closed position outcome (full exits only) ──
                 if sell_fraction >= 1.0:
                     try:
@@ -269,6 +253,26 @@ class SellAutomation:
                     recommendation="SELL",
                     sell_quantity=quantity * sell_fraction,
                 )
+                # ── Update tier state only if proposal was successfully created ──
+                if result.get("success"):
+                    if trigger["type"] == "profit_tier_1":
+                        self._tiers_taken.setdefault(symbol, set()).add(1)
+                        self._tightened_trailing[symbol] = self.tier1_trailing_pct
+                        logger.info(
+                            f"{symbol}: Tier 1 taken — trailing stop tightened to {self.tier1_trailing_pct}%"
+                        )
+                    elif trigger["type"] == "profit_tier_2":
+                        self._tiers_taken.setdefault(symbol, set()).add(2)
+                        self._tightened_trailing[symbol] = self.tier2_trailing_pct
+                        logger.info(
+                            f"{symbol}: Tier 2 taken — trailing stop tightened to {self.tier2_trailing_pct}%"
+                        )
+                    elif sell_fraction >= 1.0:
+                        # Full exit — clear all tier/peak state for this symbol
+                        self._tiers_taken.pop(symbol, None)
+                        self._tightened_trailing.pop(symbol, None)
+                        self._peak_prices.pop(symbol, None)
+
                 outcome = "auto-executed" if result.get("auto_approved") else "proposed"
                 partial_label = f" ({sell_fraction*100:.0f}%)" if sell_fraction < 1.0 else ""
                 proposals.append({
@@ -493,14 +497,19 @@ class SellAutomation:
                     logger.warning("%s: skipping agent_recheck — Gemini budget exceeded: %s", symbol, _be)
                     continue
 
-                import asyncio
                 from ml.agents.official.orchestrator import analyze_crypto
 
-                loop = asyncio.new_event_loop()
-                result = loop.run_until_complete(
-                    analyze_crypto(symbol, coin_data=holding)
-                )
-                loop.close()
+                async def _run_recheck():
+                    return await asyncio.wait_for(
+                        analyze_crypto(symbol, coin_data=holding),
+                        timeout=60.0,
+                    )
+
+                try:
+                    result = asyncio.run(_run_recheck())
+                except asyncio.TimeoutError:
+                    logger.warning(f"{symbol}: agent recheck timed out after 60s — skipping")
+                    continue
 
                 self._last_recheck[symbol] = now.isoformat()
 
@@ -546,8 +555,9 @@ class SellAutomation:
                     for p in engine.proposals.values():
                         if p.side == "sell" and p.symbol == symbol and p.created_at:
                             try:
+                                cooldown_secs = float(os.getenv("SELL_PROPOSAL_COOLDOWN_HOURS", "4")) * 3600
                                 created = datetime.fromisoformat(p.created_at)
-                                if (datetime.utcnow() - created).total_seconds() < 14400:
+                                if (datetime.utcnow() - created).total_seconds() < cooldown_secs:
                                     pending_for_sym.add(p.status)
                             except Exception:
                                 pass

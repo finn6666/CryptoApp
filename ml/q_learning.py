@@ -27,6 +27,7 @@ import logging
 import math
 import os
 import random
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -80,6 +81,28 @@ def _momentum_direction(pct_7d: float) -> str:
     if pct_7d < -5:
         return "downtrend"
     return "flat"
+
+
+def _btc_regime() -> str:
+    """
+    Classify the current BTC market regime (bull / neutral / bear) from
+    BTC's 7-day price change in app state.  Falls back to 'neutral' if
+    the data is unavailable so the state space stays consistent.
+    """
+    try:
+        import services.app_state as state
+        if state.analyzer and state.analyzer.coins:
+            for coin in state.analyzer.coins:
+                if getattr(coin, "symbol", "").upper() in ("BTC", "WBTC"):
+                    pct = float(getattr(coin, "price_change_7d", 0) or 0)
+                    if pct > 10:
+                        return "bull"
+                    if pct < -10:
+                        return "bear"
+                    return "neutral"
+    except Exception:
+        pass
+    return "neutral"
 
 
 def _mcap_tier(mcap_gbp: float) -> str:
@@ -159,7 +182,8 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
     conf = _confidence_tier(conf_raw)
 
     momentum = _momentum_direction(weekly_pct)
-    return f"{gem}|{vol}|{wk}|{mc}|{conf}|{momentum}"
+    btc = _btc_regime()
+    return f"{gem}|{vol}|{wk}|{mc}|{conf}|{momentum}|{btc}"
 
 
 # ─── Q-Learning Engine ────────────────────────────────────────
@@ -193,11 +217,12 @@ class QLearningTrader:
             os.environ.get("QL_GAMMA", "0.9")
         )
         # Exploration rate — probability of random action
+        # Lower default (0.10 vs legacy 0.3) to reduce random noise in live trading
         self.epsilon = epsilon if epsilon is not None else float(
-            os.environ.get("QL_EPSILON", "0.3")
+            os.environ.get("QL_EPSILON", "0.10")
         )
         self.epsilon_min = epsilon_min if epsilon_min is not None else float(
-            os.environ.get("QL_EPSILON_MIN", "0.05")
+            os.environ.get("QL_EPSILON_MIN", "0.02")
         )
         # Decay per episode (each completed trade outcome)
         self.epsilon_decay = epsilon_decay if epsilon_decay is not None else float(
@@ -215,8 +240,9 @@ class QLearningTrader:
         self.visit_counts: Dict[str, Dict[str, int]] = defaultdict(
             lambda: {a: 0 for a in ACTIONS}
         )
-        # Track symbols that have lost money and how many times (capped at 5)
-        self.loss_memory: Dict[str, int] = {}
+        # Track symbols that have lost money: stores Unix timestamps of losses.
+        # Time-decayed: only losses within the last 90 days count toward penalties.
+        self.loss_memory: Dict[str, List[float]] = {}
         # State recorded at scan/buy time, keyed by symbol; used at close time
         # so record_outcome uses the real market-context state, not stale holding data
         self._symbol_state_cache: Dict[str, str] = {}
@@ -291,13 +317,18 @@ class QLearningTrader:
         if base < 0:
             base *= 1.5
 
-        # 3. Repeat-loser penalty (loss count capped at 5 to prevent runaway penalties)
+        # 3. Repeat-loser penalty — count only losses within the last 90 days
+        loss_window = time.time() - 90 * 86400
         if pnl_pct < -5:
-            times_lost = self.loss_memory.get(symbol, 0)
-            self.loss_memory[symbol] = min(times_lost + 1, 5)
+            timestamps = self.loss_memory.get(symbol, [])
+            # Prune losses older than 90 days, then record this one
+            timestamps = [t for t in timestamps if t > loss_window]
+            timestamps.append(time.time())
+            self.loss_memory[symbol] = timestamps
+            times_lost = len(timestamps)
             # Progressive penalty: -0.1 first loss, -0.2 second, capped at -0.5
-            repeat_penalty = -0.1 * (times_lost + 1)
-            base += max(repeat_penalty, -0.5)  # Cap at -0.5
+            repeat_penalty = -0.1 * min(times_lost, 5)
+            base += max(repeat_penalty, -0.5)
         elif pnl_pct > 5:
             # Winning resets the loss counter
             self.loss_memory.pop(symbol, None)
@@ -503,7 +534,10 @@ class QLearningTrader:
             "state_diversity": round(state_diversity, 2),
             "state_cache_size": len(self._symbol_state_cache),
             "total_visits": total_visits,
-            "loss_memory": dict(self.loss_memory),
+            "loss_memory": {
+                k: len([t for t in v if t > time.time() - 90 * 86400])
+                for k, v in self.loss_memory.items()
+            },
             "best_state": {
                 "state": best_state,
                 "q_buy": round(self.q_table[best_state]["buy"], 4) if best_state else 0,
@@ -560,12 +594,12 @@ class QLearningTrader:
 
             skipped_legacy = 0
             for state, actions in data.get("q_table", {}).items():
-                if state.count("|") != 5:
+                if state.count("|") != 6:
                     skipped_legacy += 1
                     continue
                 self.q_table[state] = actions
             for state, counts in data.get("visit_counts", {}).items():
-                if state.count("|") != 5:
+                if state.count("|") != 6:
                     continue
                 self.visit_counts[state] = counts
             if skipped_legacy:
@@ -573,9 +607,18 @@ class QLearningTrader:
                     f"Q-table loaded: skipped {skipped_legacy} legacy state entries (dimension mismatch)"
                 )
 
-            # Sanitize loss_memory: values inflated by checkpoint calls get capped
+            # loss_memory is stored as lists of Unix timestamps.
+            # Migrate from legacy int format (counts) to timestamp list format.
             raw_loss = data.get("loss_memory", {})
-            self.loss_memory = {k: min(v, 5) for k, v in raw_loss.items()}
+            migrated = {}
+            for k, v in raw_loss.items():
+                if isinstance(v, list):
+                    migrated[k] = v
+                elif isinstance(v, (int, float)) and v > 0:
+                    # Legacy: count → synthesize timestamps spaced 1 day apart
+                    now_ts = time.time()
+                    migrated[k] = [now_ts - i * 86400 for i in range(min(int(v), 5))]
+            self.loss_memory = migrated
 
             self._symbol_state_cache = data.get("symbol_state_cache", {})
             loaded_eps = data.get("epsilon", self.epsilon)
