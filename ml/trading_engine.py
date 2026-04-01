@@ -129,7 +129,7 @@ class TradingEngine:
 
         # Sell-side control
         self.sell_require_approval = os.getenv(
-            "SELL_REQUIRE_APPROVAL", "false"
+            "SELL_REQUIRE_APPROVAL", "true"
         ).lower() in ("1", "true", "yes")
         if self.sell_require_approval:
             logger.info("Sell-side: manual approval REQUIRED for ALL sells")
@@ -609,7 +609,11 @@ class TradingEngine:
             self._record_to_portfolio(proposal, exchange_used, fee_gbp=fee_gbp)
 
             # Send confirmation email
-            self._send_execution_email(proposal)
+            if not self._send_execution_email(proposal):
+                logger.warning(
+                    f"Execution email not sent for {proposal.side.upper()} {proposal.symbol} "
+                    f"— check SMTP config or logs above"
+                )
 
             logger.info(
                 f"TRADE EXECUTED: {proposal.side.upper()} {(proposal.quantity or 0):.6f} "
