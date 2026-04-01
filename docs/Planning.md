@@ -1,3 +1,24 @@
+## Activate on Pi
+
+### Swing / dual-strategy trading
+
+Implemented — just needs env vars set on the Pi. Add to `~/CryptoApp/.env`:
+
+```
+SWING_TRADE_ENABLED=true   # enable swing exits for swing-tagged positions
+SWING_BULL_REGIME=true     # tag all bull-market (BTC +10% 7d) trades as swing
+
+# Swing exit thresholds (defaults — adjust to taste):
+SWING_MIN_HOLD_HOURS=8         # vs 72h for accumulate
+SWING_TRAILING_STOP_PCT=15.0   # vs 45% for accumulate
+SWING_TIER1_PCT=25.0           # first profit target vs 75%
+SWING_TIER1_FRACTION=0.5       # sell 50% at tier 1 vs 33%
+```
+
+Long-term holds (`trade_mode=accumulate`) are unaffected — only new positions entered during a bull regime get swing exits. Regime is determined by BTC 7-day % change: >+10% = bull, <-10% = bear, otherwise neutral.
+
+---
+
 ## Future Work
 
 ### Self-custody / wallet consolidation
