@@ -205,6 +205,10 @@
     </div>
 
     <script>
+    // Auto-populate API key from server so the key modal never appears
+    {% if trading_api_key %}
+    sessionStorage.setItem('tradingApiKey', {{ trading_api_key | tojson }});
+    {% endif %}
     function toggleSidebarPanel(headerEl) {
         const isOpen = headerEl.classList.contains('open');
         const body = headerEl.nextElementSibling;

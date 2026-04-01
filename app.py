@@ -127,7 +127,7 @@ def track_activity():
 @app.route('/')
 def index():
     """Serve the main page with dashboard improvements"""
-    return render_template('index.html')
+    return render_template('index.html', trading_api_key=os.environ.get('TRADING_API_KEY', ''))
 
 @app.route('/legacy')
 def legacy():

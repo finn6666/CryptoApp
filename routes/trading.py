@@ -1483,9 +1483,9 @@ def claude_context():
         ctx['budget'] = {
             'daily_budget_gbp': status.get('daily_budget_gbp'),
             'spent_today_gbp': status.get('spent_today_gbp'),
-            'remaining_gbp': status.get('remaining_budget_gbp'),
+            'remaining_gbp': status.get('remaining_today_gbp'),
         }
-        ctx['kill_switch'] = status.get('kill_switch_active', False)
+        ctx['kill_switch'] = not status.get('active', True)
         ctx['pending_proposals'] = engine.get_pending_proposals()
     except Exception as e:
         logger.warning(f"Claude context — trading error: {e}")
