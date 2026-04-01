@@ -41,12 +41,15 @@ class SellAutomation:
         self.stop_loss_pct = float(os.getenv("SELL_STOP_LOSS_PCT", "-50.0"))
         self.trailing_stop_pct = float(os.getenv("SELL_TRAILING_STOP_PCT", "45.0"))
         self.enable_agent_recheck = os.getenv("SELL_AGENT_RECHECK", "true").lower() in ("1", "true", "yes")
-        # 6h recheck keeps close tabs on held positions while scan frequency is reduced.
-        # Each recheck = 6 Gemini calls per held coin, so with ~3 holdings = ~18 calls/6h.
-        self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "6"))
-        # Minimum cooldown for sharp-drawdown bypasses — prevents re-analysing every
-        # coin every 5-min market-monitor cycle when the whole portfolio is in drawdown.
-        self.drawdown_recheck_min_hours = float(os.getenv("SELL_DRAWDOWN_RECHECK_MIN_HOURS", "2.0"))
+        # 12h recheck balances signal quality vs. API cost. With 30+ holdings the
+        # 6h default generated 120+ calls/day (~£0.74). At 12h = 60 calls/day (~£0.37).
+        # Stop-loss and trailing stop handle urgent exits mechanistically, so 12h
+        # agent checks remain sufficient to catch fundamental deterioration.
+        self.recheck_interval_hours = int(os.getenv("SELL_RECHECK_HOURS", "12"))
+        # Minimum cooldown for sharp-drawdown bypasses — 4h prevents the whole
+        # portfolio burning budget in a broad market dip; stop-loss fires immediately
+        # at -50% regardless, so 4h is safe.
+        self.drawdown_recheck_min_hours = float(os.getenv("SELL_DRAWDOWN_RECHECK_MIN_HOURS", "4.0"))
 
         # Minimum hold period in hours before ANY sell trigger (except stop-loss) fires.
         # 72h lets positions ride out short-term volatility before evaluating exits.
@@ -490,6 +493,20 @@ class SellAutomation:
                     self._last_drawdown_recheck[symbol] = now.isoformat()
 
             try:
+                # Pre-check: skip positions too small to sell before spending API budget.
+                # Uses the same live price data passed into this method, so no extra I/O.
+                _pre_price = live_prices.get(symbol, 0)
+                _pre_qty = holding.get("quantity", 0)
+                _pre_val = _pre_price * _pre_qty
+                if _pre_price > 0:
+                    try:
+                        from ml.exchange_manager import get_exchange_manager
+                        _min_gbp = get_exchange_manager().get_min_order_gbp(symbol)
+                    except Exception:
+                        _min_gbp = 1.0
+                    if _min_gbp > 0 and _pre_val < _min_gbp:
+                        continue
+
                 from services.gemini_budget import get_gemini_budget, BudgetExceededError
                 try:
                     get_gemini_budget().check_and_record("agent_recheck")
