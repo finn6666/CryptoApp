@@ -94,6 +94,26 @@ docs/               — Markdown documentation
 - **Auth:** Bearer token (`TRADING_API_KEY`) on all trading POST endpoints
 - **Frontend:** Vanilla JS modules in `src/web/static/js/`, no build step
 
+## API Cost Rules
+
+Gemini is the primary cost driver. Every code change that touches agent calls, scan loops, or sell automation MUST be evaluated for API cost impact before merging.
+
+| Guard | Value |
+|-------|-------|
+| `GEMINI_DAILY_BUDGET_GBP` | £1.00 default — hard ceiling on Gemini spend per day |
+| `SCAN_MAX_COINS` | 10 — coins reaching full agent analysis per scan |
+| `max_full_analysis` | 3 — max coins analysed by full 5-agent chain per scan |
+| `SCAN_COOLDOWN_HOURS` | 1h — minimum gap between any two scans |
+| `RECYCLE_MIN_GBP` | £2.00 — minimum sell value to trigger a post-sell recycle scan |
+
+**Rules for new code:**
+- Never call an agent inside a hot loop or a path that runs more than once per scan cycle.
+- Prefer data already in `coin_data` / `holding` dicts over a fresh API call (e.g. `price_change_7d` for stagnation checks).
+- Raise quick-screen thresholds in bear regimes — fewer full analyses saves budget.
+- Any new background scan trigger MUST check the scan cooldown and must be bounded by `GEMINI_DAILY_BUDGET_GBP`.
+- Log a warning whenever the Gemini budget exceeds 80% — don't silently burn spend.
+- New env vars that control agent call frequency must be documented in `.env.example`.
+
 ## Safety Mechanisms
 
 | Mechanism | Default |
