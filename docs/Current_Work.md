@@ -1,12 +1,12 @@
-# Current Work
+## To Do
 
-Active tasks and in-progress changes. Clear entries when merged/deployed.
+
 
 ---
 
 ## In Progress
 
-_Nothing active right now._
+
 
 ---
 
