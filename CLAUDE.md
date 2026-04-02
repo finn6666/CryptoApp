@@ -5,7 +5,7 @@
 - **Package manager:** `uv` — always use `uv run`, `uv add`, `uv sync` (never pip)
 - **No emojis:** Never use emoji characters anywhere — not in JS strings, HTML templates, Python log messages, or route responses. Use plain text instead (e.g. `STOPPED` not `🛑 STOPPED`, `Auto-approving` not `🤖 Auto-approving`).
 - **Code style:** Keep the project tidy — no redundant files, dead code, or orphaned imports
-- **Git workflow:** `dev` branch for work, merge to `main` for releases. Commit + push after every completed change. Descriptive commit messages with bullet-point body. Always include `docs/Planning.md` in commits if it has been updated.
+- **Git workflow:** `dev` branch for work, merge to `main` for releases. Commit + push after every completed change. Descriptive commit messages with bullet-point body.
 - **Deployment:** Raspberry Pi 4 — if running locally use `ssh pi "cd ~/CryptoApp && git pull && sudo systemctl restart cryptoapp"`. If already on the Pi, run `git pull && sudo systemctl restart cryptoapp` directly.
 
 ## Verification Commands
@@ -36,8 +36,8 @@ AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 
 | Layer | Technology |
 |-------|-----------|
 | Language | Python 3.13 |
-| Web | Flask + Gunicorn (1 worker, 2 gthread) |
-| AI Agents | Google ADK + `gemini-3-flash-preview` (preview — may be deprecated) |
+| Web | Flask + Gunicorn (1 worker, 4 gthread) |
+| AI Agents | Google ADK + `gemini-2.0-flash` (configurable via `ORCHESTRATOR_MODEL`) |
 | Exchange | Kraken via ccxt |
 | ML | scikit-learn (training), ONNX Runtime (inference), Q-learning RL |
 | Frontend | Vanilla JS + Jinja2 templates + CSS |
@@ -88,7 +88,7 @@ docs/               — Markdown documentation
 - **Singletons:** `get_trading_engine()`, `get_scan_loop()`, `get_exchange_manager()` — module-level globals with lazy init
 - **State init:** `services/app_state.py` → `init_all()` called once at startup
 - **Error handling:** try/except with `logger.warning()` fallback; graceful degradation if dependencies missing
-- **Logging:** Per-module `logger = logging.getLogger(__name__)`, emoji prefixes in messages
+- **Logging:** Per-module `logger = logging.getLogger(__name__)`
 - **Data models:** `@dataclass` for core models, Pydantic `BaseModel` for agent I/O
 - **Section separators:** `# ─── Section Name ───────────────────`
 - **Auth:** Bearer token (`TRADING_API_KEY`) on all trading POST endpoints
@@ -99,14 +99,16 @@ docs/               — Markdown documentation
 | Mechanism | Default |
 |-----------|---------|
 | Kill switch | Halts all trading instantly |
-| Daily budget | `DAILY_TRADE_BUDGET_GBP` (£5 default) |
+| Daily budget | `DAILY_TRADE_BUDGET_GBP` (£3 default) |
 | Per-trade max | 50% of daily budget |
+| Approval threshold | Trades above `APPROVAL_THRESHOLD_GBP` (£50) always require email approval |
 | Proposal expiry | 1 hour (proposal auto-cancels if unactioned) |
 | Trade cooldown | 60 min between new proposal generation |
 | Scan cooldown | 1 hour between scans |
 | Max proposals/scan | 3 |
 | Conviction threshold | ≥55% (agent) / ≥45% (scan loop) |
-| Min hold period | 48h before profit/trailing triggers |
+| Min hold period | 72h before profit/trailing triggers |
+| Tiered exits | Tier 1: 75% profit → sell 33%; Tier 2: 150% → sell 50% of remaining |
 | Balance check | Kraken balance verified before every order |
 | Email approval | HMAC-signed links; sells always require manual approval |
 | Memory guard | systemd MemoryMax=1G, Gunicorn max_requests=500 |

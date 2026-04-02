@@ -30,16 +30,35 @@ propose_and_auto_execute(symbol, side, amount, price, reason, confidence)
 
 ## SellAutomation Exit Triggers
 
-| Trigger | Setting | Notes |
+Priority order (first matching trigger fires):
+
+| Trigger | Default | Notes |
 |---------|---------|-------|
-| Stop-loss | -80% | Intentionally loose — emergency floor only, not a normal exit |
-| Trailing stop | -45% from peak | Very wide — won't fire on normal volatility |
-| Profit target | 9999% (disabled) | Agents decide when to take profit via re-checks |
-| Agent re-analysis | variable | Primary sell mechanism — `SELL_RECHECK_HOURS` (24h) |
+| Stop-loss | -50% | Always fires — ignores min hold period. Capital protection floor only, not a normal exit |
+| Tier 1 profit | +75% | Partial sell (33% of position), tightens trailing stop to 20% |
+| Tier 2 profit | +150% | Partial sell (50% of remaining), tightens trailing stop to 15% |
+| Trailing stop | -45% from peak | Wide — won't fire on normal volatility; tightens after each profit tier |
+| Nuclear profit | +300% | Full exit at extreme levels — last resort |
+| Agent re-analysis | every 12h | Primary exit mechanism — full exit if agents recommend SELL/AVOID |
 
-**Strategy:** Stop-loss and trailing stop are set wide intentionally. Normal crypto volatility (-25% to -40%) should NOT trigger auto-sells. The agent re-analysis cycle is the primary exit mechanism. Hard stops only protect against catastrophic/near-total loss.
+All triggers except stop-loss respect a **72h minimum hold period**.
 
-Sells do **not** require email approval (`SELL_REQUIRE_APPROVAL=false`). Manual approval only applies to trades above `APPROVAL_THRESHOLD_GBP=50.0`.
+**Strategy:** Stop-loss and trailing stop are set wide intentionally — small-cap coins routinely swing 20–40%/day. Tiered profit-taking lets winners run while banking partial gains. Agent re-analysis is the primary full-exit mechanism for fundamental deterioration.
+
+Sells require email approval by default (`SELL_REQUIRE_APPROVAL=true`). The `APPROVAL_THRESHOLD_GBP` (£50) means trades above that value always require approval regardless of `BUY_AUTO_APPROVE`.
+
+## Swing Trade Mode
+
+When `SWING_TRADE_ENABLED=true`, positions tagged as `trade_mode="swing"` use tighter exits:
+
+| Setting | Swing default | Accumulate default |
+|---------|--------------|-------------------|
+| Min hold | 8h | 72h |
+| Trailing stop | 15% | 45% |
+| Tier 1 profit | 25% | 75% |
+| Tier 1 fraction | 50% | 33% |
+
+`SWING_BULL_REGIME=true` tags all new buys as swing trades automatically (useful in bull markets).
 
 ## ExchangeManager Routing
 
@@ -52,17 +71,30 @@ Sells do **not** require email approval (`SELL_REQUIRE_APPROVAL=false`). Manual 
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `DAILY_TRADE_BUDGET_GBP` | `5.00` | Max daily buy spend |
+| `DAILY_TRADE_BUDGET_GBP` | `3.00` | Max daily buy spend |
 | `MAX_TRADE_PCT` | `50` | Max single trade as % of daily budget |
+| `APPROVAL_THRESHOLD_GBP` | `50.0` | Trades above this always require email approval |
 | `TRADE_COOLDOWN_MIN` | `60` | Minutes between proposals per side |
 | `BUY_AUTO_APPROVE` | `true` | Buys auto-execute without email |
 | `SELL_REQUIRE_APPROVAL` | `true` | Sells always need manual approval |
-| `SELL_PROFIT_TARGET_PCT` | `50.0` | Take-profit % |
-| `SELL_STOP_LOSS_PCT` | `-20.0` | Stop-loss % |
-| `SELL_TRAILING_STOP_PCT` | `20.0` | Drop-from-peak % |
-| `SELL_MIN_HOLD_HOURS` | `48.0` | Min hold before profit/trailing triggers |
+| `SELL_STOP_LOSS_PCT` | `-50.0` | Stop-loss % (full exit, bypasses min hold) |
+| `SELL_TRAILING_STOP_PCT` | `45.0` | Drop-from-peak % for trailing stop |
+| `SELL_MIN_HOLD_HOURS` | `72.0` | Min hold before profit/trailing triggers |
+| `SELL_TIER1_PCT` | `75.0` | Tier 1 partial-sell profit threshold |
+| `SELL_TIER1_FRACTION` | `0.33` | Fraction to sell at Tier 1 |
+| `SELL_TIER1_TRAILING_PCT` | `20.0` | Trailing stop tightened to this after Tier 1 |
+| `SELL_TIER2_PCT` | `150.0` | Tier 2 partial-sell profit threshold |
+| `SELL_TIER2_FRACTION` | `0.50` | Fraction of remaining to sell at Tier 2 |
+| `SELL_TIER2_TRAILING_PCT` | `15.0` | Trailing stop tightened to this after Tier 2 |
+| `SELL_PROFIT_TARGET_PCT` | `300.0` | Nuclear full-exit threshold |
 | `SELL_AGENT_RECHECK` | `true` | Re-analyse holdings with agents |
-| `SELL_RECHECK_HOURS` | `24` | Throttle between agent rechecks |
+| `SELL_RECHECK_HOURS` | `12` | Hours between agent rechecks per coin |
+| `SWING_TRADE_ENABLED` | `false` | Enable tighter exits for swing-tagged positions |
+| `SWING_BULL_REGIME` | `false` | Tag all new buys as swing trades |
+| `SWING_MIN_HOLD_HOURS` | `8` | Min hold for swing positions |
+| `SWING_TRAILING_STOP_PCT` | `15.0` | Trailing stop for swing positions |
+| `SWING_TIER1_PCT` | `25.0` | Tier 1 threshold for swing positions |
+| `SWING_TIER1_FRACTION` | `0.50` | Fraction to sell at swing Tier 1 |
 | `EXCHANGE_PRIORITY` | `kraken` | Comma-separated exchange priority |
 | `SECRET_KEY` | (required) | HMAC token signing |
 | `TRADE_NOTIFICATION_EMAIL` | (empty) | Approval email recipient |

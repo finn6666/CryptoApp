@@ -5,7 +5,7 @@ applyTo: "ml/agents/**,ml/tools/**,ml/orchestrator_wrapper.py"
 
 # AI Agents (Google ADK)
 
-Five specialised agents on `gemini-flash` coordinated by `crypto_orchestrator`. Entry point: `analyze_crypto()` in `ml/agents/official/orchestrator.py`.
+Five specialised agents on `gemini-2.0-flash` coordinated by `crypto_orchestrator`. Model is configurable via `ORCHESTRATOR_MODEL` env var. Entry point: `analyze_crypto()` in `ml/agents/official/orchestrator.py`.
 
 ## Architecture
 
