@@ -379,6 +379,20 @@ class ScanLoop:
 
         passed = []
 
+        # Regime-aware threshold: lower bar in bull markets (more opportunities),
+        # higher bar in bear markets (filter weak coins before spending API budget).
+        regime = self._get_market_regime()
+        regime_screen_thresholds = {
+            "bull":    int(os.getenv("SCAN_QUICK_SCREEN_BULL",    "60")),
+            "neutral": int(os.getenv("SCAN_QUICK_SCREEN_NEUTRAL", str(self.quick_screen_min_confidence))),
+            "bear":    int(os.getenv("SCAN_QUICK_SCREEN_BEAR",    "78")),
+        }
+        effective_threshold = regime_screen_thresholds.get(regime, self.quick_screen_min_confidence)
+        if effective_threshold != self.quick_screen_min_confidence:
+            logger.info(
+                f"[Scan] Quick-screen threshold: {effective_threshold}% ({regime} regime)"
+            )
+
         for coin in candidates:
             symbol = coin["symbol"]
 
@@ -399,7 +413,7 @@ class ScanLoop:
                 confidence = result.get("confidence", 0)
                 one_liner = result.get("one_liner", "")
 
-                if did_pass and confidence >= self.quick_screen_min_confidence:
+                if did_pass and confidence >= effective_threshold:
                     logger.info(
                         f"[Scan {scan_id}] {symbol}: PASS ({confidence}%) — {one_liner}"
                     )

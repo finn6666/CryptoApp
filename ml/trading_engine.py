@@ -44,6 +44,7 @@ class TradeProposal:
     error: Optional[str] = None
     sell_quantity: Optional[float] = None  # Exact coin qty to sell (bypasses amount→qty reconversion)
     trade_mode: str = "accumulate"  # "accumulate" (hold weeks/months) or "swing" (tight exit, short hold)
+    trigger_type: str = ""  # type of trigger that prompted this sell (e.g. "stop_loss", "agent_recheck")
 
     def __post_init__(self):
         if not self.created_at:
@@ -247,6 +248,7 @@ class TradingEngine:
         coin_name: str = "",
         sell_quantity: Optional[float] = None,
         trade_mode: str = "accumulate",
+        trigger_type: str = "",
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -277,11 +279,22 @@ class TradingEngine:
             # Hard cap — never exceed daily budget in a single trade
             amount_gbp = min(amount_gbp, self.daily_budget_gbp)
 
-            # Safety: cap single trade to max_trade_pct of daily budget
-            max_single = self.daily_budget_gbp * self.max_trade_pct
+            # Conviction-tiered sizing: scale up position for high-confidence signals.
+            # At 80%+ conviction deploy up to 80% of daily budget; 65%+ up to 60%;
+            # below 65% use the standard 50% cap.
+            if confidence >= 80:
+                max_pct = float(os.getenv("MAX_TRADE_PCT_HIGH", "80")) / 100
+            elif confidence >= 65:
+                max_pct = float(os.getenv("MAX_TRADE_PCT_MED", "60")) / 100
+            else:
+                max_pct = self.max_trade_pct
+            max_single = self.daily_budget_gbp * max_pct
             if amount_gbp > max_single:
                 amount_gbp = max_single
-                logger.info(f"Capped trade to max single trade: £{amount_gbp:.4f}")
+                logger.info(
+                    f"Capped trade to conviction-tiered max: £{amount_gbp:.4f} "
+                    f"({max_pct*100:.0f}% at {confidence}% conviction)"
+                )
 
             # Enforce exchange minimum order size — bump up if needed
             min_order_gbp = self._get_min_order_gbp(symbol)
@@ -338,6 +351,7 @@ class TradingEngine:
             coin_name=coin_name,
             sell_quantity=sell_quantity,
             trade_mode=trade_mode,
+            trigger_type=trigger_type,
         )
 
         self.proposals[proposal.id] = proposal
@@ -351,10 +365,12 @@ class TradingEngine:
         budget.trades_proposed += 1
 
         # Send approval email only when manual approval is needed.
-        # Auto-approved trades skip this — the execution email covers it.
+        # Mechanical sell triggers (stop-loss, trailing stop, profit tiers) always
+        # auto-execute — waiting for email approval defeats their purpose.
+        MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
         will_auto_approve = False
         if is_sell:
-            will_auto_approve = not self.sell_require_approval
+            will_auto_approve = trigger_type in MECHANICAL_TRIGGERS or not self.sell_require_approval
         else:
             will_auto_approve = self.buy_auto_approve
 
@@ -388,13 +404,16 @@ class TradingEngine:
         coin_name: str = "",
         sell_quantity: Optional[float] = None,
         trade_mode: str = "accumulate",
+        trigger_type: str = "",
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
         immediately approve and execute it.  Falls back to the normal
         email-approval flow when auto-approve is off.
 
-        Sells auto-execute unless SELL_REQUIRE_APPROVAL is set.
+        Mechanical sell triggers (stop_loss, trailing_stop, profit tiers) always
+        auto-execute regardless of SELL_REQUIRE_APPROVAL — they are time-sensitive.
+        Discretionary triggers (agent_recheck, stagnation_exit) honour the flag.
         """
         result = self.propose_trade(
             symbol=symbol,
@@ -407,6 +426,7 @@ class TradingEngine:
             coin_name=coin_name,
             sell_quantity=sell_quantity,
             trade_mode=trade_mode,
+            trigger_type=trigger_type,
         )
 
         if not result.get("success"):
@@ -415,10 +435,17 @@ class TradingEngine:
         proposal_id = result["proposal_id"]
         is_sell = side.lower() == "sell"
 
-        # Determine whether to auto-approve this trade
+        # Determine whether to auto-approve this trade.
+        # Mechanical sell triggers always auto-execute — they are time-sensitive
+        # and defeat their purpose if they wait for email approval.
+        MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
+
         should_auto = False
         if is_sell:
-            should_auto = not self.sell_require_approval
+            if trigger_type in MECHANICAL_TRIGGERS:
+                should_auto = True
+            else:
+                should_auto = not self.sell_require_approval
         else:
             # Buys: honour existing buy_auto_approve flag
             should_auto = self.buy_auto_approve
@@ -636,6 +663,28 @@ class TradingEngine:
                 "exchange": exchange_used,
                 "confidence": proposal.confidence,
             })
+
+            # After a sell executes, kick off a background scan to redeploy the
+            # freed capital rather than waiting up to 12h for the next scheduled scan.
+            # Only triggers for sells above RECYCLE_MIN_GBP to avoid dust exits
+            # burning Gemini budget. Scan loop's own cooldown prevents spam.
+            if proposal.side == "sell":
+                recycle_min = float(os.getenv("RECYCLE_MIN_GBP", "2.00"))
+                if proposal.amount_gbp >= recycle_min:
+                    try:
+                        import threading
+                        from ml.scan_loop import get_scan_loop
+                        threading.Thread(
+                            target=get_scan_loop().run_scan,
+                            kwargs={"triggered_by": "post_sell_recycle"},
+                            daemon=True,
+                        ).start()
+                        logger.info(
+                            f"Post-sell recycle scan triggered for {proposal.symbol} "
+                            f"(freed £{proposal.amount_gbp:.2f})"
+                        )
+                    except Exception as _e:
+                        logger.debug(f"Post-sell recycle scan failed to start: {_e}")
 
             return {
                 "success": True,

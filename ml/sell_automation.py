@@ -189,7 +189,7 @@ class SellAutomation:
             # ── Stagnation exit — check flat positions after extended hold ──
             if not trigger:
                 conviction_val = self._last_recheck_conviction.get(symbol)
-                stagnation = self._check_stagnation(symbol, pnl_pct, hold_hours, conviction_val)
+                stagnation = self._check_stagnation(symbol, pnl_pct, hold_hours, conviction_val, coin_data=holding)
                 if stagnation:
                     pending_for_sym = pending_sell_triggers.get(symbol, set())
                     if stagnation["type"] not in pending_for_sym:
@@ -255,6 +255,7 @@ class SellAutomation:
                     confidence=trigger["confidence"],
                     recommendation="SELL",
                     sell_quantity=quantity * sell_fraction,
+                    trigger_type=trigger["type"],
                 )
                 # ── Update tier state only if proposal was successfully created ──
                 if result.get("success"):
@@ -411,26 +412,56 @@ class SellAutomation:
         pnl_pct: float,
         hold_hours: float,
         conviction: Optional[float],
+        coin_data: Optional[Dict] = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Detect positions going nowhere after an extended hold.
-        Criteria: held >SELL_STAGNATION_DAYS AND P&L within the flat window
-        AND most recent agent conviction below SELL_STAGNATION_CONVICTION_MAX.
-        Returns a trigger dict if all criteria are met, else None.
+
+        Two paths:
+        1. Fast path (SELL_STAGNATION_EARLY_DAYS, default 7): no agent recheck required.
+           Uses CMC weekly price change to detect genuinely flat positions without
+           burning Gemini budget. Tight P&L window avoids exiting positions building a base.
+        2. Standard path (SELL_STAGNATION_DAYS, default 14): requires prior agent recheck.
+           If no recheck has ever run, treats conviction as 0 (no thesis support).
+
+        Returns a trigger dict if criteria are met, else None.
         """
         stagnation_days = float(os.getenv("SELL_STAGNATION_DAYS", "14"))
         pnl_min = float(os.getenv("SELL_STAGNATION_PNL_MIN", "-15.0"))
         pnl_max = float(os.getenv("SELL_STAGNATION_PNL_MAX", "15.0"))
         conviction_max = float(os.getenv("SELL_STAGNATION_CONVICTION_MAX", "50.0"))
 
+        # Fast path: truly flat position at 7 days — no agent API call needed.
+        # P&L window is tight (-5% to +10%) to avoid exiting coins building a base.
+        early_days = float(os.getenv("SELL_STAGNATION_EARLY_DAYS", "7"))
+        early_pnl_min = float(os.getenv("SELL_STAGNATION_EARLY_PNL_MIN", "-5.0"))
+        early_pnl_max = float(os.getenv("SELL_STAGNATION_EARLY_PNL_MAX", "10.0"))
+        if hold_hours >= early_days * 24 and early_pnl_min <= pnl_pct <= early_pnl_max:
+            weekly_drift = (coin_data or {}).get("price_change_7d")
+            if weekly_drift is not None:
+                try:
+                    if abs(float(weekly_drift)) < 8.0:
+                        return {
+                            "type": "stagnation_exit",
+                            "reason": (
+                                f"Early stagnation exit: held {hold_hours/24:.1f} days with "
+                                f"P&L {pnl_pct:.1f}% and 7d market drift {float(weekly_drift):.1f}% "
+                                f"(<8% — no momentum). Capital redeployed to better opportunities."
+                            ),
+                            "confidence": 68,
+                            "sell_fraction": 1.0,
+                        }
+                except (TypeError, ValueError):
+                    pass
+
+        # Standard path: extended hold with low agent conviction.
+        # If no recheck has ever run, treat conviction as 0 (no thesis support remaining).
         if hold_hours < stagnation_days * 24:
             return None
         if not (pnl_min <= pnl_pct <= pnl_max):
             return None
-        if conviction is None:
-            # No recheck has run yet — do not fire on first check after 14 days
-            return None
-        if conviction >= conviction_max:
+        effective_conviction = conviction if conviction is not None else 0.0
+        if effective_conviction >= conviction_max:
             return None
 
         return {
@@ -438,7 +469,7 @@ class SellAutomation:
             "reason": (
                 f"Stagnation exit: held {hold_hours/24:.1f} days with P&L {pnl_pct:.1f}% "
                 f"(flat window {pnl_min}% to {pnl_max}%) and agent conviction "
-                f"{conviction:.0f}% below threshold {conviction_max}%. "
+                f"{effective_conviction:.0f}% below threshold {conviction_max}%. "
                 f"Capital redeployed to better opportunities."
             ),
             "confidence": 70,
@@ -593,6 +624,7 @@ class SellAutomation:
                         confidence=confidence,
                         recommendation="SELL",
                         sell_quantity=quantity,
+                        trigger_type="agent_recheck",
                     )
                     proposals.append({
                         "symbol": symbol,

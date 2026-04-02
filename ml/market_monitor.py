@@ -507,6 +507,11 @@ class MarketMonitor:
             coin_data["tradeable_exchanges"] = exchanges
             coin_data["primary_exchange"] = exchanges[0]
 
+            # Tag momentum/quick-scan buys as swing trades: they need tighter exits
+            # (15% trailing, 25% tier 1) not accumulate-mode wide stops (45%, 75%).
+            if trigger in ("momentum_surge", "quick_scan_gem"):
+                coin_data["play_type"] = "swing"
+
             logger.info(f"[Monitor] Auto-buy trigger: {symbol} (trigger={trigger})")
             self._stats["buy_triggers"] += 1
 
