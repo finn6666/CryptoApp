@@ -365,14 +365,20 @@ class TradingEngine:
         budget.trades_proposed += 1
 
         # Send approval email only when manual approval is needed.
-        # Mechanical sell triggers (stop-loss, trailing stop, profit tiers) always
-        # auto-execute — waiting for email approval defeats their purpose.
+        # Mechanical triggers and sells under the approval threshold auto-execute
+        # (execution confirmation email is always sent after the trade).
+        # Sells at or above the threshold send an approval email with Approve/Reject links.
         MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
         will_auto_approve = False
         if is_sell:
-            will_auto_approve = trigger_type in MECHANICAL_TRIGGERS or not self.sell_require_approval
+            if trigger_type in MECHANICAL_TRIGGERS or amount_gbp <= self.approval_threshold_gbp:
+                will_auto_approve = True
+            else:
+                will_auto_approve = not self.sell_require_approval
         else:
             will_auto_approve = self.buy_auto_approve
+            if amount_gbp > self.approval_threshold_gbp:
+                will_auto_approve = False
 
         email_sent = False
         if not will_auto_approve:
@@ -436,27 +442,30 @@ class TradingEngine:
         is_sell = side.lower() == "sell"
 
         # Determine whether to auto-approve this trade.
-        # Mechanical sell triggers always auto-execute — they are time-sensitive
-        # and defeat their purpose if they wait for email approval.
+        # Sells: mechanical triggers and anything under the approval threshold auto-execute.
+        # Sells at or above the threshold require manual email approval.
+        # Buys: always auto unless above the threshold.
+        # Execution confirmation email is always sent after the trade fires regardless.
         MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
 
         should_auto = False
         if is_sell:
-            if trigger_type in MECHANICAL_TRIGGERS:
+            if trigger_type in MECHANICAL_TRIGGERS or amount_gbp <= self.approval_threshold_gbp:
                 should_auto = True
             else:
+                logger.info(
+                    f"SELL {symbol} £{amount_gbp:.2f} >= approval threshold "
+                    f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
+                )
                 should_auto = not self.sell_require_approval
         else:
-            # Buys: honour existing buy_auto_approve flag
             should_auto = self.buy_auto_approve
-
-        # Override: trades above approval threshold always require manual approval
-        if amount_gbp > self.approval_threshold_gbp:
-            logger.info(
-                f"Trade £{amount_gbp:.2f} exceeds approval threshold "
-                f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
-            )
-            should_auto = False
+            if amount_gbp > self.approval_threshold_gbp:
+                logger.info(
+                    f"BUY {symbol} £{amount_gbp:.2f} >= approval threshold "
+                    f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
+                )
+                should_auto = False
 
         if not should_auto:
             return result  # normal email-approval flow
