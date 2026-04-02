@@ -586,20 +586,36 @@ class ExchangeManager:
             if time.time() - fetched_at < FX_RATE_TTL_SECONDS:
                 return cached_rate
 
-        # Try direct pair on exchange (e.g. GBP/USD)
-        for direct_pair in [f"{from_currency}/{to_currency}", f"{to_currency}/{from_currency}"]:
+        # Build candidate pairs to try: direct pair first, then USD proxies for stablecoin quotes.
+        # Kraken and others don't list GBP/USDT but do list GBP/USD — USDT/USDC ≈ USD.
+        usd_proxy_map = {"USDT": "USD", "USDC": "USD", "DAI": "USD"}
+        effective_to = usd_proxy_map.get(to_currency, to_currency)
+        effective_from = usd_proxy_map.get(from_currency, from_currency)
+
+        candidate_pairs = [
+            (f"{from_currency}/{to_currency}", True),    # direct: rate = ticker.last
+            (f"{to_currency}/{from_currency}", False),   # inverse: rate = 1/ticker.last
+        ]
+        if effective_to != to_currency:  # to_currency is a stablecoin
+            candidate_pairs += [
+                (f"{from_currency}/{effective_to}", True),
+                (f"{effective_to}/{from_currency}", False),
+            ]
+        if effective_from != from_currency:  # from_currency is a stablecoin
+            candidate_pairs += [
+                (f"{effective_from}/{to_currency}", True),
+                (f"{to_currency}/{effective_from}", False),
+            ]
+
+        for direct_pair, is_direct in candidate_pairs:
             try:
                 if direct_pair in getattr(exchange, "markets", {}):
                     ticker = exchange.fetch_ticker(direct_pair)
-                    rate = ticker.get("last", 0)
-                    if rate and rate > 0:
-                        if direct_pair.startswith(from_currency):
-                            self._fx_cache[cache_key] = (rate, time.time())
-                            return rate
-                        else:
-                            inv = 1.0 / rate
-                            self._fx_cache[cache_key] = (inv, time.time())
-                            return inv
+                    last = ticker.get("last", 0)
+                    if last and last > 0:
+                        rate = last if is_direct else 1.0 / last
+                        self._fx_cache[cache_key] = (rate, time.time())
+                        return rate
             except Exception:
                 continue
 

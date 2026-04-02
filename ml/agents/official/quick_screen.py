@@ -18,7 +18,7 @@ _session_service = InMemorySessionService()
 
 # Use a lighter/cheaper model for quick screen — it's a binary triage filter,
 # not a deep analysis. Override via QUICK_SCREEN_MODEL env var if needed.
-_QUICK_SCREEN_MODEL = os.getenv("QUICK_SCREEN_MODEL", "gemini-2.0-flash-lite")
+_QUICK_SCREEN_MODEL = os.getenv("QUICK_SCREEN_MODEL", "gemini-2.0-flash")
 
 
 class QuickScreenResult(BaseModel):
