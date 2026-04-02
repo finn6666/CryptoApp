@@ -607,22 +607,30 @@ class ExchangeManager:
                 (f"{to_currency}/{effective_from}", False),
             ]
 
-        for direct_pair, is_direct in candidate_pairs:
-            try:
-                if direct_pair in getattr(exchange, "markets", {}):
-                    ticker = exchange.fetch_ticker(direct_pair)
-                    last = ticker.get("last", 0)
-                    if last and last > 0:
-                        rate = last if is_direct else 1.0 / last
-                        self._fx_cache[cache_key] = (rate, time.time())
-                        return rate
-            except Exception:
-                continue
+        # Try against the passed-in exchange first, then fall back to any cached exchange
+        # that may have GBP pairs (e.g. Kraken has GBP/USD; KuCoin/MEXC typically don't).
+        exchanges_to_try = [exchange]
+        for ex_id, ex in self._exchanges.items():
+            if ex is not exchange:
+                exchanges_to_try.append(ex)
+
+        for ex_obj in exchanges_to_try:
+            for direct_pair, is_direct in candidate_pairs:
+                try:
+                    if direct_pair in getattr(ex_obj, "markets", {}):
+                        ticker = ex_obj.fetch_ticker(direct_pair)
+                        last = ticker.get("last", 0)
+                        if last and last > 0:
+                            rate = last if is_direct else 1.0 / last
+                            self._fx_cache[cache_key] = (rate, time.time())
+                            return rate
+                except Exception:
+                    continue
 
         # Return stale cached rate rather than falling back to hardcoded approximation
         if cache_key in self._fx_cache:
             stale_rate, _ = self._fx_cache[cache_key]
-            logger.warning(f"Using stale FX rate for {cache_key} (live fetch failed)")
+            logger.debug(f"Using stale FX rate for {cache_key} (live fetch failed)")
             return stale_rate
 
         # Last resort: approximate rates (GBP base)

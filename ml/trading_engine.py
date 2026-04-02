@@ -589,20 +589,44 @@ class TradingEngine:
                 else:
                     quantity = amount_in_quote / current_price
 
-                # Enforce exchange minimum order quantity (buy-side only)
-                if proposal.side != "sell":
-                    try:
-                        market = exchange.market(symbol_pair)
-                        min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
-                        min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                # Enforce exchange minimum order quantity
+                try:
+                    market = exchange.market(symbol_pair)
+                    min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+                    min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                    if proposal.side == "sell":
+                        # For sells we cannot bump — abort if below exchange minimum
+                        if min_qty and quantity < min_qty:
+                            proposal.status = "rejected"
+                            proposal.error = (
+                                f"Sell quantity {quantity:.8f} below Kraken minimum {min_qty:.8f} "
+                                f"— position too small to sell"
+                            )
+                            logger.info(
+                                f"Legacy sell {proposal.symbol}: quantity {quantity:.8f} < min {min_qty:.8f} "
+                                f"— skipping to avoid exchange rejection"
+                            )
+                            return {"success": False, "error": proposal.error}
+                        if min_cost and (quantity * current_price) < min_cost:
+                            proposal.status = "rejected"
+                            proposal.error = (
+                                f"Sell cost £{quantity * current_price / fx_rate if quote_currency != 'GBP' else quantity * current_price:.4f} "
+                                f"below exchange minimum — position too small to sell"
+                            )
+                            logger.info(
+                                f"Legacy sell {proposal.symbol}: cost below min {min_cost:.4f} "
+                                f"— skipping to avoid exchange rejection"
+                            )
+                            return {"success": False, "error": proposal.error}
+                    else:
                         if min_qty and quantity < min_qty:
                             quantity = min_qty * 1.02  # 2% buffer
                             logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
                         if min_cost and (quantity * current_price) < min_cost:
                             quantity = (min_cost * 1.02) / current_price
                             logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
-                    except Exception as e:
-                        logger.debug(f"Could not check min order for {symbol_pair}: {e}")
+                except Exception as e:
+                    logger.debug(f"Could not check min order for {symbol_pair}: {e}")
 
                 if proposal.side == "buy":
                     order = exchange.create_market_buy_order(symbol_pair, quantity)
