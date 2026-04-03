@@ -126,7 +126,7 @@ Gemini is the primary cost driver. Every code change that touches agent calls, s
 | Trade cooldown | 60 min between new proposal generation |
 | Scan cooldown | 1 hour between scans |
 | Max proposals/scan | 3 |
-| Conviction threshold | ≥55% (agent) / ≥45% (scan loop) |
+| Conviction threshold | ≥55% (agent) / regime-aware scan: bull=40%, neutral=45%, bear=60% |
 | Min hold period | 72h before profit/trailing triggers |
 | Tiered exits | Tier 1: 75% profit → sell 33%; Tier 2: 150% → sell 50% of remaining |
 | Balance check | Kraken balance verified before every order |
@@ -142,7 +142,8 @@ See `.env.example` for the full list. Key groups:
 - **Trading:** `KRAKEN_API_KEY`, `KRAKEN_PRIVATE_KEY`, `TRADING_API_KEY`, `DAILY_TRADE_BUDGET_GBP`
 - **Approval:** `BUY_AUTO_APPROVE`, `SELL_REQUIRE_APPROVAL`, `TRADE_NOTIFICATION_EMAIL`, SMTP settings
 - **Scan:** `SCAN_ENABLED`, `SCAN_INTERVAL_HOURS`, `SCAN_MAX_COINS`
-- **Sell:** `SELL_TIER1_PCT` (75%), `SELL_TIER1_FRACTION` (0.33), `SELL_TIER1_TRAILING_PCT` (20%), `SELL_TIER2_PCT` (150%), `SELL_TIER2_FRACTION` (0.50), `SELL_TIER2_TRAILING_PCT` (15%), `SELL_PROFIT_TARGET_PCT` (300% nuclear), `SELL_STOP_LOSS_PCT`, `SELL_TRAILING_STOP_PCT`, `SELL_MIN_HOLD_HOURS`
+- **Sell:** `SELL_TIER1_PCT` (75%), `SELL_TIER1_FRACTION` (0.33), `SELL_TIER1_TRAILING_PCT` (20%), `SELL_TIER2_PCT` (150%), `SELL_TIER2_FRACTION` (0.50), `SELL_TIER2_TRAILING_PCT` (15%), `SELL_STOP_LOSS_PCT`, `SELL_TRAILING_STOP_PCT`, `SELL_MIN_HOLD_HOURS`
+- **Scan thresholds:** `SCAN_QUICK_SCREEN_BULL` (60%), `SCAN_QUICK_SCREEN_NEUTRAL` (70%), `SCAN_QUICK_SCREEN_BEAR` (72%)
 
 ## Domain Knowledge
 

@@ -60,9 +60,15 @@ All set in `.env`. See `.env.example` for full list with descriptions.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `SELL_PROFIT_TARGET_PCT` | `20.0` | Take profit % |
-| `SELL_STOP_LOSS_PCT` | `-15.0` | Stop loss % |
-| `SELL_TRAILING_STOP_PCT` | `10.0` | Trailing stop from peak % |
+| `SELL_STOP_LOSS_PCT` | `-50.0` | Stop-loss % (full exit, bypasses min hold) |
+| `SELL_TRAILING_STOP_PCT` | `45.0` | Drop-from-peak % for trailing stop |
+| `SELL_MIN_HOLD_HOURS` | `72.0` | Min hold before profit/trailing triggers |
+| `SELL_TIER1_PCT` | `75.0` | Tier 1 partial-sell threshold |
+| `SELL_TIER1_FRACTION` | `0.33` | Fraction to sell at Tier 1 |
+| `SELL_TIER1_TRAILING_PCT` | `20.0` | Trailing stop after Tier 1 |
+| `SELL_TIER2_PCT` | `150.0` | Tier 2 partial-sell threshold |
+| `SELL_TIER2_FRACTION` | `0.50` | Fraction of remaining to sell at Tier 2 |
+| `SELL_TIER2_TRAILING_PCT` | `15.0` | Trailing stop after Tier 2 |
 
 ### Scan Schedule
 
