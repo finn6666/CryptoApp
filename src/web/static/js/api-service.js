@@ -49,10 +49,8 @@ async function loadDashboardSummary(prefetchedData = null) {
 
         // Populate sidebar scanner stats
         const s = data.scanner || {};
-        _setText('sbScanNext',     s.next_scan  ? timeAgo(s.next_scan, true) : '—');
-        _setText('sbScanLast',     s.last_scan  ? timeAgo(s.last_scan)       : 'Never');
-        _setText('sbScanCoins',    s.coins_scanned ?? 0);
-        _setText('sbScanProposals',s.total_proposals ?? s.proposals_made ?? 0);
+        _setText('scanNextTime', s.next_scan ? timeAgo(s.next_scan, true) : '—');
+        _setText('scanLastRun',  s.last_scan ? timeAgo(s.last_scan)       : 'Never');
 
         // Populate sidebar scan-status badge
         const scanBadge = document.getElementById('scanStatusDetail');
