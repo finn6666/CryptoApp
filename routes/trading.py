@@ -1093,7 +1093,7 @@ def rl_insights():
         }
         def describe_state(s):
             parts = s.split('|')
-            if len(parts) == 4:
+            if len(parts) >= 4:
                 desc = [state_labels.get(parts[0], parts[0]),
                         state_labels.get(parts[2], parts[2]),
                         state_labels.get(parts[3], parts[3])]
