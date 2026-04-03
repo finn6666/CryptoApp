@@ -58,15 +58,13 @@ class SellAutomation:
         # Tiered profit-taking: partial sells that let winners run.
         # Tier 1 (75%): take 33% off the table, tighten trailing to 20%.
         # Tier 2 (150%): take 50% of remaining off, tighten trailing to 15%.
-        # Full exit only via trailing stop, stop-loss, or the nuclear SELL_PROFIT_TARGET_PCT.
+        # Full exit via trailing stop or stop-loss only — no nuclear profit cap.
         self.tier1_pct = float(os.getenv("SELL_TIER1_PCT", "75.0"))
         self.tier2_pct = float(os.getenv("SELL_TIER2_PCT", "150.0"))
         self.tier1_fraction = float(os.getenv("SELL_TIER1_FRACTION", "0.33"))
         self.tier2_fraction = float(os.getenv("SELL_TIER2_FRACTION", "0.50"))
         self.tier1_trailing_pct = float(os.getenv("SELL_TIER1_TRAILING_PCT", "20.0"))
         self.tier2_trailing_pct = float(os.getenv("SELL_TIER2_TRAILING_PCT", "15.0"))
-        # Nuclear full-exit if profit goes extreme (default 300% — very rare, last resort).
-        self.profit_target_pct = float(os.getenv("SELL_PROFIT_TARGET_PCT", "300.0"))
 
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
@@ -372,20 +370,7 @@ class SellAutomation:
                 "sell_fraction": self.tier2_fraction,
             }
 
-        # 4. Nuclear full exit — extreme profit level (last resort, default 300%)
-        if pnl_pct >= self.profit_target_pct:
-            return {
-                "type": "profit_target",
-                "reason": (
-                    f"Extreme profit target reached: {pnl_pct:.1f}% gain "
-                    f"(target: {self.profit_target_pct}%). Full exit. "
-                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
-                ),
-                "confidence": 85,
-                "sell_fraction": 1.0,
-            }
-
-        # 5. Trailing stop — use tightened value if we're in runner mode after a tier
+        # 4. Trailing stop — use tightened value if we're in runner mode after a tier
         peak = self._peak_prices.get(symbol, current_price)
         trailing_pct = self._tightened_trailing.get(symbol, effective_trailing_pct)
         if peak > entry_price:
@@ -647,7 +632,7 @@ class SellAutomation:
             "tier2_pct": self.tier2_pct,
             "tier2_fraction": self.tier2_fraction,
             "tier2_trailing_pct": self.tier2_trailing_pct,
-            "profit_target_pct": self.profit_target_pct,
+
             "stop_loss_pct": self.stop_loss_pct,
             "trailing_stop_pct": self.trailing_stop_pct,
             "min_hold_hours": self.min_hold_hours,
