@@ -6,19 +6,22 @@
 }
 
 :root {
-    --primary-bg: #000000;
-    --secondary-bg: #0a0a0a;
-    --card-bg: #111111;
-    --accent-primary: #667eea;
-    --accent-secondary: #764ba2;
+    --primary-bg: #06080d;
+    --secondary-bg: #0d1017;
+    --card-bg: #0d1017;
+    --accent-primary: #00e5ff;
+    --accent-secondary: #0099bb;
     --accent-gold: #f6d55c;
-    --text-primary: #ffffff;
-    --text-secondary: #cccccc;
-    --success: #48bb78;
-    --warning: #ed8936;
-    --error: #f56565;
-    --border: #333333;
+    --text-primary: #e8edf2;
+    --text-secondary: #8899aa;
+    --success: #34d399;
+    --warning: #f59e0b;
+    --error: #f87171;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.14);
     --shadow: rgba(0, 0, 0, 0.6);
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
 }
 
 /* ===== GLOBAL STYLES ===== */
@@ -3474,3 +3477,423 @@ html, body {
 }
 
 /* ===== END VIEWPORT-FIT ===== */
+
+/* ===== PRECISION DARK THEME ===== */
+
+/* Body */
+body {
+    font-family: var(--sans);
+    background: var(--primary-bg);
+}
+
+body::before {
+    background:
+        radial-gradient(ellipse at 85% 8%, rgba(0,229,255,0.04) 0%, transparent 50%),
+        radial-gradient(ellipse at 10% 92%, rgba(20,50,110,0.06) 0%, transparent 50%);
+}
+
+/* Header — dissolved into a minimal wordmark line, no card */
+.header {
+    background: none !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    padding: 8px 0 !important;
+    margin-bottom: 0 !important;
+}
+
+.header::before {
+    display: none !important;
+}
+
+.header h1 {
+    font-family: var(--mono) !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.14em !important;
+    text-transform: uppercase !important;
+    color: var(--text-secondary) !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--text-secondary) !important;
+    margin-bottom: 0 !important;
+}
+
+/* Ticker bar */
+.ticker-bar {
+    background: rgba(255,255,255,0.015) !important;
+    border-bottom: 1px solid var(--border) !important;
+    height: 26px !important;
+}
+
+.ticker-item {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    border-right-color: rgba(255,255,255,0.05) !important;
+    padding: 0 16px;
+    gap: 7px;
+}
+
+.ticker-headline {
+    font-family: var(--mono);
+    color: var(--text-secondary);
+}
+
+.ticker-stat__label {
+    color: var(--accent-primary) !important;
+    font-size: 8px;
+}
+
+.ticker-stat__value {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+}
+
+.ticker-fng__label {
+    color: var(--accent-primary) !important;
+}
+
+.ticker-fng__value,
+.ticker-fng__cls {
+    font-family: var(--mono);
+}
+
+/* Topbar — add subtle bottom border, tight gap */
+.topbar {
+    gap: 0 !important;
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+    margin-top: 0;
+}
+
+/* Nav — underline tab style */
+.site-nav {
+    gap: 0;
+    margin: 0;
+}
+
+.site-nav__link {
+    font-family: var(--sans);
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.07em !important;
+    text-transform: uppercase !important;
+    color: var(--text-secondary) !important;
+    padding: 9px 14px !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-bottom: 1.5px solid transparent !important;
+    background: none !important;
+    text-decoration: none;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+    display: inline-block;
+}
+
+.site-nav__link:hover {
+    color: var(--text-primary) !important;
+    background: none !important;
+    border-bottom-color: var(--border-strong) !important;
+}
+
+.site-nav__link--active {
+    color: var(--accent-primary) !important;
+    background: none !important;
+    border-bottom-color: var(--accent-primary) !important;
+}
+
+/* Status strip — right-aligned, monospace */
+.status-strip {
+    justify-content: flex-end !important;
+    gap: 10px !important;
+}
+
+.st-item {
+    font-family: var(--mono);
+    gap: 5px;
+}
+
+.st-label {
+    font-family: var(--mono);
+    font-size: 9px !important;
+    font-weight: 400 !important;
+    letter-spacing: 0.04em;
+}
+
+.st-val {
+    font-family: var(--mono);
+    font-size: 11px !important;
+    font-weight: 500 !important;
+}
+
+.st-sep {
+    color: var(--border-strong) !important;
+}
+
+/* Sidebar column spacing */
+.sidebar-column {
+    gap: 6px !important;
+}
+
+/* Portfolio card — borderless, typographic */
+.portfolio-card {
+    background: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    padding: 12px 14px !important;
+}
+
+.portfolio-card__label {
+    font-family: var(--mono);
+    font-size: 9px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.12em !important;
+    color: var(--accent-primary) !important;
+}
+
+.portfolio-card__sub {
+    font-family: var(--mono);
+    font-size: 9px;
+    opacity: 1;
+}
+
+.portfolio-card__value {
+    font-family: var(--mono);
+    font-size: 26px !important;
+    font-weight: 600 !important;
+    letter-spacing: -1px !important;
+    color: var(--text-primary);
+}
+
+.portfolio-card__pnl {
+    font-family: var(--mono);
+    font-size: 11px !important;
+    font-weight: 400 !important;
+}
+
+.portfolio-card__holdings {
+    border-top-color: var(--border) !important;
+    gap: 4px !important;
+}
+
+.holding-row {
+    font-family: var(--mono);
+    font-size: 11px !important;
+    padding: 3px 0 !important;
+}
+
+.holding-row__symbol {
+    font-weight: 500 !important;
+}
+
+.holding-row__value {
+    font-family: var(--mono);
+    color: var(--text-secondary);
+}
+
+.holding-row__pnl {
+    font-family: var(--mono);
+    font-weight: 500 !important;
+}
+
+/* Sidebar panels — dark glass, soft borders */
+.sidebar-panel {
+    background: rgba(255,255,255,0.025) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.sidebar-panel__header {
+    border-left: 2px solid transparent !important;
+    border-bottom: 1px solid transparent !important;
+    padding: 9px 12px 9px 10px !important;
+    transition: background 0.15s, border-color 0.15s !important;
+}
+
+.sidebar-panel__header.open {
+    border-left-color: var(--accent-primary) !important;
+    border-bottom-color: var(--border) !important;
+}
+
+.sidebar-panel__header:hover {
+    background: rgba(255,255,255,0.02) !important;
+}
+
+.sidebar-panel__title {
+    font-family: var(--sans);
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.07em !important;
+    text-transform: uppercase !important;
+    color: var(--text-primary);
+}
+
+.sidebar-panel__toggle {
+    font-family: var(--mono);
+    font-size: 11px;
+}
+
+.sidebar-panel__body {
+    padding: 10px 12px !important;
+}
+
+/* Stat grids — borderless, typography only */
+.sidebar-stats-grid {
+    gap: 0 !important;
+}
+
+.sidebar-stat {
+    background: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    border-left: 1px solid var(--border) !important;
+    padding: 6px 10px !important;
+}
+
+.sidebar-stats-grid .sidebar-stat:first-child {
+    border-left: none !important;
+}
+
+.sidebar-stat__value {
+    font-family: var(--mono);
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+
+.sidebar-stat__label {
+    font-family: var(--sans);
+    font-size: 9px !important;
+    letter-spacing: 0.04em !important;
+}
+
+/* Section labels */
+.sidebar-section-label {
+    font-family: var(--mono) !important;
+    font-size: 9px !important;
+    letter-spacing: 0.1em !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid var(--border) !important;
+    margin-bottom: 8px !important;
+}
+
+/* Status badge — strip the pill, plain text */
+.status-badge {
+    font-family: var(--mono) !important;
+    font-size: 10px !important;
+    font-weight: 400 !important;
+    background: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    margin-left: 4px !important;
+}
+
+/* Ghost buttons — sharp, monospace */
+.btn-ghost {
+    font-family: var(--mono) !important;
+    font-size: 9px !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    padding: 4px 9px !important;
+    border-radius: 3px !important;
+    border: 0.5px solid var(--border-strong) !important;
+    background: transparent !important;
+    color: var(--text-secondary) !important;
+    transition: border-color 0.15s, color 0.15s !important;
+}
+
+.btn-ghost:hover {
+    background: transparent !important;
+    border-color: var(--accent-primary) !important;
+    color: var(--accent-primary) !important;
+}
+
+.btn-ghost--accent {
+    border-color: rgba(0,229,255,0.4) !important;
+    color: var(--accent-primary) !important;
+    background: rgba(0,229,255,0.05) !important;
+}
+
+.btn-ghost--accent:hover {
+    border-color: var(--accent-primary) !important;
+    background: rgba(0,229,255,0.1) !important;
+    color: var(--accent-primary) !important;
+}
+
+.btn-ghost--danger {
+    border-color: rgba(248,113,113,0.3) !important;
+    color: var(--error) !important;
+    background: transparent !important;
+}
+
+.btn-ghost--danger:hover {
+    border-color: var(--error) !important;
+    color: var(--error) !important;
+    background: transparent !important;
+}
+
+/* Scan result */
+.scan-result {
+    background: rgba(0,229,255,0.04) !important;
+    border-color: rgba(0,229,255,0.25) !important;
+    font-family: var(--mono);
+    font-size: 10px;
+}
+
+/* Trade log entries */
+.trade-log-entry {
+    font-family: var(--mono);
+    font-size: 11px !important;
+    border-bottom-color: rgba(255,255,255,0.04) !important;
+}
+
+.trade-log-entry__symbol { font-weight: 500 !important; }
+.trade-log-entry__side-buy  { font-weight: 500 !important; color: var(--success) !important; }
+.trade-log-entry__side-sell { font-weight: 500 !important; color: var(--error) !important; }
+.trade-log-entry__info { font-family: var(--mono); }
+.trade-log-entry__amount { font-family: var(--mono); font-weight: 500 !important; }
+
+/* Empty state */
+.empty-state {
+    font-family: var(--mono);
+    font-size: 11px !important;
+}
+
+/* RL insights — update pattern accent */
+.rl-section--pattern .rl-section__label {
+    color: var(--accent-primary) !important;
+}
+
+.rl-insight--pattern { border-left-color: var(--accent-primary) !important; }
+.rl-tag--pattern { background: rgba(0,229,255,0.1) !important; color: var(--accent-primary) !important; }
+.rl-pattern { border-color: var(--border) !important; }
+
+/* Market state */
+.market-state {
+    font-family: var(--mono);
+    font-size: 10px !important;
+    border-top-color: rgba(255,255,255,0.05) !important;
+}
+
+/* Heatmap header label — subtle, not dominant */
+.heatmap-header h2 {
+    font-family: var(--sans) !important;
+    font-size: 10px !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.08em !important;
+    color: var(--text-secondary) !important;
+}
+
+/* Config warning — keep functional */
+.config-warning {
+    font-family: var(--mono);
+    font-size: 10px !important;
+}
+
+/* ===== END PRECISION DARK THEME ===== */
