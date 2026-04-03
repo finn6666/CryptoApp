@@ -6,17 +6,6 @@ Auto-withdraw bought coins to a hardware wallet (e.g. Ledger) after purchase to 
 
 ---
 
-### Future: Bitget exchange support
-
-Bitget has a large altcoin selection and would complement Gate.io/KuCoin/MEXC for small-cap discovery. The ExchangeManager architecture already supports it — only needs:
-- `_get_exchange_config()` case for `bitget` (requires passphrase like KuCoin)
-- `.env.example` entry for `BITGET_API_KEY`, `BITGET_API_SECRET`, `BITGET_PASSPHRASE`
-- Add `bitget` to `EXCHANGE_PRIORITY` in `.env`
-
-Blocked on: obtaining Bitget API keys.
-
----
-
 ### Future: Weekly report email
 
 ---

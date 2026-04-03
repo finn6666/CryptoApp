@@ -1,5 +1,19 @@
 ## To Do
 
+### Bitget integration — manual steps pending
+
+- [ ] Wait for Bitget cooling-off period to end
+- [ ] Generate Bitget API keys at https://www.bitget.com/account/newApiManagement
+      (Permissions needed: Trade, Read)
+- [ ] Add to `.env` on the Pi:
+      ```
+      BITGET_API_KEY=<your key>
+      BITGET_API_SECRET=<your secret>
+      BITGET_PASSPHRASE=<your passphrase>
+      EXCHANGE_PRIORITY=kraken,bitget
+      ```
+- [ ] Deploy: `ssh pi "cd ~/CryptoApp && git pull && sudo systemctl restart cryptoapp"`
+- [ ] Verify Bitget appears connected in `/api/trades/status`
 
 
 ---
