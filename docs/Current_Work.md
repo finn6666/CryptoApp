@@ -2,6 +2,7 @@
 
 ### Bitget integration — manual steps pending
 
+- [ ] Remove `SELL_PROFIT_TARGET_PCT` from `.env` on the Pi (nuclear exit trigger removed — no longer read)
 - [ ] Wait for Bitget cooling-off period to end
 - [ ] Generate Bitget API keys at https://www.bitget.com/account/newApiManagement
       (Permissions needed: Trade, Read)
