@@ -125,10 +125,8 @@ crypto_orchestrator = Agent(
 )
 
 
-# Initialize memory service for session persistence
-# Using in-memory for now - can upgrade to VertexAI memory bank later
+# Memory service for optional cross-analysis context (disabled by default)
 memory_service = InMemoryMemoryService()
-session_service = InMemorySessionService()
 
 
 def _build_market_data_str(coin_data: Optional[Dict[str, Any]], symbol: str = "") -> str:
@@ -272,7 +270,9 @@ async def analyze_crypto(
     """
     session_id = session_id or f"analysis_{symbol}"
     
-    # Create runner — skip memory by default to reduce overhead
+    # Fresh session service per call — sessions are garbage collected when the
+    # runner goes out of scope, preventing unbounded RAM growth on the Pi.
+    session_service = InMemorySessionService()
     runner_kwargs = {
         "app_name": "crypto_analysis_app",
         "agent": crypto_orchestrator,
@@ -281,7 +281,7 @@ async def analyze_crypto(
     }
     if use_memory:
         runner_kwargs["memory_service"] = memory_service
-    
+
     runner = Runner(**runner_kwargs)
     
     market_data_str = _build_market_data_str(coin_data, symbol)
