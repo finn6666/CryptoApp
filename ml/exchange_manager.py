@@ -264,23 +264,104 @@ class ExchangeManager:
 
     # ─── Order Routing ────────────────────────────────────────
 
-    def find_best_pair(self, symbol: str) -> Optional[Tuple[str, str]]:
+    def find_best_pair(
+        self, symbol: str, side: str = None
+    ) -> Optional[Tuple[str, str]]:
         """
         Find the best exchange and trading pair for a symbol.
-        Tries exchanges in priority order.
+
+        When `side` is provided ("buy" or "sell"), fetches live prices from all
+        candidate exchanges and picks the best execution price (lowest ask for
+        buys, highest bid for sells), normalised to GBP.  Falls back to
+        priority-order selection if live price fetching fails on all exchanges.
+
+        When `side` is None (default), returns the first match in priority order
+        — used for price lookups and other non-trade callers.
+
         Returns (exchange_id, "SYMBOL/QUOTE") or None.
         """
         self.load_pairs()
         exchanges = self.get_exchanges_for_coin(symbol)
+        if not exchanges:
+            return None
+
+        if side is None:
+            # Priority-order fallback (unchanged behaviour for non-trade callers)
+            for exchange_id in exchanges:
+                pairs = self._pairs.get(exchange_id, set())
+                for quote in ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]:
+                    pair = f"{symbol.upper()}/{quote}"
+                    if pair in pairs:
+                        return exchange_id, pair
+            return None
+
+        # ── Price-comparison routing ───────────────────────────────────
+        # Fetch ticker from every exchange that lists this coin and pick
+        # the best execution price (normalised to GBP).
+        QUOTE_ORDER = ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]
+        best_result: Optional[Tuple[str, str]] = None
+        best_price_gbp: Optional[float] = None
+
+        any_exchange = None  # used as reference exchange for FX lookups
 
         for exchange_id in exchanges:
+            exchange = self.get_exchange(exchange_id)
+            if not exchange:
+                continue
+            if any_exchange is None:
+                any_exchange = exchange
+
             pairs = self._pairs.get(exchange_id, set())
-            # Try quote currencies in preference order
-            for quote in ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]:
+            for quote in QUOTE_ORDER:
+                pair = f"{symbol.upper()}/{quote}"
+                if pair not in pairs:
+                    continue
+                try:
+                    ticker = self._fetch_ticker_with_retry(exchange, pair)
+                    if side == "buy":
+                        raw_price = ticker.get("ask") or ticker.get("last") or 0
+                    else:
+                        raw_price = ticker.get("bid") or ticker.get("last") or 0
+                    if not raw_price or raw_price <= 0:
+                        continue
+
+                    # Normalise to GBP for cross-exchange comparison
+                    fx_rate = 1.0
+                    if quote != "GBP":
+                        fx_rate = self._get_fx_rate("GBP", quote, exchange) or 0
+                        if fx_rate <= 0:
+                            continue
+                    price_gbp = raw_price / fx_rate
+
+                    if side == "buy":
+                        if best_price_gbp is None or price_gbp < best_price_gbp:
+                            best_price_gbp = price_gbp
+                            best_result = (exchange_id, pair)
+                    else:  # sell
+                        if best_price_gbp is None or price_gbp > best_price_gbp:
+                            best_price_gbp = price_gbp
+                            best_result = (exchange_id, pair)
+
+                    break  # found a valid pair on this exchange — no need to try other quotes
+                except Exception as e:
+                    logger.debug(f"Price fetch failed on {exchange_id} for {pair}: {e}")
+                    continue
+
+        if best_result:
+            logger.info(
+                f"Best {side} exchange for {symbol}: {best_result[0]} "
+                f"({best_result[1]}, ~£{best_price_gbp:.6f})"
+            )
+            return best_result
+
+        # All live price fetches failed — fall back to priority order
+        logger.warning(f"Price comparison failed for {symbol}, falling back to priority order")
+        for exchange_id in exchanges:
+            pairs = self._pairs.get(exchange_id, set())
+            for quote in QUOTE_ORDER:
                 pair = f"{symbol.upper()}/{quote}"
                 if pair in pairs:
                     return exchange_id, pair
-
         return None
 
     def get_exchange(self, exchange_id: str):
@@ -313,7 +394,7 @@ class ExchangeManager:
                       preventing failures when the GBP value and live exchange
                       price have diverged since the proposal was created.
         """
-        result = self.find_best_pair(symbol)
+        result = self.find_best_pair(symbol, side=side)
         if not result:
             return {
                 "success": False,
