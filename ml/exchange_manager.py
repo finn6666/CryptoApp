@@ -109,7 +109,12 @@ class ExchangeManager:
             secret = os.getenv("BITGET_API_SECRET", "")
             passphrase = os.getenv("BITGET_PASSPHRASE", "")
             if key and secret and passphrase:
-                return {"apiKey": key, "secret": secret, "password": passphrase}
+                return {
+                    "apiKey": key,
+                    "secret": secret,
+                    "password": passphrase,
+                    "options": {"defaultType": "spot"},
+                }
         elif exchange_id == "mexc":
             key = os.getenv("MEXC_API_KEY", "")
             secret = os.getenv("MEXC_API_SECRET", "")
