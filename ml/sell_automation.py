@@ -569,6 +569,29 @@ class SellAutomation:
                     quantity = holding.get("quantity", 0)
                     amount_gbp = current_price * quantity
 
+                    # Q-learning: record outcome for agent-recommended full exits.
+                    # Agent recheck always exits the full position, so this is terminal.
+                    try:
+                        from ml.q_learning import get_q_learner
+                        avg_entry = holding.get("avg_entry_price", 0)
+                        pnl_pct = ((current_price - avg_entry) / avg_entry * 100) if avg_entry > 0 else 0
+                        first_buy_str = holding.get("first_buy_at", "")
+                        hold_hours = 0.0
+                        if first_buy_str:
+                            from datetime import datetime
+                            first_buy = datetime.fromisoformat(first_buy_str.replace("Z", "+00:00"))
+                            hold_hours = (datetime.now(first_buy.tzinfo) - first_buy).total_seconds() / 3600
+                        get_q_learner().record_outcome(
+                            symbol=symbol,
+                            coin_data=holding,
+                            action="buy",
+                            pnl_pct=pnl_pct,
+                            hold_hours=hold_hours,
+                            exit_trigger="agent_recheck",
+                        )
+                    except Exception as _qe:
+                        logger.debug(f"Q-learning agent_recheck outcome failed: {_qe}")
+
                     # Skip if position is too small to meet exchange minimum
                     try:
                         from ml.exchange_manager import get_exchange_manager

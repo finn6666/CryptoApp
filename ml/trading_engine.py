@@ -847,6 +847,18 @@ class TradingEngine:
         try:
             from ml.portfolio_tracker import get_portfolio_tracker
             tracker = get_portfolio_tracker()
+
+            # For buys: retrieve the Q-learning state that was computed at scan time.
+            # Stored in the holding so record_outcome() at close time has the correct
+            # buy-time state even after a process restart (bypasses the in-memory cache).
+            ql_state = ""
+            if proposal.side.lower() == "buy":
+                try:
+                    from ml.q_learning import get_q_learner
+                    ql_state = get_q_learner()._symbol_state_cache.get(proposal.symbol, "")
+                except Exception:
+                    pass
+
             tracker.record_trade(
                 symbol=proposal.symbol,
                 side=proposal.side,
@@ -861,6 +873,7 @@ class TradingEngine:
                 fee_gbp=fee_gbp,
                 coin_name=proposal.coin_name or "",
                 trade_mode=getattr(proposal, "trade_mode", "accumulate"),
+                ql_state=ql_state,
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")
