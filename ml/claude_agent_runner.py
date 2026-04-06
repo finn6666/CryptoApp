@@ -48,6 +48,9 @@ AGENT_MODEL = os.getenv("CLAUDE_AGENT_MODEL", "gemini-2.0-flash")
 
 MIN_BUY_CONFIDENCE = 70   # Only propose buys at this confidence or above
 MIN_SELL_CONFIDENCE = 60  # Only propose sells at this confidence or above
+# Skip sell proposals for positions whose total value is below this threshold
+# (avoids hitting exchange minimum-quantity rejections for dust positions)
+SELL_MIN_POSITION_GBP = float(os.getenv("AGENT_SELL_MIN_POSITION_GBP", "5.0"))
 
 
 # ─── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -180,6 +183,7 @@ def execute_actions(analysis: dict, ctx: dict) -> None:
     """Execute proposed_actions from the Gemini analysis."""
     kill_switch = ctx.get("kill_switch", False)
     remaining = float(ctx.get("budget", {}).get("remaining_gbp", 0) or 0)
+    holdings_by_symbol = {h["symbol"].upper(): h for h in ctx.get("holdings", [])}
 
     concerns = analysis.get("concerns", [])
     if concerns:
@@ -232,6 +236,14 @@ def execute_actions(analysis: dict, ctx: dict) -> None:
                 logger.info(
                     "Skipping sell [%s] — confidence %d%% below threshold %d%%",
                     symbol, confidence, MIN_SELL_CONFIDENCE,
+                )
+                continue
+            holding = holdings_by_symbol.get(symbol, {})
+            position_value_gbp = float(holding.get("current_value_gbp") or 0)
+            if position_value_gbp < SELL_MIN_POSITION_GBP:
+                logger.info(
+                    "Skipping sell [%s] — position value £%.2f below minimum £%.2f (dust position)",
+                    symbol, position_value_gbp, SELL_MIN_POSITION_GBP,
                 )
                 continue
             sell_qty = action.get("sell_quantity")
