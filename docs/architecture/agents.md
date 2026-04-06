@@ -1,54 +1,42 @@
 # ADK Agent Architecture
 
-Five specialised agents on Gemini Flash coordinated by `crypto_orchestrator`. Full pipeline takes 30–120 seconds depending on Gemini API response times.
+3-agent sequential debate on Gemini Flash. Replaced the 5-agent parallel chain in April 2026. Costs 3 Gemini calls per coin vs 6 — `SCAN_MAX_FULL_ANALYSIS` raised to 5 within the same budget.
 
-## Agent Tree
+## Debate Flow
 
 ```
-crypto_orchestrator (master agent)
-    ├── research_specialist   — on-chain fundamentals, partnerships, red flags
-    ├── technical_specialist  — chart patterns, indicators, support/resistance
-    ├── risk_specialist       — position sizing, stop-loss, exit strategy (advisory)
-    ├── sentiment_specialist  — social sentiment, FUD/FOMO detection
-    └── trading_specialist    — final trade decision (no tools, pure LLM)
+BullAdvocate   → builds strongest buy case from coin data
+    ↓ (bull case passed as context)
+BearAdvocate   → reads bull case, dismantles it point by point
+    ↓ (both cases passed as context)
+RefereeAgent   → weighs both arguments, considers portfolio concentration
+               and market regime → produces final trade verdict
 ```
+
+Returns same dict shape as the old `analyze_crypto()` — drop-in compatible.
 
 ## Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `ml/agents/official/orchestrator.py` | ~302 | Master agent, `analyze_crypto()` |
-| `ml/agents/official/research_agent.py` | ~112 | Research sub-agent |
-| `ml/agents/official/technical_agent.py` | ~120 | Technical sub-agent |
-| `ml/agents/official/risk_agent.py` | ~120 | Risk sub-agent |
-| `ml/agents/official/sentiment_agent.py` | ~110 | Sentiment sub-agent |
-| `ml/agents/official/trading_agent.py` | ~145 | Trading decision sub-agent |
-| `ml/agents/official/quick_screen.py` | — | Single-call Tier 1 triage |
-| `ml/tools/adk_tools.py` | ~495 | 16 ADK tool functions |
-| `ml/orchestrator_wrapper.py` | — | Thin ADK adapter for portfolio analysis |
+| File | Purpose |
+|------|---------|
+| `ml/agents/official/debate_orchestrator.py` | All 3 agents + `analyze_crypto_debate()` (active) |
+| `ml/agents/official/orchestrator.py` | Legacy 5-agent chain — kept, not used in production |
+| `ml/agents/official/quick_screen.py` | Single-call Tier 1 triage (unchanged) |
+| `ml/tools/adk_tools.py` | 16 ADK tool functions |
+| `ml/orchestrator_wrapper.py` | Thin ADK adapter for portfolio analysis |
 
 ## Analysis Entry Point
 
 ```python
-from ml.agents.official import analyze_crypto
-result = await analyze_crypto(symbol, coin_data, session_id, use_memory=False)
+from ml.agents.official import analyze_crypto_debate
+result = await analyze_crypto_debate(symbol, coin_data, session_id, use_memory=False)
 ```
 
 **Returns:** `success`, `symbol`, `analysis`, `all_agent_texts`, `trade_decision`, `confidence`, `agents_used`
 
+- Sequential: each agent receives previous agent's output as context
+- Referee receives `get_portfolio_summary_for_agents()` for concentration awareness
 - `use_memory=False` by default — reduces API costs
-- Uses `InMemorySessionService` (no cross-session state unless enabled)
-- Trade decision extracted via regex JSON from `trading_specialist` output
-
-## Dynamic Weighting
-
-Sentiment state drives agent weighting:
-
-| Condition | Research | Technical | Sentiment | Risk |
-|-----------|----------|-----------|-----------|------|
-| High hype | 25% | 25% | 40% | 10% |
-| Neutral | 30% | 30% | 25% | 15% |
-| Bearish | 35% | 35% | 20% | 10% |
 
 ## Quick Screen
 
@@ -57,15 +45,14 @@ from ml.agents.official.quick_screen import quick_screen_coin
 result = await quick_screen_coin(symbol, coin_data)
 ```
 
-Single ADK call for Tier 1 triage — fast pass before committing full 5-agent analysis budget.
+Single ADK call for Tier 1 triage — fast pass before committing full debate budget.
 
-## Trading Agent Rules
+## Referee Rules
 
 - BUY conviction: ≥55% (scan loop fires at ≥45%)
 - Allocation: 55–70% → 40–60% of budget; 70%+ → up to 100%
 - SELL only on fundamental deterioration — never short-term dips
 - Strategy: accumulate and hold medium-to-long-term
-- Must recognise the coin — no trades on unknown assets
 
 ## ADK Tools
 
@@ -87,14 +74,8 @@ wrapper = get_orchestrator_wrapper()
 result = await wrapper.analyze_coin(symbol, coin_data)
 ```
 
-## Orchestrator Personality
-
-- "Sharp crypto analyst" — direct, opinionated, no corporate hedging
-- Opportunity-seeking bias: "think like a venture investor"
-- Output: `CryptoAnalysisOutput` (Pydantic, 16 fields)
-
 ## Costs & Limits
 
-- ~£2.50/month at normal scan rates
+- ~£2.50/month at normal scan rates (3 calls/coin, up to 5 full analyses/scan)
 - 12h analysis cache (in-memory + Redis + disk) minimises repeat calls
 - Rate limit (HTTP 429) triggers `alert_api_quota()` notification

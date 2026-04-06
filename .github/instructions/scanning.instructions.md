@@ -8,19 +8,21 @@ applyTo: "ml/scan_loop.py,ml/market_monitor.py,ml/scheduler.py"
 ## Scan Pipeline (runs every 12h)
 
 ```
-_refresh_data()          → CoinMarketCap prices + tracked symbols
-_get_tradeable_coins()   → filter via ExchangeManager (remove stablecoins)
-_select_candidates()     → priority: favorites → attractiveness_score fallback
-_analyse_and_evaluate()  → ADK orchestrator per coin → propose_and_auto_execute()
+_refresh_data()              → CoinGecko prices + tracked symbols
+_get_tradeable_coins()       → filter via ExchangeManager (remove stablecoins)
+_select_candidates()         → priority: favorites → attractiveness_score fallback
+_quick_screen_candidates()   → Tier 1: 1 Gemini call each, regime-aware threshold
+_analyse_and_evaluate()      → Tier 2: debate orchestrator (3 calls: bull/bear/referee)
+                               → propose_and_auto_execute()
 SellAutomation.check_and_propose_sells()
 ```
 
-Candidate selection is capped to `SCAN_MAX_COINS` (default 10).
+Candidate selection capped to `SCAN_MAX_COINS` (default 10). Full debate analysis capped to `SCAN_MAX_FULL_ANALYSIS` (default 5).
 
 ## Analysis Fallback Chain
 
 ```
-ADK Orchestrator (Gemini API)
+Debate Orchestrator (Gemini API — 3 sequential calls)
     ↓ fails (quota / timeout / error)
 Skip coin
 ```
@@ -66,7 +68,8 @@ Quick scan ranks coins by `attractiveness_score`, maps to `gem_probability = min
 | `SCAN_ENABLED` | `true` | Enable/disable scan loop |
 | `SCAN_INTERVAL_HOURS` | `12` | Hours between scans (0 = legacy daily mode) |
 | `SCAN_TIME` | `12:00` | Daily scan time (legacy mode only) |
-| `SCAN_MAX_COINS` | `10` | Max coins per scan |
+| `SCAN_MAX_COINS` | `10` | Max coins reaching quick-screen per scan |
+| `SCAN_MAX_FULL_ANALYSIS` | `5` | Max coins reaching full debate analysis per scan |
 | `SCAN_MAX_PROPOSALS` | `3` | Max trade proposals per scan |
 | `SCAN_COOLDOWN_HOURS` | `1` | Min hours between scans |
 | `MONITOR_ENABLED` | `true` | Start market monitor between scans |

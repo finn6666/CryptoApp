@@ -27,9 +27,9 @@ When compacting, ALWAYS preserve:
 
 ## Project Overview
 
-AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 5-agent Google ADK (Gemini) architecture to discover undervalued coins, analyse them, and execute live trades on Kraken. Runs headlessly on a Raspberry Pi 4 for ~£2.50/month.
+AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 3-agent debate architecture (Google ADK + Gemini) to discover undervalued coins, analyse them, and execute live trades across Kraken, Bitget, KuCoin, and MEXC. Runs headlessly on a Raspberry Pi 4 for ~£2.50/month.
 
-**Key flow:** CoinGecko data → 5 AI agents analyse → trading engine proposes → auto-approve or email → Kraken execution → portfolio tracking → sell automation monitors exits.
+**Key flow:** CoinGecko data → debate orchestrator (bull/bear/referee) analyses → trading engine proposes → auto-approve or email → best-price exchange routing → portfolio tracking → sell automation monitors exits.
 
 ## Tech Stack
 
@@ -38,7 +38,7 @@ AI-powered low-cap cryptocurrency analysis and automated trading system. Uses a 
 | Language | Python 3.13 |
 | Web | Flask + Gunicorn (1 worker, 4 gthread) |
 | AI Agents | Google ADK + `gemini-2.0-flash` (configurable via `ORCHESTRATOR_MODEL`) |
-| Exchange | Kraken via ccxt |
+| Exchange | Kraken, Bitget, KuCoin, MEXC via ccxt — best-price routing per trade |
 | ML | scikit-learn (training), ONNX Runtime (inference), Q-learning RL |
 | Frontend | Vanilla JS + Jinja2 templates + CSS |
 | Data | JSON file persistence, optional Redis cache |
@@ -72,7 +72,7 @@ ml/                 — All ML, trading, and agent logic
   agent_memory.py      — Short/long-term agent context
   scheduler.py         — Weekly retrain + performance reports
   doc_updater.py       — Auto-updates documentation
-  agents/official/     — 5 ADK agents + orchestrator + quick_screen
+  agents/official/     — debate orchestrator (bull/bear/referee) + quick_screen + legacy 5-agent chain
 
 routes/             — Flask Blueprints (coins, health, ml, symbols, trading)
 services/           — Shared app state + optional Redis cache
@@ -101,8 +101,8 @@ Gemini is the primary cost driver. Every code change that touches agent calls, s
 | Guard | Value |
 |-------|-------|
 | `GEMINI_DAILY_BUDGET_GBP` | £1.00 default — hard ceiling on Gemini spend per day |
-| `SCAN_MAX_COINS` | 10 — coins reaching full agent analysis per scan |
-| `max_full_analysis` | 3 — max coins analysed by full 5-agent chain per scan |
+| `SCAN_MAX_COINS` | 10 — coins reaching quick-screen per scan |
+| `SCAN_MAX_FULL_ANALYSIS` | 5 — max coins reaching full debate analysis per scan (3 Gemini calls each) |
 | `SCAN_COOLDOWN_HOURS` | 1h — minimum gap between any two scans |
 | `RECYCLE_MIN_GBP` | £2.00 — minimum sell value to trigger a post-sell recycle scan |
 

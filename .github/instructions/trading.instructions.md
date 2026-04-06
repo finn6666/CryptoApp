@@ -115,3 +115,4 @@ When `SWING_TRADE_ENABLED=true`, positions tagged as `trade_mode="swing"` use ti
 - Balance check failure is non-blocking — order proceeds (exchange rejects if insufficient)
 - Kill switch rejects all pending proposals immediately
 - Sells **never** auto-execute regardless of `BUY_AUTO_APPROVE`
+- Best-price routing fetches live ask/bid from all exchanges listing the coin at execution time — falls back to `EXCHANGE_PRIORITY` order if all price fetches fail

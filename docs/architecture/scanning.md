@@ -19,8 +19,8 @@ How coins are discovered, filtered, and fed into the analysis pipeline.
    └─ Regime-aware threshold gates coins through to full analysis
    └─ Gemini budget checked before each call — stops cleanly if exceeded
 
-5. _analyse_and_evaluate(coin_data)  [Tier 2 — 6 Gemini calls each, cap 3/scan]
-   └─ ADK orchestrator → trade_decision dict
+5. _analyse_and_evaluate(coin_data)  [Tier 2 — 3 Gemini calls each, cap 5/scan]
+   └─ Debate orchestrator (bull/bear/referee) → trade_decision dict
    └─ Regime-aware conviction threshold → TradingEngine.propose_and_auto_execute()
 
 6. SellAutomation.check_and_propose_sells(live_prices)
@@ -98,7 +98,8 @@ Scheduler runs in a daemon thread checking every 30 seconds for pending jobs.
 | `SCAN_ENABLED` | `true` | Enable/disable scan loop |
 | `SCAN_INTERVAL_HOURS` | `12` | Hours between scans |
 | `SCAN_TIME` | `12:00` | Daily scan time (legacy mode only) |
-| `SCAN_MAX_COINS` | `10` | Max coins per scan |
+| `SCAN_MAX_COINS` | `10` | Max coins reaching quick-screen per scan |
+| `SCAN_MAX_FULL_ANALYSIS` | `5` | Max coins reaching full debate analysis per scan |
 | `SCAN_MAX_PROPOSALS` | `3` | Max trade proposals per scan |
 | `SCAN_COOLDOWN_HOURS` | `1` | Min hours between scans |
 | `SCAN_QUICK_SCREEN_BULL` | `60` | Quick-screen pass threshold in bull market |
