@@ -40,6 +40,20 @@ Multiple agent teams with different risk profiles (conservative vs aggressive) v
 
 ---
 
+### Monetisation
+
+Two viable paths, not mutually exclusive:
+
+**1. Paid Telegram signal channel** — bot posts scan signals to a private channel on each scan completion. Users pay for access (managed via Gumroad/Patreon invite). Minimal build: `ml/telegram_notifier.py` + patch `scan_loop.py`. Fastest route to revenue validation.
+
+**2. All-in-one packaged software** — Docker image the user runs on their own Pi/VPS. Includes: first-run setup wizard (collects all API keys via web UI), built-in Telegram bot for their own private signals, licence key validation (HMAC, tied to purchase email), full trading dashboard. Sell via Gumroad (~£120-200 one-time). Their keys, their trades, no ongoing cost to seller. ~1.5 weeks to build.
+
+Recommended order: Telegram first (validates demand in days), packaged software second (embed affiliate links in the setup wizard at that point).
+
+**Exchange affiliate programs** — Kraken, KuCoin, Bitget, and MEXC all have referral programs paying 20-40% of trading fees from referred users. Two touch points: welcome message in the Telegram channel (new subscribers get referral links immediately), and the setup wizard in the packaged software. Zero extra build work, passive income on every trade users make.
+
+---
+
 ### OpenViking for agent memory (longer term)
 
 Open-source tiered context database for agents (L0 abstract / L1 overview / L2 full content). Better than flat prompt stuffing for long-running agents with large memory.
