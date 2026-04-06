@@ -1,6 +1,55 @@
 // Trade Journal & Live Trading Functions
 // Extracted from trades.html inline script for merged dashboard
 
+// ─── Debate Panel ────────────────────────────────────
+
+function renderDebatePanel(p) {
+    const d = p.debate_data;
+    if (!d || (!d.bull_text && !d.bear_text && !d.referee_text)) return '';
+
+    const bullConv = Number(d.bull_conviction || 0);
+    const bearConv = Number(d.bear_conviction || 0);
+    const total = bullConv + bearConv;
+    const bullPct = total > 0 ? Math.round((bullConv / total) * 100) : 50;
+    const regime = d.regime || '';
+
+    const truncate = (text, len) => {
+        if (!text) return 'No data.';
+        return text.length > len ? text.slice(0, len) + '...' : text;
+    };
+
+    const regimeBadge = regime
+        ? `<span class="debate-regime-badge debate-regime-${regime}">${regime.toUpperCase()}</span>`
+        : '';
+
+    const bullLabel = bullConv ? ` ${bullConv}%` : '';
+    const bearLabel = bearConv ? ` ${bearConv}%` : '';
+
+    return `
+        <div class="debate-toggle" onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
+            View debate ${regimeBadge}<span style="color:#48bb78">Bull${bullLabel}</span> vs <span style="color:#fc8181">Bear${bearLabel}</span>
+        </div>
+        <div class="debate-body" style="display:none">
+            <div class="debate-conviction-bar">
+                <div class="debate-bull-bar" style="width:${bullPct}%"></div>
+                <div class="debate-bear-bar" style="width:${100 - bullPct}%"></div>
+            </div>
+            <div class="debate-section bull">
+                <div class="debate-section-label">Bull Case</div>
+                <div class="debate-section-text">${escapeHtml(truncate(d.bull_text, 500))}</div>
+            </div>
+            <div class="debate-section bear">
+                <div class="debate-section-label">Bear Case</div>
+                <div class="debate-section-text">${escapeHtml(truncate(d.bear_text, 500))}</div>
+            </div>
+            <div class="debate-section referee">
+                <div class="debate-section-label">Referee</div>
+                <div class="debate-section-text">${escapeHtml(truncate(d.referee_text, 500))}</div>
+            </div>
+        </div>
+    `;
+}
+
 // ─── Live Trading Functions ──────────────────────────
 
 async function loadTradingStatus(data = null) {
@@ -65,6 +114,7 @@ async function loadPendingProposals(prefetchedProposals = null) {
                             <div style="margin-bottom: 4px;">${escapeHtml(p.reason)}</div>
                             <div>Confidence: ${Number(p.confidence)}% • Price: £${Number(p.price_at_proposal).toFixed(6)} • ${created}</div>
                         </div>
+                        ${renderDebatePanel(p)}
                     </div>
                 `;
             }).join('');

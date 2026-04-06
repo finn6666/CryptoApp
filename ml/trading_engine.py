@@ -45,6 +45,7 @@ class TradeProposal:
     sell_quantity: Optional[float] = None  # Exact coin qty to sell (bypasses amount→qty reconversion)
     trade_mode: str = "accumulate"  # "accumulate" (hold weeks/months) or "swing" (tight exit, short hold)
     trigger_type: str = ""  # type of trigger that prompted this sell (e.g. "stop_loss", "agent_recheck")
+    debate_data: dict = field(default_factory=dict)  # bull/bear/referee texts + conviction scores
 
     def __post_init__(self):
         if not self.created_at:
@@ -249,6 +250,7 @@ class TradingEngine:
         sell_quantity: Optional[float] = None,
         trade_mode: str = "accumulate",
         trigger_type: str = "",
+        debate_data: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -384,6 +386,7 @@ class TradingEngine:
             sell_quantity=sell_quantity,
             trade_mode=trade_mode,
             trigger_type=trigger_type,
+            debate_data=debate_data or {},
         )
 
         self.proposals[proposal.id] = proposal
@@ -443,6 +446,7 @@ class TradingEngine:
         sell_quantity: Optional[float] = None,
         trade_mode: str = "accumulate",
         trigger_type: str = "",
+        debate_data: Optional[dict] = None,
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -465,6 +469,7 @@ class TradingEngine:
             sell_quantity=sell_quantity,
             trade_mode=trade_mode,
             trigger_type=trigger_type,
+            debate_data=debate_data,
         )
 
         if not result.get("success"):
@@ -720,14 +725,19 @@ class TradingEngine:
             )
 
             # Write to shared audit log for Activity Log UI
-            self._write_audit("trade_executed", {
+            audit_entry: Dict[str, Any] = {
                 "symbol": proposal.symbol,
                 "side": proposal.side,
                 "amount_gbp": round(proposal.amount_gbp, 2),
                 "price": proposal.execution_price,
                 "exchange": exchange_used,
                 "confidence": proposal.confidence,
-            })
+            }
+            if proposal.debate_data:
+                audit_entry["bull_conviction"] = proposal.debate_data.get("bull_conviction")
+                audit_entry["bear_conviction"] = proposal.debate_data.get("bear_conviction")
+                audit_entry["regime"] = proposal.debate_data.get("regime")
+            self._write_audit("trade_executed", audit_entry)
 
             # After a sell executes, kick off a background scan to redeploy the
             # freed capital rather than waiting up to 12h for the next scheduled scan.

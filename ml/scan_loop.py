@@ -666,6 +666,16 @@ class ScanLoop:
 
                 # Use auto-execute for scheduled scans so trades don't
                 # sit waiting for manual approval overnight.
+                agent_texts = analysis.get("all_agent_texts", {})
+                debate_meta = analysis.get("debate", {})
+                debate_data = {
+                    "bull_text": agent_texts.get("bull_advocate", ""),
+                    "bear_text": agent_texts.get("bear_advocate", ""),
+                    "referee_text": agent_texts.get("referee", ""),
+                    "bull_conviction": debate_meta.get("bull_conviction"),
+                    "bear_conviction": debate_meta.get("bear_conviction"),
+                    "regime": debate_meta.get("regime"),
+                } if agent_texts else {}
                 result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side=trade_side,
@@ -676,6 +686,7 @@ class ScanLoop:
                     recommendation=analysis.get("recommendation", "BUY"),
                     coin_name=coin_data.get("name", ""),
                     trade_mode=trade_mode,
+                    debate_data=debate_data,
                 )
 
                 outcome = "executed" if result.get("auto_approved") else "proposed"
