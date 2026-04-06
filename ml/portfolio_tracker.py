@@ -237,6 +237,24 @@ class PortfolioTracker:
             })
         return sorted(closed, key=lambda x: x.get("closed_at", ""), reverse=True)
 
+    def get_portfolio_summary_for_agents(self) -> Dict[str, Any]:
+        """
+        Compact portfolio snapshot passed to the debate referee agent.
+        Lets the referee factor in concentration before recommending a trade.
+        """
+        holdings = self.get_holdings()
+        active = [h for h in holdings if h.get("quantity", 0) > 0]
+        total_cost = sum(h.get("total_cost_gbp", 0) for h in active)
+        symbols = [h["symbol"] for h in active]
+        pnl_pcts = [h["unrealised_pnl_pct"] for h in active if "unrealised_pnl_pct" in h]
+        return {
+            "held_symbols": symbols,
+            "position_count": len(active),
+            "total_cost_gbp": round(total_cost, 2),
+            "worst_position_pct": round(min(pnl_pcts), 1) if pnl_pcts else None,
+            "best_position_pct": round(max(pnl_pcts), 1) if pnl_pcts else None,
+        }
+
     def get_performance_summary(self) -> Dict[str, Any]:
         """
         Aggregated performance metrics for tracking app progress.

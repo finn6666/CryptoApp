@@ -41,8 +41,8 @@ class ScanLoop:
         self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "10"))
         self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "6.0"))
         self.quick_screen_min_confidence = int(os.getenv("SCAN_QUICK_SCREEN_MIN", "70"))
-        # Max coins that proceed to the expensive 6-call full analysis per scan
-        self.max_full_analysis = int(os.getenv("SCAN_MAX_FULL_ANALYSIS", "3"))
+        # Max coins that proceed to full debate analysis per scan (3 calls each vs 6 previously)
+        self.max_full_analysis = int(os.getenv("SCAN_MAX_FULL_ANALYSIS", "5"))
         self.scan_running = False
         self._scheduler_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()

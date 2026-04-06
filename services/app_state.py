@@ -58,10 +58,10 @@ def initialize_official_adk():
     global official_adk_available, analyze_crypto_adk
     logger.info("Attempting to initialize Official Google ADK...")
     try:
-        from ml.agents.official import analyze_crypto
-        analyze_crypto_adk = analyze_crypto
+        from ml.agents.official import analyze_crypto_debate
+        analyze_crypto_adk = analyze_crypto_debate
         official_adk_available = True
-        logger.info("Official Google ADK initialized successfully")
+        logger.info("Official Google ADK initialized (debate orchestrator)")
         return True
     except Exception as e:
         logger.warning(f"Official ADK not available: {e}")
