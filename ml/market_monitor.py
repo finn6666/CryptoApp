@@ -474,13 +474,23 @@ class MarketMonitor:
                 logger.debug(f"[Monitor] Budget exhausted, skipping auto-buy for {symbol}")
                 return
 
-            # Don't re-buy coins we already hold
+            # For held coins: allow top-ups but max 1 per coin per calendar day.
+            # No hard cap on total top-ups — the debate agent decides each time.
+            is_topup = False
             try:
                 from ml.portfolio_tracker import get_portfolio_tracker
                 tracker = get_portfolio_tracker()
-                if symbol.upper() in tracker.holdings:
-                    logger.debug(f"[Monitor] Already holding {symbol}, skipping auto-buy")
-                    return
+                holding = tracker.holdings.get(symbol.upper())
+                if holding and holding.get("quantity", 0) > 0:
+                    topup_date_key = f"topup_daily:{symbol.upper()}:{datetime.utcnow().date().isoformat()}"
+                    if topup_date_key in self._alert_cooldowns:
+                        logger.debug(f"[Monitor] {symbol} already topped up today, skipping")
+                        return
+                    logger.info(
+                        f"[Monitor] {symbol} held ({holding.get('trades', 1)} buy(s)) — "
+                        f"running top-up analysis"
+                    )
+                    is_topup = True
             except Exception:
                 pass
 
@@ -529,6 +539,11 @@ class MarketMonitor:
             if proposed:
                 self._auto_buys_today += 1
                 self._stats["buy_proposals"] += 1
+                # Mark per-coin daily top-up so we don't top-up again today
+                if is_topup:
+                    topup_date_key = f"topup_daily:{symbol.upper()}:{datetime.utcnow().date().isoformat()}"
+                    self._alert_cooldowns[topup_date_key] = datetime.utcnow()
+                    logger.info(f"[Monitor] Top-up proposal created for {symbol} — locked for rest of day")
                 logger.info(
                     f"[Monitor] Auto-buy proposed for {symbol}: "
                     f"outcome={outcome}, confidence={result.get('confidence', 0)}"
@@ -539,6 +554,7 @@ class MarketMonitor:
                     "symbol": symbol,
                     "confidence": result.get("confidence", 0),
                     "trigger": trigger,
+                    "is_topup": is_topup,
                 })
             else:
                 logger.info(
