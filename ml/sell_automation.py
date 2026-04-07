@@ -578,7 +578,6 @@ class SellAutomation:
                         first_buy_str = holding.get("first_buy_at", "")
                         hold_hours = 0.0
                         if first_buy_str:
-                            from datetime import datetime
                             first_buy = datetime.fromisoformat(first_buy_str.replace("Z", "+00:00"))
                             hold_hours = (datetime.now(first_buy.tzinfo) - first_buy).total_seconds() / 3600
                         get_q_learner().record_outcome(

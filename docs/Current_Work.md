@@ -1,5 +1,8 @@
 ## To Do
 
+### Null current prices for some holdings
+Agent runner flagged several holdings with null current prices (XPR, SOSO and others showing £0.00 position value). Likely cause: exchange pair lookup failing for delisted or low-liquidity tokens. Need to investigate `portfolio_tracker.py` / `exchange_manager.py` price refresh path and handle gracefully — e.g. fall back to last known price or mark as stale rather than returning null.
+
 ### Differentiation strategy
 Deepen learning and trade quality to stand out from competing services. Key moat areas to develop:
 - Q-learning feedback loop — close the loop between trade outcomes and future buy/skip decisions
