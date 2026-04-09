@@ -113,7 +113,10 @@ class ScanLoop:
             # ── Step 1: Refresh coin data ──
             logger.info(f"[Scan {scan_id}] Step 1: Refreshing coin data...")
             refresh_ok = self._refresh_data()
-            if not refresh_ok:
+            if refresh_ok:
+                import services.app_state as state
+                scan_result["coins_refreshed"] = len(state.analyzer.coins) if state.analyzer else 0
+            else:
                 scan_result["errors"].append("Data refresh failed — using cached data")
             self._audit("scan_start", {"scan_id": scan_id, "triggered_by": triggered_by})
 
