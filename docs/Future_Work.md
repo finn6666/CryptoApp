@@ -1,5 +1,25 @@
 ## Future Work
 
+### Backtesting → Q-table pre-seeding
+
+`ml/backtesting.py` is a standalone historical simulation tool — currently disconnected from the
+learning systems. Q-learning only accumulates knowledge from live trades, which means it starts
+from zero and takes many real trades before its adjustments are meaningful.
+
+**What to build:**
+- Run backtesting over 3–6 months of historical price data for the tracked coin universe
+- For each simulated trade outcome, call `ql.record_outcome()` with the historical P&L
+- This pre-seeds the Q-table before the first live trade, giving the RL agent a prior instead
+  of pure random exploration
+- Result: confidence adjustments start making sense on day 1 rather than week 6
+
+**Also useful for:**
+- Validating exit threshold changes (stop-loss %, trailing stop, tier levels) before going live
+- Stress-testing the debate threshold calibration — how many good trades would have been
+  caught at 40% vs 45% vs 60% conviction thresholds across different market regimes
+
+---
+
 ### Self-custody / wallet consolidation
 
 Auto-withdraw bought coins to a hardware wallet (e.g. Ledger) after purchase to reduce exchange counterparty risk. Portfolio tracking via `data/portfolio.json` already works exchange-agnostic. Needs per-exchange withdrawal API calls + minimum threshold to avoid fee bleed.
