@@ -69,13 +69,12 @@ ml/                 — All ML, trading, and agent logic
   data_pipeline.py     — Data ingestion and feature engineering
   gem_score_tracker.py — Tracks gem scores over time
   error_handling.py    — Shared error handling utilities
-  agent_memory.py      — Short/long-term agent context
+  agent_memory.py      — Short/long-term agent context (used by legacy 5-agent validator)
   scheduler.py         — Weekly retrain + performance reports
-  doc_updater.py       — Auto-updates documentation
-  agents/official/     — debate orchestrator (bull/bear/referee) + quick_screen + legacy 5-agent chain
+  agents/official/     — debate orchestrator (bull/bear/referee) + quick_screen + legacy 5-agent chain (validator)
 
 routes/             — Flask Blueprints (coins, health, ml, symbols, trading)
-services/           — Shared app state + optional Redis cache
+services/           — Shared app state
 src/core/           — Config, CryptoAnalyzer model, CoinGecko fetcher
 src/web/            — Jinja2 templates + static JS/CSS
 data/               — Runtime JSON state (gitignored)

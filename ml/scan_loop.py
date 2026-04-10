@@ -222,7 +222,14 @@ class ScanLoop:
             scan_result["success"] = True
             self._last_scan_time = datetime.utcnow()
 
-            # ── Step 6: Sell-side automation ──
+            # ── Step 6a: Gem score daily summary ──
+            try:
+                from ml.gem_score_tracker import get_gem_score_tracker
+                get_gem_score_tracker().generate_daily_summary()
+            except Exception as e:
+                logger.debug(f"[Scan] Gem score daily summary failed: {e}")
+
+            # ── Step 6c: Sell-side automation ──
             try:
                 from ml.sell_automation import get_sell_automation
                 sell_auto = get_sell_automation()
@@ -570,6 +577,53 @@ class ScanLoop:
                     allocation_pct = min(80, conf - 10)
                     trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
 
+            # ── Option B: 5-agent deep validator (high-conviction second opinion) ──
+            # When the debate returns high conviction, run the legacy 5-agent chain
+            # as an independent cross-check before committing real money.
+            # Only adds cost on the ~1-2 coins per scan most likely to trade.
+            validator_enabled = os.getenv("DEBATE_VALIDATOR_ENABLED", "true").lower() in ("1", "true", "yes")
+            validator_threshold = int(os.getenv("DEBATE_VALIDATOR_THRESHOLD", "75"))
+            if validator_enabled and should_trade and conviction >= validator_threshold:
+                try:
+                    from ml.agents.official.orchestrator import analyze_crypto
+                    from services.gemini_budget import get_gemini_budget, BudgetExceededError
+                    get_gemini_budget().check_and_record("validator")
+                    logger.info(
+                        f"[Scan] {symbol}: conviction={conviction}% >= {validator_threshold}% — "
+                        f"running 5-agent validator as second opinion"
+                    )
+                    validator_analysis = state.run_async(
+                        analyze_crypto(symbol, coin_data, session_id=f"validator_{symbol}")
+                    )
+                    if validator_analysis and validator_analysis.get("success"):
+                        v_decision = validator_analysis.get("trade_decision", {})
+                        v_conviction = int(v_decision.get("trade_conviction", 0) or 0)
+                        v_should_trade = v_decision.get("should_trade", False)
+                        logger.info(
+                            f"[Scan] {symbol}: validator conviction={v_conviction}%, "
+                            f"should_trade={v_should_trade}"
+                        )
+                        if v_should_trade and v_conviction >= 45:
+                            # Both agree — take the max conviction (validator validates the buy)
+                            conviction = max(conviction, v_conviction)
+                            trade_reasoning = (
+                                f"Debate: {trade_reasoning[:200]} | "
+                                f"Validator: {v_decision.get('trade_reasoning', '')[:200]}"
+                            )
+                            logger.info(f"[Scan] {symbol}: validator CONFIRMED — conviction={conviction}%")
+                        else:
+                            # Validator disagrees — use the average, making it harder to clear threshold
+                            old_conviction = conviction
+                            conviction = (conviction + v_conviction) // 2
+                            logger.warning(
+                                f"[Scan] {symbol}: validator DISAGREED (v_conviction={v_conviction}%) — "
+                                f"conviction downgraded {old_conviction} -> {conviction}"
+                            )
+                except BudgetExceededError as _be:
+                    logger.warning(f"[Scan] {symbol}: Gemini budget exceeded — skipping validator: {_be}")
+                except Exception as e:
+                    logger.warning(f"[Scan] {symbol}: 5-agent validator failed (continuing with debate result): {e}")
+
             # ── Q-learning adjustment ──
             # Let the RL agent nudge conviction based on past outcomes
             # for this coin's state pattern (gem tier, vol, weekly change, mcap)
@@ -632,17 +686,7 @@ class ScanLoop:
                     f"computed_alloc={sized_pct:.1f}%, amount=£{amount:.2f}"
                 )
 
-                # Determine trade mode: swing for quick-screen swing plays or bull-market regime.
-                # Long-term holds (accumulate) keep wide trailing stops (45%) and 72h hold period.
-                # Swing positions use tighter exits (SWING_* env vars) — set per-position at entry.
-                swing_enabled = os.getenv("SWING_TRADE_ENABLED", "false").lower() in ("1", "true", "yes")
-                swing_on_bull = os.getenv("SWING_BULL_REGIME", "true").lower() in ("1", "true", "yes")
-                is_swing_play = coin_data.get("play_type") == "swing"
-                is_bull_regime = regime == "bull" and swing_on_bull
-                trade_mode = "swing" if (swing_enabled and (is_swing_play or is_bull_regime)) else "accumulate"
-                if trade_mode == "swing":
-                    swing_reason = "quick-screen play_type" if is_swing_play else "bull market regime"
-                    logger.info(f"[Scan] {symbol}: swing trade mode ({swing_reason})")
+                trade_mode = "accumulate"
 
                 # Portfolio concentration guard: require higher conviction when
                 # the book is already crowded to avoid low-quality add-ons.

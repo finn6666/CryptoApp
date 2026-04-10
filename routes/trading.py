@@ -669,11 +669,16 @@ def portfolio_holdings():
                 except Exception as e:
                     logger.warning(f"Exchange price fetch failed: {e}")
 
-            # 4) Last resort: use last_buy_price (will show 0% P&L)
+            # 4) Last resort: use last_buy_price or avg_entry_price (shows 0% P&L,
+            #    marks the price as stale so the UI can indicate the value is estimated)
+            stale_price_symbols = set()
             for h in holdings_raw:
                 sym = h["symbol"]
-                if sym not in live_prices and h.get("last_buy_price"):
-                    live_prices[sym] = h["last_buy_price"]
+                if sym not in live_prices:
+                    fallback = h.get("last_buy_price") or h.get("avg_entry_price")
+                    if fallback:
+                        live_prices[sym] = fallback
+                        stale_price_symbols.add(sym)
 
         holdings = tracker.get_holdings(live_prices)
         summary = tracker.get_total_value(live_prices)
@@ -693,6 +698,11 @@ def portfolio_holdings():
                     # Fall back to exchange ticker 24h % captured during price fetch
                     h["price_change_24h"] = ticker_changes.get(h["symbol"])
         # coin_name already stored in holdings for any trades recorded after this fix
+
+        # Mark holdings whose price is a stale fallback (last_buy_price / avg_entry)
+        for h in holdings:
+            if h["symbol"] in stale_price_symbols:
+                h["price_stale"] = True
 
         return jsonify({
             "holdings": holdings,
@@ -1310,17 +1320,6 @@ def retrain_trigger():
     except Exception as e:
         logger.error(f"Retrain trigger error: {e}")
         return jsonify({'success': False, 'error': 'Failed to trigger retraining'}), 500
-
-
-@trading_bp.route('/api/cache/status')
-def cache_status():
-    """Get Redis cache statistics."""
-    try:
-        from services.redis_cache import get_cache_stats
-        return jsonify({'success': True, **get_cache_stats()}), 200
-    except Exception as e:
-        logger.error(f"Cache status error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to get cache status'}), 500
 
 
 # ========================================

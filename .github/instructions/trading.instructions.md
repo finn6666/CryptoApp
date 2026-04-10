@@ -47,19 +47,6 @@ All triggers except stop-loss respect a **72h minimum hold period**.
 
 Sells require email approval by default (`SELL_REQUIRE_APPROVAL=true`). The `APPROVAL_THRESHOLD_GBP` (£50) means trades above that value always require approval regardless of `BUY_AUTO_APPROVE`.
 
-## Swing Trade Mode
-
-When `SWING_TRADE_ENABLED=true`, positions tagged as `trade_mode="swing"` use tighter exits:
-
-| Setting | Swing default | Accumulate default |
-|---------|--------------|-------------------|
-| Min hold | 8h | 72h |
-| Trailing stop | 15% | 45% |
-| Tier 1 profit | 25% | 75% |
-| Tier 1 fraction | 50% | 33% |
-
-`SWING_BULL_REGIME=true` tags all new buys as swing trades automatically (useful in bull markets).
-
 ## ExchangeManager Routing
 
 - Quote currency priority: GBP → USD → USDT → USDC → EUR → BTC
@@ -89,12 +76,8 @@ When `SWING_TRADE_ENABLED=true`, positions tagged as `trade_mode="swing"` use ti
 | `SELL_PROFIT_TARGET_PCT` | `300.0` | Nuclear full-exit threshold |
 | `SELL_AGENT_RECHECK` | `true` | Re-analyse holdings with agents |
 | `SELL_RECHECK_HOURS` | `12` | Hours between agent rechecks per coin |
-| `SWING_TRADE_ENABLED` | `false` | Enable tighter exits for swing-tagged positions |
-| `SWING_BULL_REGIME` | `false` | Tag all new buys as swing trades |
-| `SWING_MIN_HOLD_HOURS` | `8` | Min hold for swing positions |
-| `SWING_TRAILING_STOP_PCT` | `15.0` | Trailing stop for swing positions |
-| `SWING_TIER1_PCT` | `25.0` | Tier 1 threshold for swing positions |
-| `SWING_TIER1_FRACTION` | `0.50` | Fraction to sell at swing Tier 1 |
+| `SELL_DRAWDOWN_RECHECK_MIN_HOURS` | `4.0` | Min hours between sharp-drawdown agent rechecks |
+| `MAX_SLIPPAGE_PCT` | `3.0` | Max price slippage % vs proposal price before order rejected |
 | `EXCHANGE_PRIORITY` | `kraken` | Comma-separated exchange priority |
 | `SECRET_KEY` | (required) | HMAC token signing |
 | `TRADE_NOTIFICATION_EMAIL` | (empty) | Approval email recipient |

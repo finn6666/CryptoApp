@@ -147,30 +147,13 @@ def cache_analysis(symbol: str, result: dict):
     for k in expired:
         del agent_analysis_cache[k]
     save_analysis_cache()
-    # Also store in Redis if available
-    try:
-        from services.redis_cache import cache_set
-        cache_set(f"analysis:{symbol}", result, CACHE_EXPIRY_SECONDS)
-    except Exception:
-        pass
 
 
 def get_cached_analysis(symbol: str):
     """Return cached analysis for symbol if still valid, else None."""
-    # Try in-memory first
     entry = agent_analysis_cache.get(symbol)
     if entry and time.time() - entry.get("_cached_at", 0) <= CACHE_EXPIRY_SECONDS:
         return entry
-    # Try Redis
-    try:
-        from services.redis_cache import cache_get
-        redis_entry = cache_get(f"analysis:{symbol}")
-        if redis_entry:
-            agent_analysis_cache[symbol] = redis_entry
-            return redis_entry
-    except Exception:
-        pass
-    # Expired or missing
     agent_analysis_cache.pop(symbol, None)
     return None
 

@@ -314,15 +314,9 @@ class SellAutomation:
         sell_fraction < 1.0 means a partial sell; 1.0 means full exit.
         Respects minimum hold period for all triggers except stop-loss.
         """
-        swing_enabled = os.getenv("SWING_TRADE_ENABLED", "false").lower() in ("1", "true", "yes")
-        if swing_enabled and trade_mode == "swing":
-            effective_min_hold = float(os.getenv("SWING_MIN_HOLD_HOURS", "8"))
-            effective_trailing_pct = float(os.getenv("SWING_TRAILING_STOP_PCT", "15.0"))
-            effective_tier1_pct = float(os.getenv("SWING_TIER1_PCT", "25.0"))
-        else:
-            effective_min_hold = self.min_hold_hours
-            effective_trailing_pct = self.trailing_stop_pct
-            effective_tier1_pct = self.tier1_pct
+        effective_min_hold = self.min_hold_hours
+        effective_trailing_pct = self.trailing_stop_pct
+        effective_tier1_pct = self.tier1_pct
 
         within_hold_period = hold_hours < effective_min_hold
         tiers_taken = self._tiers_taken.get(symbol, set())
