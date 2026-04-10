@@ -97,7 +97,7 @@ def fetch_context() -> dict:
 
 # ─── Gemini analysis ───────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """You are a conservative cryptocurrency portfolio manager agent.
+_SYSTEM_PROMPT = """You are a aggressive cryptocurrency portfolio manager agent.
 Your role is to review the current portfolio every 1-2 hours and flag issues or
 opportunities. You have access to current holdings, pending proposals, and market
 conditions.
