@@ -25,38 +25,3 @@ That likely hits the £1/day Gemini budget. Options:
 
 
 ## In Progress
-
-
----
-
-## Recently Completed
-
-### Rework agent functionality — Option B validator
-Debate runs first (3 calls). If conviction ≥75%, the 5-agent chain runs as a second opinion.
-Validator agrees (≥45%) → use max conviction. Disagrees → average both, may kill the trade.
-Env: `DEBATE_VALIDATOR_ENABLED` (default: true), `DEBATE_VALIDATOR_THRESHOLD` (default: 75).
-
-### Null prices fix
-Fallback chain in `routes/trading.py` now uses `avg_entry_price` if `last_buy_price` is also
-missing. Stale holdings tagged `price_stale: true` in API response.
-
-### Gem score daily summaries
-`generate_daily_summary()` now auto-called at end of each scan. Saves to
-`data/gem_score_summaries/YYYY-MM-DD.json`. Was never auto-invoked before.
-
-### Swing trade removed
-All positions use `trade_mode="accumulate"` (72h hold, wide trailing stops). Strategy is
-medium-to-long-term only.
-
-### Redis removed
-`services/redis_cache.py` deleted — single-worker Pi has no use for shared cache.
-
-### doc_updater deleted
-`ml/doc_updater.py` removed; `deploy/security-check.sh` updated.
-
-### .gitignore consolidation
-`.pytest_cache/.gitignore` removed — root `.gitignore` already covers it.
-
-### .env.example
-Added `DEBATE_AGENT_MODEL`, `DEBATE_VALIDATOR_*`, all `QL_*`, `MAX_SLIPPAGE_PCT`,
-`SELL_DRAWDOWN_RECHECK_MIN_HOURS`, `SCAN_CONCENTRATION_*`.
