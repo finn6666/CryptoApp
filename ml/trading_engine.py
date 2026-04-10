@@ -636,7 +636,7 @@ class TradingEngine:
                         if min_qty and quantity < min_qty:
                             proposal.status = "rejected"
                             proposal.error = (
-                                f"Sell quantity {quantity:.8f} below Kraken minimum {min_qty:.8f} "
+                                f"Sell quantity {quantity:.8f} below exchange minimum {min_qty:.8f} "
                                 f"— position too small to sell"
                             )
                             logger.info(
@@ -835,6 +835,12 @@ class TradingEngine:
             error = result.get("error", "")
             if "nsufficient" in error or "budget" in error or "minimum" in error:
                 raise RuntimeError(error)
+            # For sells: the exchange manager tried all available exchanges.
+            # Don't fall through to the legacy Kraken-only path — it won't find
+            # coins listed only on KuCoin/Bitget and produces a misleading
+            # "No trading pair found" error.
+            if proposal.side == "sell":
+                raise RuntimeError(error or "Sell failed on all available exchanges")
             return None
         except RuntimeError:
             raise  # re-raise our own insufficient-funds errors

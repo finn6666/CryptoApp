@@ -419,10 +419,16 @@ class ExchangeManager:
                     "error": f"No current price available for {pair} on {exchange_id} (ticker returned None)",
                 }
 
-            # Slippage guard: reject if price has moved too far since the proposal
+            # Slippage guard: reject if price has moved too far since the proposal.
+            # Sells use a wider threshold — stop-losses must execute even in fast markets.
             if expected_price and expected_price > 0:
                 slippage_pct = abs(current_price - expected_price) / expected_price * 100
-                max_slippage = float(os.getenv("MAX_SLIPPAGE_PCT", "3.0"))
+                default_max = float(os.getenv("MAX_SLIPPAGE_PCT", "3.0"))
+                max_slippage = (
+                    float(os.getenv("MAX_SLIPPAGE_PCT_SELL", "15.0"))
+                    if side == "sell"
+                    else default_max
+                )
                 if slippage_pct > max_slippage:
                     return {
                         "success": False,
