@@ -10,4 +10,4 @@ HOOKS_DIR="$REPO_ROOT/.git/hooks"
 cp "$REPO_ROOT/deploy/pre-commit" "$HOOKS_DIR/pre-commit"
 chmod +x "$HOOKS_DIR/pre-commit"
 
-echo "✅ pre-commit hook installed at $HOOKS_DIR/pre-commit"
+echo "OK: pre-commit hook installed at $HOOKS_DIR/pre-commit"

@@ -46,11 +46,11 @@ All triggers except stop-loss respect the **72h minimum hold period**.
 
 Full exit only via trailing stop, stop-loss, or agent re-analysis — no hard profit cap.
 
-Sells **always** require email approval — `BUY_AUTO_APPROVE` does not affect sells.
+Mechanical triggers (stop-loss, trailing stop, profit tiers) always auto-execute. Discretionary triggers (agent recheck, stagnation) and sells above `APPROVAL_THRESHOLD_GBP` respect `SELL_REQUIRE_APPROVAL`.
 
 ## ExchangeManager
 
-- Supported exchanges: Kraken (primary), Bitget (via `EXCHANGE_PRIORITY`)
+- Supported exchanges: Kraken, Bitget, KuCoin, MEXC (via `EXCHANGE_PRIORITY`)
 - Quote currency priority: GBP → USD → USDT → USDC → EUR → BTC
 - Pair cache: 6h TTL at `data/exchange_pairs_cache.json`
 - `execute_order` adds 5% buffer above exchange minimum

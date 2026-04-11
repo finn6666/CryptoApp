@@ -20,7 +20,7 @@ Returns same dict shape as the old `analyze_crypto()` — drop-in compatible.
 | File | Purpose |
 |------|---------|
 | `ml/agents/official/debate_orchestrator.py` | All 3 agents + `analyze_crypto_debate()` (active) |
-| `ml/agents/official/orchestrator.py` | Legacy 5-agent chain — kept, not used in production |
+| `ml/agents/official/orchestrator.py` | 5-agent chain — used by sell automation rechecks and scan loop fallback |
 | `ml/agents/official/quick_screen.py` | Single-call Tier 1 triage (unchanged) |
 | `ml/tools/adk_tools.py` | 16 ADK tool functions |
 | `ml/orchestrator_wrapper.py` | Thin ADK adapter for portfolio analysis |

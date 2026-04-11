@@ -20,7 +20,7 @@ Type=oneshot
 User=finnbryant
 WorkingDirectory=/home/finnbryant/CryptoApp
 EnvironmentFile=/home/finnbryant/CryptoApp/.env
-ExecStart=/home/finnbryant/CryptoApp/.venv/bin/python -m ml.claude_agent_runner
+ExecStart=/usr/bin/env bash -lc 'cd /home/finnbryant/CryptoApp && uv run python -m ml.claude_agent_runner'
 StandardOutput=journal
 StandardError=journal
 

@@ -31,12 +31,17 @@ class TradeProposal:
     reason: str
     confidence: float          # 0–100
     agent_recommendation: str
+    coin_name: str             # human-readable name (e.g. "Vaulta")
     status: str                # pending → approved/rejected/executed/expired
     executed_at: Optional[str]
     execution_price: Optional[float]
     quantity: Optional[float]
     order_id: Optional[str]
     error: Optional[str]
+    sell_quantity: Optional[float]  # exact coin qty for sells
+    trade_mode: str            # 'accumulate' | 'swing'
+    trigger_type: str          # e.g. 'stop_loss', 'agent_recheck'
+    debate_data: dict          # bull/bear/referee texts + conviction scores
 ```
 
 ## DailyBudget (dataclass)

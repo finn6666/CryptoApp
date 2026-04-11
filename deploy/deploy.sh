@@ -13,8 +13,8 @@ ssh "$PI" "
   set -e
   cd ~/CryptoApp
   git fetch origin
-  git checkout $BRANCH
-  git pull origin $BRANCH
+  git checkout '${BRANCH}'
+  git pull origin '${BRANCH}'
   uv sync --quiet
   sudo systemctl restart cryptoapp
   sleep 3
