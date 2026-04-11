@@ -88,7 +88,7 @@ def add_symbol():
                 return jsonify({'success': True, 'symbol': symbol, 'message': f'Symbol {symbol} added successfully and data fetched'})
             except Exception as e:
                 logger.error(f"Failed to fetch data for {symbol}: {e}", exc_info=True)
-                return jsonify({'success': False, 'symbol': symbol, 'error': f'Symbol added but data fetch failed'}), 500
+                return jsonify({'success': False, 'symbol': symbol, 'error': 'Symbol added but data fetch failed'}), 500
         return jsonify({'success': False, 'symbol': symbol, 'error': f'Failed to add symbol {symbol}. It may not exist or is already supported.'}), 400
     except Exception as e:
         logger.error(f"Failed to add symbol: {e}")

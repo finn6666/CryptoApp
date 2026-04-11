@@ -10,14 +10,13 @@ import uuid
 import math
 import logging
 import smtplib
-import asyncio
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from itsdangerous import URLSafeTimedSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,7 @@ class DailyBudget:
 class TradingEngine:
     """
     Core trading engine with safety limits and email approval.
-    
+
     Safety features:
     - Hard daily spend limit (from DAILY_TRADE_BUDGET_GBP env var)
     - Per-trade max (never exceed daily limit in one trade)
@@ -78,6 +77,9 @@ class TradingEngine:
     - All trades logged to disk
     - Kill switch to halt all trading
     """
+
+    # Time-sensitive triggers that always auto-execute regardless of SELL_REQUIRE_APPROVAL
+    MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
 
     def __init__(
         self,
@@ -155,7 +157,7 @@ class TradingEngine:
 
         logger.info(
             f"Trading engine initialized: budget=£{daily_budget_gbp}/day, "
-            f"exchange={exchange_id}, email={self.email_to}"
+            f"exchange={self.exchange_id}, email={self.email_to}"
         )
         logger.info(
             f"Safety: max_trade={self.max_trade_pct*100:.0f}% of budget, "
@@ -205,6 +207,17 @@ class TradingEngine:
                 logger.error(f"Exchange connection failed: {e}")
                 raise
         return self._exchange
+
+    def _should_auto_approve(self, side: str, amount_gbp: float, trigger_type: str) -> bool:
+        """Determine whether a trade should auto-execute without email approval."""
+        is_sell = side.lower() == "sell"
+        if is_sell:
+            if trigger_type in self.MECHANICAL_TRIGGERS or amount_gbp <= self.approval_threshold_gbp:
+                return True
+            return not self.sell_require_approval
+        if amount_gbp > self.approval_threshold_gbp:
+            return False
+        return self.buy_auto_approve
 
     # ─── Budget Tracking ──────────────────────────────────────
 
@@ -400,23 +413,8 @@ class TradingEngine:
         budget.trades_proposed += 1
 
         # Send approval email only when manual approval is needed.
-        # Mechanical triggers and sells under the approval threshold auto-execute
-        # (execution confirmation email is always sent after the trade).
-        # Sells at or above the threshold send an approval email with Approve/Reject links.
-        MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
-        will_auto_approve = False
-        if is_sell:
-            if trigger_type in MECHANICAL_TRIGGERS or amount_gbp <= self.approval_threshold_gbp:
-                will_auto_approve = True
-            else:
-                will_auto_approve = not self.sell_require_approval
-        else:
-            will_auto_approve = self.buy_auto_approve
-            if amount_gbp > self.approval_threshold_gbp:
-                will_auto_approve = False
-
         email_sent = False
-        if not will_auto_approve:
+        if not self._should_auto_approve(side, amount_gbp, trigger_type):
             email_sent = self._send_approval_email(proposal)
 
         self._save_state()
@@ -476,41 +474,17 @@ class TradingEngine:
             return result
 
         proposal_id = result["proposal_id"]
-        is_sell = side.lower() == "sell"
 
-        # Determine whether to auto-approve this trade.
-        # Sells: mechanical triggers and anything under the approval threshold auto-execute.
-        # Sells at or above the threshold require manual email approval.
-        # Buys: always auto unless above the threshold.
-        # Execution confirmation email is always sent after the trade fires regardless.
-        MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
-
-        should_auto = False
-        if is_sell:
-            if trigger_type in MECHANICAL_TRIGGERS or amount_gbp <= self.approval_threshold_gbp:
-                should_auto = True
-            else:
-                logger.info(
-                    f"SELL {symbol} £{amount_gbp:.2f} >= approval threshold "
-                    f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
-                )
-                should_auto = not self.sell_require_approval
-        else:
-            should_auto = self.buy_auto_approve
-            if amount_gbp > self.approval_threshold_gbp:
-                logger.info(
-                    f"BUY {symbol} £{amount_gbp:.2f} >= approval threshold "
-                    f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
-                )
-                should_auto = False
-
+        should_auto = self._should_auto_approve(side, amount_gbp, trigger_type)
         if not should_auto:
+            logger.info(
+                f"{side.upper()} {symbol} £{amount_gbp:.2f} — requiring manual approval"
+            )
             return result  # normal email-approval flow
 
         # Auto-approve: execute immediately
-        side_label = "SELL" if is_sell else "BUY"
         logger.info(
-            f"Auto-approving {side_label} {symbol} £{amount_gbp:.4f} "
+            f"Auto-approving {side.upper()} {symbol} £{amount_gbp:.4f} "
             f"(confidence {confidence}%)"
         )
         exec_result = self.approve_trade(proposal_id)
@@ -794,8 +768,6 @@ class TradingEngine:
 
     def _write_audit(self, event: str, data: Dict[str, Any]):
         """Append an event to the shared audit log (JSONL) for the Activity Log UI."""
-        from pathlib import Path
-        import json as _json
         audit_file = Path("data/trades/audit_log.jsonl")
         entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -805,7 +777,7 @@ class TradingEngine:
         try:
             audit_file.parent.mkdir(parents=True, exist_ok=True)
             with open(audit_file, "a") as f:
-                f.write(_json.dumps(entry, default=str) + "\n")
+                f.write(json.dumps(entry, default=str) + "\n")
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
 
@@ -1226,6 +1198,11 @@ class TradingEngine:
         # Keep only the last 500 trades in memory (full history lives on disk)
         if len(self.trade_history) > 500:
             self.trade_history = self.trade_history[-500:]
+        # Prune daily budgets older than 30 days
+        budget_cutoff = (date.today() - timedelta(days=30)).isoformat()
+        self.daily_budgets = {
+            k: v for k, v in self.daily_budgets.items() if k >= budget_cutoff
+        }
         state = {
             "proposals": {k: asdict(v) for k, v in self.proposals.items()},
             "trade_history": self.trade_history,

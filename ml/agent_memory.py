@@ -5,7 +5,7 @@ Provides context storage and retrieval for agents.
 
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 import hashlib

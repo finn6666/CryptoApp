@@ -8,9 +8,8 @@ import html as _html
 import json as _json
 import re
 import logging
-import asyncio
 from functools import wraps
-from flask import Blueprint, jsonify, request, render_template, redirect, Response, stream_with_context
+from flask import Blueprint, jsonify, request, redirect, Response, stream_with_context
 from itsdangerous import SignatureExpired, BadSignature
 
 from extensions import limiter
@@ -205,7 +204,7 @@ def confirm_trade(token):
                                    result.get('error', 'Unknown error'))
         else:
             engine.reject_trade(proposal_id)
-            return f"""
+            return """
             <html>
             <body style="font-family: -apple-system, sans-serif; background: #0d0d14; color: #e2e8f0;
                          display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0;">
@@ -402,7 +401,6 @@ def auto_evaluate_trade():
 
         data = request.json
         symbol = data.get('symbol', '').upper()
-        analysis = data.get('analysis', {})
         current_price = float(data.get('current_price', 0))
 
         if not symbol or not current_price:

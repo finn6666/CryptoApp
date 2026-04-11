@@ -4,7 +4,7 @@ Provides portfolio optimization, diversification analysis, and cross-coin recomm
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from dataclasses import dataclass
 import asyncio
 

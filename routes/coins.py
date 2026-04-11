@@ -3,13 +3,11 @@ Coin data, stats, and refresh routes.
 """
 
 import logging
-from datetime import datetime
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 
 from extensions import limiter
 from routes.trading import require_trading_auth
 from services.app_state import (
-    analyzer, run_async,
     parse_market_cap, parse_volume,
     fetch_and_add_new_symbol_data,
 )

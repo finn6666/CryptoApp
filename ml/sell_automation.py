@@ -15,9 +15,10 @@ Tier thresholds and fractions are configurable via env vars (SELL_TIER1_PCT, etc
 """
 
 import asyncio
+import json
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 
@@ -225,8 +226,6 @@ class SellAutomation:
                     pass
 
             if trigger:
-                sell_fraction = trigger.get("sell_fraction", 1.0)
-                amount_gbp = current_price * quantity * sell_fraction
 
                 # ── Q-learning: record closed position outcome (full exits only) ──
                 if sell_fraction >= 1.0:
@@ -475,8 +474,14 @@ class SellAutomation:
         Re-analyse held coins with the ADK orchestrator.
         If agents now recommend SELL/AVOID, propose a sell.
         """
+        from ml.exchange_manager import get_exchange_manager
+        from ml.trading_engine import get_trading_engine
+        from ml.agents.official.orchestrator import analyze_crypto
+        from services.gemini_budget import get_gemini_budget, BudgetExceededError
+
         proposals = []
         now = datetime.utcnow()
+        exchange_mgr = get_exchange_manager()
 
         for holding in holdings:
             symbol = holding["symbol"]
@@ -510,21 +515,16 @@ class SellAutomation:
                 _pre_val = _pre_price * _pre_qty
                 if _pre_price > 0:
                     try:
-                        from ml.exchange_manager import get_exchange_manager
-                        _min_gbp = get_exchange_manager().get_min_order_gbp(symbol)
+                        _min_gbp = exchange_mgr.get_min_order_gbp(symbol)
                     except Exception:
                         _min_gbp = 1.0
                     if _min_gbp > 0 and _pre_val < _min_gbp:
                         continue
-
-                from services.gemini_budget import get_gemini_budget, BudgetExceededError
                 try:
                     get_gemini_budget().check_and_record("agent_recheck")
                 except BudgetExceededError as _be:
                     logger.warning("%s: skipping agent_recheck — Gemini budget exceeded: %s", symbol, _be)
                     continue
-
-                from ml.agents.official.orchestrator import analyze_crypto
 
                 async def _run_recheck():
                     return await asyncio.wait_for(
@@ -557,7 +557,6 @@ class SellAutomation:
                 if should_sell:
                     confidence = trade_decision.get("trade_conviction", 70)
                     reason_text = trade_decision.get("trade_reasoning", "Agent re-analysis recommends exit")
-                    from ml.trading_engine import get_trading_engine
                     engine = get_trading_engine()
                     current_price = live_prices.get(symbol, 0)
                     quantity = holding.get("quantity", 0)
@@ -587,8 +586,7 @@ class SellAutomation:
 
                     # Skip if position is too small to meet exchange minimum
                     try:
-                        from ml.exchange_manager import get_exchange_manager
-                        min_gbp = get_exchange_manager().get_min_order_gbp(symbol)
+                        min_gbp = exchange_mgr.get_min_order_gbp(symbol)
                         if min_gbp > 0 and amount_gbp < min_gbp:
                             logger.info(
                                 f"{symbol}: skipping agent_recheck sell — position value "
@@ -663,8 +661,6 @@ class SellAutomation:
     # ─── Persistence ──────────────────────────────────────────
 
     def _save_state(self):
-        import json
-        import os
         try:
             SELL_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
             state = {
@@ -685,7 +681,6 @@ class SellAutomation:
                 tmp.unlink()
 
     def _load_state(self):
-        import json
         if not SELL_STATE_FILE.exists():
             return
         try:

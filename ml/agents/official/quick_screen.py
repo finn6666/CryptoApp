@@ -6,7 +6,7 @@ Saves ~80% of API calls by filtering out obvious skips early.
 
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types

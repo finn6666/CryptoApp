@@ -393,6 +393,7 @@ async def compare_with_previous(
         Comparative analysis
     """
     session_id = session_id or f"analysis_{symbol}"
+    session_service = InMemorySessionService()
     runner = Runner(
         app_name="crypto_comparison_app",
         agent=crypto_orchestrator,

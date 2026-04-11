@@ -219,7 +219,6 @@ class PortfolioTracker:
         closed = []
         for sym, h in self.holdings.items():
             qty = h.get("quantity", 0)
-            cost = h.get("total_cost_gbp", 0)
             entry = h.get("avg_entry_price", 0)
             # Consider closed if quantity is zero, or remaining value is < £0.01
             remaining_value = qty * entry if entry > 0 else qty

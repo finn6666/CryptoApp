@@ -763,9 +763,6 @@ def propose_live_trade(
         Proposal status with approve/reject URLs
     """
     try:
-        from ml.trading_engine import get_trading_engine
-        engine = get_trading_engine()
-        
         # Get current price (placeholder — real price comes from caller)
         return {
             "tool": "propose_live_trade",

@@ -4,7 +4,6 @@ ML pipeline, gem detection, agent analysis, and portfolio routes.
 
 import os
 import logging
-from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from services.app_state import run_async, parse_market_cap, parse_volume, project_root
