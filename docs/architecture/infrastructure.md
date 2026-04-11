@@ -1,103 +1,61 @@
 # Infrastructure
 
-Raspberry Pi 4 stack — systemd, nginx, Gunicorn, Redis, Flask.
+Raspberry Pi 4 stack -- systemd, nginx, Gunicorn, Flask.
+
+For deployment commands, SSH setup, and systemd config, see [deployment.instructions.md](../../.github/instructions/deployment.instructions.md).
 
 ## Request Flow
 
 ```
-Client → nginx (:80/:443)
-           │
-           ├─ /static/*  → served directly from src/web/static/ (7-day cache)
-           │
-           └─ /api/* and /  → Gunicorn @ 127.0.0.1:5001
-                                  │
-                                  └─ Flask app (wsgi:app)
-                                       ├─ routes/coins.py
-                                       ├─ routes/ml_routes.py
-                                       ├─ routes/trading.py
-                                       ├─ routes/health.py
-                                       └─ routes/symbols.py
+Client --> nginx (:80/:443)
+              |
+              |-- /static/*  --> served directly (cached, skip Gunicorn)
+              |
+              +-- everything else --> Gunicorn @ localhost:5001
+                                          |
+                                          +-- Flask app (wsgi:app)
+                                               |-- routes/coins.py
+                                               |-- routes/ml_routes.py
+                                               |-- routes/trading.py
+                                               |-- routes/health.py
+                                               +-- routes/symbols.py
 ```
 
-## Gunicorn
+## Why These Choices
 
-| Setting | Value | Reason |
-|---------|-------|--------|
-| Workers | 1 | Pi memory constraint (1G cap) |
-| Worker class | `gthread` | Mixed I/O workload |
-| Threads | 2 | Light concurrency within the single worker |
-| Timeout | 120s | ADK orchestrator can take 2 min |
-| `preload_app` | False | Preserves background daemon threads (scan scheduler, market monitor) |
-| Max requests | 500 + jitter 50 | Guard against memory leaks |
+**1 Gunicorn worker, gthread class**: The Pi has 4GB RAM with a 1G systemd cap. Multiple workers would each load the full app (ML models, agent state, exchange connections). A single worker with threads handles the mixed I/O workload (API polling, exchange calls) without duplicating memory. `preload_app=False` is critical -- the scan scheduler and market monitor run as daemon threads that would be lost if the app forked after preloading.
 
-## Systemd
+**nginx in front**: Serves static files directly (7d cache), handles SSL termination, adds security headers, and provides a longer read timeout (180s) than Gunicorn's worker timeout (120s) to give agent analysis headroom.
 
-Unit file: `deploy/cryptoapp.service`
+**No database**: JSON files in `data/` with atomic writes. The dataset is small enough that a database would add operational complexity (backups, migrations, connection pooling) without meaningful benefit on a single-user Pi.
 
-```ini
-[Service]
-User=pi
-WorkingDirectory=/home/pi/CryptoApp
-EnvironmentFile=/home/pi/CryptoApp/.env
-ExecStart=uv run gunicorn -c gunicorn.conf.py wsgi:app
-Restart=always
-MemoryMax=1G
-MemoryHigh=768M
-```
-
-## Redis (Optional Cache)
-
-`services/redis_cache.py` provides a Redis-backed fallback for the analysis cache. Falls back silently to in-memory if Redis is unavailable.
-
-Cache hierarchy (for agent analysis results):
-1. In-memory dict (`state.analysis_cache`) — fastest
-2. Redis (`services/redis_cache.py`) — survives Gunicorn restarts
-3. Disk (`data/agent_analysis_cache.json`) — survives Pi reboots
-4. Miss → fresh ADK analysis
-
-TTL: 12 hours (`CACHE_EXPIRY_SECONDS = 43200`).
-
-## Flask App
-
-Entry point: `wsgi.py` → `app.py:create_app()`.
-
-Blueprints registered in `app.py`:
-- `coins_bp` — `/api/coins`, `/api/favorites`
-- `ml_bp` — `/api/ml/*`, `/api/agents/*`, `/api/gems/*`, `/api/portfolio/*`
-- `trading_bp` — `/api/trades/*`
-- `health_bp` — `/api/health`, `/api/metrics`
-- `symbols_bp` — `/api/symbols`
-
-## Remote Access
-
-See [../DEPLOYMENT.md](../DEPLOYMENT.md) for Tailscale SSH setup.
-
-## Resource Constraints
-
-| Resource | Limit | Implication |
-|----------|-------|-------------|
-| RAM | 1G (systemd `MemoryMax`) | OOM-kills if exceeded |
-| Workers | 1 | No true concurrent requests |
-| Threads | 2 | Helps I/O-bound routes (API polling) |
-| CPU | 4-core ARM | Network-bound, not CPU-bound |
-| Storage | SD card | Keep JSON state files small |
+**Optional Redis**: A Redis-backed analysis cache can survive Gunicorn restarts, but the system falls back silently to in-memory + disk caching when Redis is unavailable. Most deployments run without it.
 
 ## Startup Sequence
 
 `init_all()` in `services/app_state.py` runs once on first import:
 
-1. `initialize_exchange_manager()` — loads exchange pairs
-2. `initialize_trading_engine()` — loads proposals/budgets from disk
-3. `initialize_official_agents()` — imports ADK agents
-4. `initialize_scan_loop()` — creates scan loop (doesn't start it)
-5. `initialize_market_monitor()` — creates monitor (doesn't start it)
-6. `initialize_sell_automation()` — loads sell automation state
+1. Exchange manager -- loads exchange pair cache
+2. Trading engine -- restores proposals and budgets from disk
+3. ADK agents -- imports Gemini agent definitions
+4. Scan loop -- creates scheduler (starts when app is ready)
+5. Market monitor -- creates monitor threads
+6. Sell automation -- loads peak prices and recheck state
 
-The scan scheduler is started separately when the app is ready.
+## Resource Constraints
 
-## Gotchas
+The Pi's constraints shape most design decisions:
 
-- `preload_app=False` is critical — enabling it would fork the process before the scan scheduler thread starts, causing it to be silently lost
-- `MemoryMax=1G` will OOM-kill with no warning — avoid large in-memory data structures
-- nginx `proxy_read_timeout 180s` gives 60s headroom above Gunicorn's 120s timeout
-- Static file paths in nginx are hardcoded to `/home/pi/CryptoApp` — edit for non-default installs
+- **1G RAM cap** (systemd `MemoryMax`) -- OOM-kills with no warning if exceeded. This is why there's one worker, bounded caches, and periodic state pruning.
+- **SD card storage** -- JSON state files are kept small. Trade history is capped at 500 entries in memory.
+- **4-core ARM CPU** -- workload is network-bound (exchange APIs, Gemini calls), not CPU-bound.
+- **Agent analysis latency** -- a full debate can take 60-120s, which is why both Gunicorn and nginx timeouts are set high.
+
+## Security
+
+- Bearer token auth on all trading POST endpoints
+- HMAC-signed approval links (1h expiry) for email-based trade approval
+- systemd hardening (NoNewPrivileges, ProtectSystem=strict, ReadWritePaths restricted)
+- nginx security headers (HSTS, CSP, X-Frame-Options)
+- Weekly automated security checks via systemd timer (CVE scan, secret scan, SSH config)
+- Pre-commit hook blocks commits containing likely secrets

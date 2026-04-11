@@ -1,108 +1,44 @@
 # Data Model
 
-Key data structures, state globals, and file formats.
+Key data structures and persistence approach.
 
-## Coin Object (CoinGecko data)
+## Core Principle
 
-Coins flowing through the pipeline have these key fields:
+All state is stored as JSON files in `data/` with atomic writes (write to `.tmp`, then `os.replace`). No database. This keeps the Pi deployment simple and the data human-readable for debugging.
 
-| Field | Type | Source |
-|-------|------|--------|
-| `symbol` | str | CoinGecko |
-| `name` | str | CoinGecko |
-| `price` | float | CoinGecko |
-| `volume_24h` | float | CoinGecko |
-| `percent_change_24h` | float | CoinGecko |
-| `percent_change_7d` | float | CoinGecko |
-| `market_cap` | float | CoinGecko |
-| `cmc_rank` | int | CoinGecko (market_cap_rank) |
-| `attractiveness_score` | float | Computed (0–10 scale) |
+## Runtime State
 
-## TradeProposal (dataclass)
+Each major subsystem is a module-level singleton accessed via `get_*()` functions. State is initialised once by `services/app_state.py:init_all()` on startup and persisted to disk on each change.
 
-```python
-@dataclass
-class TradeProposal:
-    id: str
-    symbol: str
-    side: str                  # 'buy' | 'sell'
-    amount_gbp: float
-    price_at_proposal: float
-    reason: str
-    confidence: float          # 0–100
-    agent_recommendation: str
-    coin_name: str             # human-readable name (e.g. "Vaulta")
-    status: str                # pending → approved/rejected/executed/expired
-    executed_at: Optional[str]
-    execution_price: Optional[float]
-    quantity: Optional[float]
-    order_id: Optional[str]
-    error: Optional[str]
-    sell_quantity: Optional[float]  # exact coin qty for sells
-    trade_mode: str            # 'accumulate' | 'swing'
-    trigger_type: str          # e.g. 'stop_loss', 'agent_recheck'
-    debate_data: dict          # bull/bear/referee texts + conviction scores
-```
+| Singleton | State it owns |
+|-----------|--------------|
+| `TradingEngine` | Proposals, daily budgets, kill switch, trade history |
+| `PortfolioTracker` | Holdings, cost basis, closed positions, P&L |
+| `SellAutomation` | Peak prices, recheck timestamps, tier state |
+| `ExchangeManager` | Exchange connections, pair cache |
+| `ScanLoop` | Scan schedule, cooldown state |
+| `MarketMonitor` | Price observations, alert history |
 
-## DailyBudget (dataclass)
+## Coin Data
 
-```python
-@dataclass
-class DailyBudget:
-    date: str
-    spent_gbp: float
-    trades_executed: int
-    trades_proposed: int
-    sell_proceeds_gbp: float
-    sells_executed: int
-    fees_gbp: float
-```
+Coins flowing through the pipeline carry data from CoinGecko (price, volume, market cap, percent changes, rank) plus a computed `attractiveness_score` (0-10 scale) used for candidate ranking.
 
-## App State Globals (`services/app_state.py`)
+## State Files
 
-Key globals initialised by `init_all()` on startup:
+| File | What it stores |
+|------|---------------|
+| `data/portfolio.json` | Holdings, trade history, closed positions |
+| `data/trades/trading_state.json` | Active proposals, daily budgets, cooldown timers |
+| `data/trades/sell_automation_state.json` | Peak prices, recheck timestamps, profit tiers taken |
+| `data/trades/audit_log.jsonl` | Full event audit trail (JSONL, append-only) |
+| `data/agent_analysis_cache.json` | Disk backup of analysis results (survives restarts) |
+| `data/exchange_pairs_cache.json` | Exchange pair lists (TTL-based refresh) |
+| `data/scan_logs/scan_YYYY-MM-DD.json` | Per-coin results from each scan |
+| `data/gem_score_history.jsonl` | Historical attractiveness scores per coin |
 
-| Global | Type | Purpose |
-|--------|------|---------|
-| `trading_engine` | `TradingEngine` | Singleton trading engine |
-| `scan_loop` | `ScanLoop` | Singleton scan loop |
-| `market_monitor` | `MarketMonitor` | Singleton monitor |
-| `official_adk_available` | bool | Whether ADK agents loaded |
-| `analyze_crypto_adk` | callable | ADK analysis entry point |
-| `CACHE_EXPIRY_SECONDS` | int | 43200 (12h) |
-| `analysis_cache` | dict | In-memory analysis results |
-| `exchange_manager` | `ExchangeManager` | Singleton exchange manager |
+## Pruning
 
-Imports within Flask request context: always use `import services.app_state as state` inside functions, never at module level.
-
-## JSON State Files
-
-| File | Schema | Notes |
-|------|--------|-------|
-| `data/portfolio.json` | `{holdings: [], trade_history: [], closed_positions: []}` | Updated on every trade |
-| `data/trades/trading_state.json` | `{proposals: [], daily_budgets: []}` | Proposals + budget tracking |
-| `data/trades/sell_automation_state.json` | `{peak_prices: {}, last_recheck: {}}` | Sell automation state |
-| `data/agent_analysis_cache.json` | `{symbol: {result, timestamp}}` | Disk backup of analysis cache |
-| `data/exchange_pairs_cache.json` | `{pairs: [], fetched_at: ""}` | Exchange pair list (6h TTL) |
-| `data/trades/audit_log.jsonl` | JSONL — one event per line | Full audit trail |
-
-## Scan Log Format
-
-`data/scan_logs/scan_YYYY-MM-DD.json` — JSON array of per-coin results:
-
-```json
-[
-  {
-    "symbol": "BTC",
-    "analyzed": true,
-    "trade_decision": {"should_trade": false, "side": "hold", "conviction": 42},
-    "proposal_id": null,
-    "error": null,
-    "timestamp": "2026-03-14T12:00:00"
-  }
-]
-```
-
-## Gem Score Data
-
-`data/gem_score_history.jsonl` — historical attractiveness scores per coin per scan, used by `/api/gems/history` endpoints. Written by `GemScoreTracker` even after gem detector removal (now uses `attractiveness_score` as the score value).
+State files are pruned on save to prevent unbounded growth:
+- Proposals: expired/rejected older than 7 days are removed
+- Daily budgets: older than 30 days are removed
+- Trade history: capped at 500 entries in memory
