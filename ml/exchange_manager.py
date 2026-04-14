@@ -419,21 +419,23 @@ class ExchangeManager:
                     "error": f"No current price available for {pair} on {exchange_id} (ticker returned None)",
                 }
 
-            # Slippage guard: reject if price has moved too far since the proposal.
-            # Sells use a wider threshold — stop-losses must execute even in fast markets.
+            # Slippage guard: reject only on ADVERSE price movement since the proposal.
+            # For sells: adverse = price dropped (you'd receive less than expected).
+            # For buys:  adverse = price rose  (you'd pay more than expected).
+            # Favorable movements (price up on a sell, price down on a buy) are allowed.
             if expected_price and expected_price > 0:
-                slippage_pct = abs(current_price - expected_price) / expected_price * 100
                 default_max = float(os.getenv("MAX_SLIPPAGE_PCT", "3.0"))
-                max_slippage = (
-                    float(os.getenv("MAX_SLIPPAGE_PCT_SELL", "15.0"))
-                    if side == "sell"
-                    else default_max
-                )
-                if slippage_pct > max_slippage:
+                if side == "sell":
+                    max_slippage = float(os.getenv("MAX_SLIPPAGE_PCT_SELL", "15.0"))
+                    adverse_pct = (expected_price - current_price) / expected_price * 100
+                else:
+                    max_slippage = default_max
+                    adverse_pct = (current_price - expected_price) / expected_price * 100
+                if adverse_pct > max_slippage:
                     return {
                         "success": False,
                         "error": (
-                            f"Slippage {slippage_pct:.1f}% exceeds limit {max_slippage:.1f}% "
+                            f"Slippage {adverse_pct:.1f}% exceeds limit {max_slippage:.1f}% "
                             f"(expected £{expected_price:.6f}, current £{current_price:.6f})"
                         ),
                     }

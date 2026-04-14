@@ -57,15 +57,24 @@ class SellAutomation:
         self.min_hold_hours = float(os.getenv("SELL_MIN_HOLD_HOURS", "72.0"))
 
         # Tiered profit-taking: partial sells that let winners run.
+        # Pump capture (20%): take 20% off on a rapid spike — fires quickly, before tier 1.
         # Tier 1 (75%): take 33% off the table, tighten trailing to 20%.
         # Tier 2 (150%): take 50% of remaining off, tighten trailing to 15%.
         # Full exit via trailing stop or stop-loss only — no nuclear profit cap.
+        self.pump_capture_pct = float(os.getenv("SELL_PUMP_CAPTURE_PCT", "20.0"))
+        self.pump_capture_fraction = float(os.getenv("SELL_PUMP_CAPTURE_FRACTION", "0.20"))
+        # Pump capture needs 12h hold so intraday noise doesn't trigger it on open day.
+        self.pump_capture_min_hold = float(os.getenv("SELL_PUMP_CAPTURE_MIN_HOLD_HOURS", "12.0"))
         self.tier1_pct = float(os.getenv("SELL_TIER1_PCT", "75.0"))
         self.tier2_pct = float(os.getenv("SELL_TIER2_PCT", "150.0"))
         self.tier1_fraction = float(os.getenv("SELL_TIER1_FRACTION", "0.33"))
         self.tier2_fraction = float(os.getenv("SELL_TIER2_FRACTION", "0.50"))
         self.tier1_trailing_pct = float(os.getenv("SELL_TIER1_TRAILING_PCT", "20.0"))
         self.tier2_trailing_pct = float(os.getenv("SELL_TIER2_TRAILING_PCT", "15.0"))
+        # Agent-recommended sells on positions in the red need a higher conviction bar.
+        # 60% confidence is fine for a losing position IF the thesis is clearly broken;
+        # but a casual "free up capital" agent opinion shouldn't exit at -10%.
+        self.agent_negative_conviction_floor = float(os.getenv("SELL_AGENT_NEGATIVE_CONVICTION", "70.0"))
 
         # Track peak prices for trailing stop
         self._peak_prices: Dict[str, float] = {}
@@ -81,10 +90,11 @@ class SellAutomation:
         self._load_state()
 
         logger.info(
-            f"Sell automation: tier1={self.tier1_pct}%({self.tier1_fraction*100:.0f}%), "
+            f"Sell automation: pump_capture={self.pump_capture_pct}%({self.pump_capture_fraction*100:.0f}%), "
+            f"tier1={self.tier1_pct}%({self.tier1_fraction*100:.0f}%), "
             f"tier2={self.tier2_pct}%({self.tier2_fraction*100:.0f}%), "
             f"stop_loss={self.stop_loss_pct}%, trailing_stop={self.trailing_stop_pct}%, "
-            f"min_hold={self.min_hold_hours}h"
+            f"min_hold={self.min_hold_hours}h, agent_neg_floor={self.agent_negative_conviction_floor}%"
         )
 
     # ─── Main Check ───────────────────────────────────────────
@@ -268,6 +278,9 @@ class SellAutomation:
                         logger.info(
                             f"{symbol}: Tier 2 taken — trailing stop tightened to {self.tier2_trailing_pct}%"
                         )
+                    elif trigger["type"] == "pump_exit":
+                        self._tiers_taken.setdefault(symbol, set()).add("pump_exit")
+                        logger.info(f"{symbol}: Pump capture taken")
                     elif sell_fraction >= 1.0:
                         # Full exit — clear all tier/peak state for this symbol
                         self._tiers_taken.pop(symbol, None)
@@ -333,11 +346,30 @@ class SellAutomation:
                 "sell_fraction": 1.0,
             }
 
-        # Skip profit-taking triggers during minimum hold period
+        # 2. Pump capture — lock in a fraction of rapid spikes before normal tiers.
+        # Uses its own shorter min-hold so it fires on day-2+ pumps without waiting
+        # for the full 72h gate. Does not tighten trailing stop (let the rest run).
+        if (
+            pnl_pct >= self.pump_capture_pct
+            and hold_hours >= self.pump_capture_min_hold
+            and "pump_exit" not in tiers_taken
+        ):
+            return {
+                "type": "pump_exit",
+                "reason": (
+                    f"Pump capture: {pnl_pct:.1f}% gain — locking in {self.pump_capture_fraction*100:.0f}% "
+                    f"to secure quick spike gains while letting the rest run. "
+                    f"Entry: £{entry_price:.6f} → Current: £{current_price:.6f}"
+                ),
+                "confidence": 75,
+                "sell_fraction": self.pump_capture_fraction,
+            }
+
+        # Skip remaining profit-taking triggers during minimum hold period
         if within_hold_period:
             return None
 
-        # 2. Tier 1 — first partial take-profit, then switch to tighter trailing
+        # 3. Tier 1 — first partial take-profit, then switch to tighter trailing
         if pnl_pct >= effective_tier1_pct and 1 not in tiers_taken:
             return {
                 "type": "profit_tier_1",
@@ -350,7 +382,7 @@ class SellAutomation:
                 "sell_fraction": self.tier1_fraction,
             }
 
-        # 3. Tier 2 — second partial take-profit, tighten trailing further
+        # 4. Tier 2 — second partial take-profit, tighten trailing further
         if pnl_pct >= self.tier2_pct and 2 not in tiers_taken:
             return {
                 "type": "profit_tier_2",
@@ -363,7 +395,7 @@ class SellAutomation:
                 "sell_fraction": self.tier2_fraction,
             }
 
-        # 4. Trailing stop — use tightened value if we're in runner mode after a tier
+        # 5. Trailing stop — use tightened value if we're in runner mode after a tier
         peak = self._peak_prices.get(symbol, current_price)
         trailing_pct = self._tightened_trailing.get(symbol, effective_trailing_pct)
         if peak > entry_price:
@@ -405,7 +437,10 @@ class SellAutomation:
         Returns a trigger dict if criteria are met, else None.
         """
         stagnation_days = float(os.getenv("SELL_STAGNATION_DAYS", "14"))
-        pnl_min = float(os.getenv("SELL_STAGNATION_PNL_MIN", "-15.0"))
+        # Tighter loss-side window: stagnation only exits near breakeven, not at -10/-15%.
+        # Coins at -5% to +15% after 14 days with low conviction are genuinely flat;
+        # coins at -10%+ might just be laggards waiting for a catalyst.
+        pnl_min = float(os.getenv("SELL_STAGNATION_PNL_MIN", "-5.0"))
         pnl_max = float(os.getenv("SELL_STAGNATION_PNL_MAX", "15.0"))
         conviction_max = float(os.getenv("SELL_STAGNATION_CONVICTION_MAX", "50.0"))
 
@@ -562,6 +597,19 @@ class SellAutomation:
                     quantity = holding.get("quantity", 0)
                     amount_gbp = current_price * quantity
 
+                    # Raise the bar for exiting a losing position — casual "free up capital"
+                    # agent opinions at 55-65% conviction shouldn't trigger a sell at -10%.
+                    # Stop-loss handles genuine disasters; agent recheck is for thesis breaks.
+                    avg_entry_chk = holding.get("avg_entry_price", 0)
+                    pnl_chk = ((current_price - avg_entry_chk) / avg_entry_chk * 100) if avg_entry_chk > 0 else 0
+                    if pnl_chk < 0 and float(confidence) < self.agent_negative_conviction_floor:
+                        logger.info(
+                            f"{symbol}: agent_recheck sell skipped \u2014 position at {pnl_chk:.1f}% "
+                            f"and conviction {confidence}% below floor "
+                            f"{self.agent_negative_conviction_floor}% for negative positions"
+                        )
+                        continue
+
                     # Q-learning: record outcome for agent-recommended full exits.
                     # Agent recheck always exits the full position, so this is terminal.
                     try:
@@ -653,7 +701,7 @@ class SellAutomation:
             "agent_recheck_enabled": self.enable_agent_recheck,
             "recheck_interval_hours": self.recheck_interval_hours,
             "tracked_peaks": {k: round(v, 8) for k, v in self._peak_prices.items()},
-            "tiers_taken": {k: sorted(v) for k, v in self._tiers_taken.items()},
+            "tiers_taken": {k: sorted(v, key=str) for k, v in self._tiers_taken.items()},
             "tightened_trailing": self._tightened_trailing,
             "last_rechecks": self._last_recheck,
         }

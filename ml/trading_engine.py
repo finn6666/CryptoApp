@@ -79,7 +79,7 @@ class TradingEngine:
     """
 
     # Time-sensitive triggers that always auto-execute regardless of SELL_REQUIRE_APPROVAL
-    MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target"}
+    MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target", "pump_exit"}
 
     def __init__(
         self,
