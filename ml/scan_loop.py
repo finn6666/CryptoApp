@@ -341,14 +341,35 @@ class ScanLoop:
         """Step 3: Select top N candidates from tradeable coins."""
         import services.app_state as state
 
+        # Build set of recently-skipped symbols to exclude — they won't yield a trade
+        # until the cache expires, so selecting them wastes a quick_screen Gemini call
+        # and hides fresh coins that haven't been looked at yet.
+        recently_skipped: set = set()
+        if self.analysis_reuse_hours > 0:
+            for coin in tradeable_coins:
+                symbol = coin["symbol"]
+                cached = state.get_cached_analysis(symbol)
+                if cached:
+                    cached_at = cached.get("_cached_at", 0)
+                    age_hours = (time.time() - cached_at) / 3600
+                    if age_hours <= self.analysis_reuse_hours:
+                        prev_decision = cached.get("analysis", {}).get("trade_decision", {})
+                        if not prev_decision.get("should_trade", False):
+                            recently_skipped.add(symbol)
+        if recently_skipped:
+            logger.info(
+                f"[Scan] Excluding {len(recently_skipped)} recently-skipped coins from "
+                f"candidates (cached within {self.analysis_reuse_hours}h): {sorted(recently_skipped)}"
+            )
+
         candidates = []
 
-        # Priority 1: Favorites that are tradeable
+        # Priority 1: Favorites that are tradeable (not excluded)
         favorites = state.load_favorites()
         fav_symbols = {f.upper() for f in favorites}
 
         for coin in tradeable_coins:
-            if coin["symbol"] in fav_symbols:
+            if coin["symbol"] in fav_symbols and coin["symbol"] not in recently_skipped:
                 candidates.append(coin)
 
         # Priority 2: High attractiveness score, filtered by min_gem_score
@@ -356,12 +377,31 @@ class ScanLoop:
             remaining = [
                 c for c in tradeable_coins
                 if c["symbol"] not in {x["symbol"] for x in candidates}
+                and c["symbol"] not in recently_skipped
                 and c.get("attractiveness_score", 0) >= self.min_gem_score
             ]
             remaining.sort(
                 key=lambda c: c.get("attractiveness_score", 0), reverse=True
             )
             candidates.extend(remaining)
+
+        # Fallback: if fresh coins don't fill the quota, top up with the least-recently-skipped
+        # coins so we never run a completely empty scan when the pool is exhausted.
+        if len(candidates) < self.max_coins_per_scan and recently_skipped:
+            seen = {c["symbol"] for c in candidates}
+            fallback = [
+                c for c in tradeable_coins
+                if c["symbol"] not in seen
+                and c.get("attractiveness_score", 0) >= self.min_gem_score
+            ]
+            fallback.sort(key=lambda c: c.get("attractiveness_score", 0), reverse=True)
+            filled = self.max_coins_per_scan - len(candidates)
+            if fallback:
+                logger.info(
+                    f"[Scan] Fresh-coin pool exhausted — topping up with "
+                    f"{min(filled, len(fallback))} cached-skip coins"
+                )
+                candidates.extend(fallback[:filled])
 
         # Cap to max
         return candidates[: self.max_coins_per_scan]
