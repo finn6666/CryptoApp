@@ -453,6 +453,29 @@ class MarketMonitor:
                 logger.debug(f"[Monitor] {symbol} analysed recently, skipping (cooldown)")
                 return
 
+            # Respect the scan loop's analysis cache — if it contains a recent SKIP for
+            # this coin, don't burn an API call re-analysing it. This also survives
+            # restarts (in-memory cooldowns are lost on restart; the cache is persistent).
+            try:
+                import time
+                import services.app_state as _state
+                from ml.scan_loop import get_scan_loop
+                _reuse_hours = get_scan_loop().analysis_reuse_hours
+                if _reuse_hours > 0:
+                    _cached = _state.get_cached_analysis(symbol)
+                    if _cached:
+                        _age_hours = (time.time() - _cached.get("_cached_at", 0)) / 3600
+                        if _age_hours <= _reuse_hours:
+                            _decision = _cached.get("analysis", {}).get("trade_decision", {})
+                            if not _decision.get("should_trade", False):
+                                logger.debug(
+                                    f"[Monitor] {symbol}: cached SKIP ({_age_hours:.1f}h old) "
+                                    f"— skipping monitor trigger"
+                                )
+                                return
+            except Exception:
+                pass
+
             # Reset daily counter if date changed
             today = datetime.utcnow().date()
             if today != self._auto_buy_date:
