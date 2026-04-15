@@ -1412,6 +1412,16 @@ def claude_propose():
             sell_qty = data.get('sell_quantity')
             amount_gbp = round(current_price * float(sell_qty), 2) if sell_qty else round(remaining * 0.5, 2)
 
+        # For sells, look up the exchange where tokens are held
+        preferred_exchange = ""
+        if side == "sell":
+            try:
+                from ml.portfolio_tracker import get_portfolio_tracker
+                holding = get_portfolio_tracker().holdings.get(symbol.upper(), {})
+                preferred_exchange = holding.get("exchange", "")
+            except Exception:
+                pass
+
         result = engine.propose_and_auto_execute(
             symbol=symbol,
             side=side,
@@ -1422,6 +1432,7 @@ def claude_propose():
             recommendation="BUY" if side == "buy" else "SELL",
             coin_name=data.get("coin_name", ""),
             sell_quantity=data.get("sell_quantity"),
+            preferred_exchange=preferred_exchange,
         )
         return jsonify(result), 200 if result.get("success") else 400
 

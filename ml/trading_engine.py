@@ -45,6 +45,7 @@ class TradeProposal:
     trade_mode: str = "accumulate"  # "accumulate" (hold weeks/months) or "swing" (tight exit, short hold)
     trigger_type: str = ""  # type of trigger that prompted this sell (e.g. "stop_loss", "agent_recheck")
     debate_data: dict = field(default_factory=dict)  # bull/bear/referee texts + conviction scores
+    preferred_exchange: str = ""  # exchange where tokens are held (for sells — route there first)
 
     def __post_init__(self):
         if not self.created_at:
@@ -264,6 +265,7 @@ class TradingEngine:
         trade_mode: str = "accumulate",
         trigger_type: str = "",
         debate_data: Optional[dict] = None,
+        preferred_exchange: str = "",
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -400,6 +402,7 @@ class TradingEngine:
             trade_mode=trade_mode,
             trigger_type=trigger_type,
             debate_data=debate_data or {},
+            preferred_exchange=preferred_exchange,
         )
 
         self.proposals[proposal.id] = proposal
@@ -445,6 +448,7 @@ class TradingEngine:
         trade_mode: str = "accumulate",
         trigger_type: str = "",
         debate_data: Optional[dict] = None,
+        preferred_exchange: str = "",
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -468,6 +472,7 @@ class TradingEngine:
             trade_mode=trade_mode,
             trigger_type=trigger_type,
             debate_data=debate_data,
+            preferred_exchange=preferred_exchange,
         )
 
         if not result.get("success"):
@@ -799,6 +804,7 @@ class TradingEngine:
                 max_amount_gbp=remaining,
                 quantity=proposal.sell_quantity,
                 expected_price=proposal.price_at_proposal,
+                preferred_exchange=proposal.preferred_exchange or None,
             )
             if result.get("success"):
                 return result

@@ -265,7 +265,7 @@ class ExchangeManager:
     # ─── Order Routing ────────────────────────────────────────
 
     def find_best_pair(
-        self, symbol: str, side: str = None
+        self, symbol: str, side: str = None, preferred_exchange: str = None
     ) -> Optional[Tuple[str, str]]:
         """
         Find the best exchange and trading pair for a symbol.
@@ -277,6 +277,10 @@ class ExchangeManager:
 
         When `side` is None (default), returns the first match in priority order
         — used for price lookups and other non-trade callers.
+
+        For sells with `preferred_exchange` set, that exchange is tried first.
+        Best-price routing across all exchanges is only used as a fallback if
+        a valid pair on the preferred exchange cannot be found or fetched.
 
         Returns (exchange_id, "SYMBOL/QUOTE") or None.
         """
@@ -294,6 +298,23 @@ class ExchangeManager:
                     if pair in pairs:
                         return exchange_id, pair
             return None
+
+        # ── Preferred-exchange fast-path (sells routed to holding exchange) ──
+        if preferred_exchange and side == "sell":
+            pref_id = preferred_exchange.lower()
+            pairs = self._pairs.get(pref_id, set())
+            for quote in ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]:
+                pair = f"{symbol.upper()}/{quote}"
+                if pair in pairs:
+                    logger.info(
+                        f"Routing sell of {symbol} to preferred exchange {pref_id} "
+                        f"(tokens held there)"
+                    )
+                    return pref_id, pair
+            logger.warning(
+                f"Preferred exchange {pref_id} has no pair for {symbol} — "
+                f"falling back to best-price routing"
+            )
 
         # ── Price-comparison routing ───────────────────────────────────
         # Fetch ticker from every exchange that lists this coin and pick
@@ -378,6 +399,7 @@ class ExchangeManager:
         max_amount_gbp: float = None,
         quantity: float = None,
         expected_price: float = None,
+        preferred_exchange: str = None,
     ) -> Dict[str, Any]:
         """
         Execute an order on the best available exchange.
@@ -393,8 +415,11 @@ class ExchangeManager:
                       amount_gbp→quantity reconversion and min-order bumping,
                       preventing failures when the GBP value and live exchange
                       price have diverged since the proposal was created.
+            preferred_exchange: For sells, the exchange where tokens are held.
+                                Tried first; falls back to best-price routing
+                                only if it fails.
         """
-        result = self.find_best_pair(symbol, side=side)
+        result = self.find_best_pair(symbol, side=side, preferred_exchange=preferred_exchange)
         if not result:
             return {
                 "success": False,

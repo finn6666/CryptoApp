@@ -263,6 +263,7 @@ class SellAutomation:
                     recommendation="SELL",
                     sell_quantity=quantity * sell_fraction,
                     trigger_type=trigger["type"],
+                    preferred_exchange=holding.get("exchange", ""),
                 )
                 # ── Update tier state only if proposal was successfully created ──
                 if result.get("success"):
@@ -672,6 +673,7 @@ class SellAutomation:
                         recommendation="SELL",
                         sell_quantity=quantity,
                         trigger_type="agent_recheck",
+                        preferred_exchange=holding.get("exchange", ""),
                     )
                     proposals.append({
                         "symbol": symbol,
