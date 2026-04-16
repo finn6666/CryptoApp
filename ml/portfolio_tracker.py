@@ -213,6 +213,36 @@ class PortfolioTracker:
         """Get full trade log, most recent first."""
         return list(reversed(self.trade_log[-limit:]))
 
+    def cleanup_dust(self, min_value_gbp: float = 0.50) -> List[str]:
+        """
+        Mark dust positions (remaining value < min_value_gbp) as closed.
+        Also closes any zero-quantity positions missing closed_at.
+        Returns list of symbols cleaned up.
+        """
+        cleaned = []
+        now = datetime.now(timezone.utc).isoformat()
+        for sym, h in self.holdings.items():
+            qty = h.get("quantity", 0)
+            if qty <= 0:
+                if not h.get("closed_at"):
+                    h["closed_at"] = now
+                    cleaned.append(sym)
+                continue
+            entry = h.get("avg_entry_price", 0)
+            remaining_value = qty * entry if entry > 0 else 0
+            if remaining_value < min_value_gbp:
+                h["quantity"] = 0
+                h["closed_at"] = now
+                cleaned.append(sym)
+                logger.info(
+                    f"Dust cleanup: closed {sym} "
+                    f"(qty={qty:.8f}, value=£{remaining_value:.4f})"
+                )
+        if cleaned:
+            self._save()
+            logger.info(f"Dust cleanup complete — closed {len(cleaned)} positions: {cleaned}")
+        return cleaned
+
     def get_closed_positions(self) -> List[Dict[str, Any]]:
         """Get all fully sold (closed) positions with outcomes."""
         # Treat dust quantities (< 0.1% of original buy) as fully closed
