@@ -266,6 +266,7 @@ class TradingEngine:
         trigger_type: str = "",
         debate_data: Optional[dict] = None,
         preferred_exchange: str = "",
+        skip_cooldown: bool = False,
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
@@ -362,16 +363,18 @@ class TradingEngine:
                         ),
                     }
 
-        # Per-side cooldown check (buys and sells have independent cooldowns)
-        last_time = self._last_sell_proposal_time if is_sell else self._last_buy_proposal_time
-        if last_time:
-            elapsed = (datetime.utcnow() - last_time).total_seconds() / 60
-            if elapsed < self.trade_cooldown_min:
-                remaining_min = self.trade_cooldown_min - elapsed
-                return {
-                    "success": False,
-                    "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
-                }
+        # Per-side cooldown check (buys and sells have independent cooldowns).
+        # Sell automation batch-processes multiple holdings — skip cooldown for those.
+        if not skip_cooldown:
+            last_time = self._last_sell_proposal_time if is_sell else self._last_buy_proposal_time
+            if last_time:
+                elapsed = (datetime.utcnow() - last_time).total_seconds() / 60
+                if elapsed < self.trade_cooldown_min:
+                    remaining_min = self.trade_cooldown_min - elapsed
+                    return {
+                        "success": False,
+                        "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
+                    }
 
         # Reject if no valid price (can happen if coin data has price=None)
         if not current_price or current_price <= 0:
@@ -449,6 +452,7 @@ class TradingEngine:
         trigger_type: str = "",
         debate_data: Optional[dict] = None,
         preferred_exchange: str = "",
+        skip_cooldown: bool = False,
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
@@ -473,6 +477,7 @@ class TradingEngine:
             trigger_type=trigger_type,
             debate_data=debate_data,
             preferred_exchange=preferred_exchange,
+            skip_cooldown=skip_cooldown,
         )
 
         if not result.get("success"):

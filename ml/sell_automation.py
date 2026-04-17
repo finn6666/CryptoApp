@@ -237,6 +237,29 @@ class SellAutomation:
                 sell_fraction = trigger.get("sell_fraction", 1.0)
                 amount_gbp = current_price * quantity * sell_fraction
 
+                # ── Dust prevention: if a partial sell would leave a remainder
+                # below the exchange minimum, escalate to a full sell instead. ──
+                if sell_fraction < 1.0:
+                    remainder_qty = quantity * (1.0 - sell_fraction)
+                    remainder_gbp = current_price * remainder_qty
+                    try:
+                        from ml.exchange_manager import get_exchange_manager
+                        _min_sell = get_exchange_manager().get_min_order_gbp(symbol)
+                        if _min_sell > 0 and remainder_gbp < _min_sell:
+                            logger.info(
+                                f"{symbol}: escalating {trigger['type']} to full sell "
+                                f"-- remainder £{remainder_gbp:.2f} would be below "
+                                f"exchange min £{_min_sell:.2f}"
+                            )
+                            sell_fraction = 1.0
+                            amount_gbp = current_price * quantity
+                            trigger["sell_fraction"] = 1.0
+                            trigger["reason"] += (
+                                f" (escalated to full sell -- remainder would be unsellable dust)"
+                            )
+                    except Exception:
+                        pass
+
                 # ── Pre-check: skip if position is too small to meet exchange minimum ──
                 try:
                     from ml.exchange_manager import get_exchange_manager
@@ -279,6 +302,7 @@ class SellAutomation:
                     sell_quantity=quantity * sell_fraction,
                     trigger_type=trigger["type"],
                     preferred_exchange=holding.get("exchange", ""),
+                    skip_cooldown=True,
                 )
                 # ── Update tier state only if proposal was successfully created ──
                 if result.get("success"):
@@ -305,24 +329,37 @@ class SellAutomation:
 
                 outcome = "auto-executed" if result.get("auto_approved") else "proposed"
                 partial_label = f" ({sell_fraction*100:.0f}%)" if sell_fraction < 1.0 else ""
-                proposals.append({
-                    "symbol": symbol,
-                    "trigger": trigger["type"],
-                    "pnl_pct": round(pnl_pct, 2),
-                    "sell_fraction": sell_fraction,
-                    "proposal": result,
-                })
-                logger.info(
-                    f"SELL{partial_label} {outcome}: {symbol} — {trigger['type']} "
-                    f"(PnL: {pnl_pct:.1f}%, £{amount_gbp:.4f})"
-                )
+                if result.get("success"):
+                    proposals.append({
+                        "symbol": symbol,
+                        "trigger": trigger["type"],
+                        "pnl_pct": round(pnl_pct, 2),
+                        "sell_fraction": sell_fraction,
+                        "proposal": result,
+                    })
+                    logger.info(
+                        f"SELL{partial_label} {outcome}: {symbol} -- {trigger['type']} "
+                        f"(PnL: {pnl_pct:.1f}%, {amount_gbp:.4f})"
+                    )
+                else:
+                    logger.warning(
+                        f"SELL{partial_label} FAILED: {symbol} -- {trigger['type']} "
+                        f"({result.get('error', 'unknown error')})"
+                    )
 
-        # Log when new dust positions are discovered
+        # Log when new dust positions are discovered, and write them off in portfolio
         if len(self._unsellable_dust) > prev_dust_count:
             logger.info(
                 f"Sell automation: {len(self._unsellable_dust)} positions below exchange "
                 f"minimum (unsellable): {', '.join(sorted(self._unsellable_dust))}"
             )
+            try:
+                from ml.portfolio_tracker import get_portfolio_tracker
+                cleaned = get_portfolio_tracker().cleanup_dust(min_value_gbp=0.50)
+                if cleaned:
+                    logger.info(f"Portfolio dust cleanup: wrote off {', '.join(cleaned)}")
+            except Exception as e:
+                logger.debug(f"Portfolio dust cleanup failed: {e}")
 
         # Optionally re-analyse with agents — exclude unsellable dust
         if (self.enable_agent_recheck or force_agent_recheck) and holdings:
@@ -700,6 +737,7 @@ class SellAutomation:
                         sell_quantity=quantity,
                         trigger_type="agent_recheck",
                         preferred_exchange=holding.get("exchange", ""),
+                        skip_cooldown=True,
                     )
                     proposals.append({
                         "symbol": symbol,
