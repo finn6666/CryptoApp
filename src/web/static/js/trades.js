@@ -513,8 +513,8 @@ async function loadTradesPortfolio() {
                             <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${formatPrice(h.avg_entry_price)}</div>
                         </div>
                         <div>
-                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Live Price</div>
-                            <div style="font-size: 13px; font-weight: 600; color: ${h.current_price ? pnlColor : 'var(--text-primary)'};">${h.current_price ? formatPrice(h.current_price) : '—'}</div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">${h.price_stale ? 'Est. Price' : 'Live Price'}</div>
+                            <div style="font-size: 13px; font-weight: 600; color: ${h.price_stale ? 'var(--text-secondary)' : (h.current_price ? pnlColor : 'var(--text-primary)')};">${h.current_price ? formatPrice(h.current_price) + (h.price_stale ? ' (est.)' : '') : '—'}</div>
                         </div>
                     </div>
                     <!-- Invested + Holdings -->

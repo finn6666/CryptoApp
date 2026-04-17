@@ -64,9 +64,11 @@ async function loadPortfolioCard() {
                     const val = h.current_value_gbp ?? 0;
                     const cls = pct >= 0 ? 'positive' : 'negative';
                     const sign = pct >= 0 ? '+' : '';
-                    return `<div class="holding-row">
+                    const stale = h.price_stale ? ' style="opacity: 0.5"' : '';
+                    const est = h.price_stale ? ' (est.)' : '';
+                    return `<div class="holding-row"${stale}>
                         <span class="holding-row__symbol">${escapeHtml(h.symbol)}</span>
-                        <span class="holding-row__value">£${Number(val).toFixed(2)}</span>
+                        <span class="holding-row__value">£${Number(val).toFixed(2)}${est}</span>
                         <span class="holding-row__pnl ${cls}">${sign}${Number(pct).toFixed(1)}%</span>
                     </div>`;
                 }).join('');
