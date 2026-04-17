@@ -86,6 +86,8 @@ class SellAutomation:
         self._tiers_taken: Dict[str, set] = {}
         # Per-symbol trailing stop override (tightens after each tier)
         self._tightened_trailing: Dict[str, float] = {}
+        # Symbols too small to sell — logged once then silently skipped
+        self._unsellable_dust: set = set()
 
         self._load_state()
 
@@ -123,6 +125,9 @@ class SellAutomation:
         if not holdings:
             return []
 
+        # Log unsellable dust summary once (when new symbols are discovered)
+        prev_dust_count = len(self._unsellable_dust)
+
         # Build a map of symbol → set of trigger types that are already pending or
         # recently actioned, to avoid duplicate proposals for the same trigger.
         # Tier triggers use _tiers_taken for deduplication, but stop-loss/trailing/
@@ -157,12 +162,22 @@ class SellAutomation:
             if entry_price <= 0 or quantity <= 0:
                 continue
 
-            # Skip dust positions — not worth selling if below exchange minimum
+            # Skip dust positions — not worth selling if below exchange minimum.
+            # Early check avoids trigger evaluation, Q-learning checkpoints, and
+            # agent rechecks that can never result in an executable sell order.
             holding_value_gbp = current_price * quantity
             dust_min_gbp = float(os.getenv("SELL_DUST_MIN_GBP", "0.50"))
             if holding_value_gbp < dust_min_gbp:
                 logger.debug(f"Skipping {symbol}: dust position worth £{holding_value_gbp:.4f}")
                 continue
+            try:
+                from ml.exchange_manager import get_exchange_manager
+                _min_order = get_exchange_manager().get_min_order_gbp(symbol)
+                if _min_order > 0 and holding_value_gbp < _min_order:
+                    self._unsellable_dust.add(symbol)
+                    continue
+            except Exception:
+                pass
 
             pnl_pct = ((current_price - entry_price) / entry_price) * 100
 
@@ -302,9 +317,20 @@ class SellAutomation:
                     f"(PnL: {pnl_pct:.1f}%, £{amount_gbp:.4f})"
                 )
 
-        # Optionally re-analyse with agents
+        # Log when new dust positions are discovered
+        if len(self._unsellable_dust) > prev_dust_count:
+            logger.info(
+                f"Sell automation: {len(self._unsellable_dust)} positions below exchange "
+                f"minimum (unsellable): {', '.join(sorted(self._unsellable_dust))}"
+            )
+
+        # Optionally re-analyse with agents — exclude unsellable dust
         if (self.enable_agent_recheck or force_agent_recheck) and holdings:
-            agent_sells = self._agent_recheck(holdings, live_prices)
+            sellable_holdings = [
+                h for h in holdings
+                if h["symbol"] not in self._unsellable_dust
+            ]
+            agent_sells = self._agent_recheck(sellable_holdings, live_prices)
             proposals.extend(agent_sells)
 
         self._save_state()
