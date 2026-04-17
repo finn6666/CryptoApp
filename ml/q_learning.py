@@ -246,6 +246,11 @@ class QLearningTrader:
         # State recorded at scan/buy time, keyed by symbol; used at close time
         # so record_outcome uses the real market-context state, not stale holding data
         self._symbol_state_cache: Dict[str, str] = {}
+        # Dedup guard: tracks (symbol, exit_trigger) → Unix timestamp of last outcome.
+        # Prevents the same closed position being recorded multiple times if the sell
+        # proposal is still pending when the market monitor re-runs (historical bug
+        # caused ESP/SUP to log 30+ duplicate outcomes in one session).
+        self._recent_outcomes: Dict[str, float] = {}  # key: "SYMBOL:trigger" → ts
         # Total update steps (increments twice per closed trade: buy + skip update)
         self.episodes = 0
         # Actual completed trade count — what the UI should display
@@ -425,6 +430,20 @@ class QLearningTrader:
         Called by sell automation when a position closes, or periodically
         for unrealised P&L checkpoints.
         """
+        # Dedup guard: skip if this (symbol, exit_trigger) was already recorded
+        # within the last 30 minutes. Prevents duplicate Q-updates when the sell
+        # proposal is still pending on the next market-monitor tick.
+        dedup_key = f"{symbol}:{exit_trigger}"
+        dedup_window = float(os.environ.get("QL_OUTCOME_DEDUP_MINUTES", "30")) * 60
+        last_ts = self._recent_outcomes.get(dedup_key, 0.0)
+        if time.time() - last_ts < dedup_window:
+            logger.debug(
+                f"Q-learning outcome skipped (dedup): {symbol} {exit_trigger} "
+                f"already recorded {(time.time() - last_ts) / 60:.1f}m ago"
+            )
+            return
+        self._recent_outcomes[dedup_key] = time.time()
+
         # Prefer the state cached at buy/scan time over recalculating from the
         # portfolio holding dict (which lacks live market data fields)
         state = (

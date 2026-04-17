@@ -1462,21 +1462,36 @@ def claude_context():
                     live_prices[coin.symbol.upper()] = coin.price
         holdings = tracker.get_holdings(live_prices)
         summary = tracker.get_total_value(live_prices)
-        ctx['holdings'] = [
-            {
-                'symbol': h['symbol'],
-                'coin_name': h.get('coin_name', ''),
-                'quantity': h.get('quantity'),
-                'avg_entry_price': h.get('avg_entry_price'),
-                'current_price': h.get('current_price'),
-                'current_value_gbp': h.get('current_value_gbp'),
-                'unrealised_pnl_pct': h.get('unrealised_pnl_pct'),
-                'unrealised_pnl_gbp': h.get('unrealised_pnl_gbp'),
-                'first_buy': h.get('first_buy'),
-                'price_change_24h': h.get('price_change_24h'),
+        # Split holdings into priced (actionable) and unpriced (blind positions).
+        # Sending 20+ unpriced holdings as full objects to the agent wastes tokens
+        # and drowns out the actionable holdings in the analysis.
+        priced_holdings = []
+        unpriced_symbols = []
+        for h in holdings:
+            if h.get('current_price'):
+                priced_holdings.append({
+                    'symbol': h['symbol'],
+                    'coin_name': h.get('coin_name', ''),
+                    'quantity': h.get('quantity'),
+                    'avg_entry_price': h.get('avg_entry_price'),
+                    'current_price': h.get('current_price'),
+                    'current_value_gbp': h.get('current_value_gbp'),
+                    'unrealised_pnl_pct': h.get('unrealised_pnl_pct'),
+                    'unrealised_pnl_gbp': h.get('unrealised_pnl_gbp'),
+                    'first_buy': h.get('first_buy'),
+                    'price_change_24h': h.get('price_change_24h'),
+                })
+            else:
+                unpriced_symbols.append(h['symbol'])
+        ctx['holdings'] = priced_holdings
+        # Compact summary so the agent knows how many positions can't be priced.
+        # These are likely delisted/renamed on Kraken or absent from the CMC feed.
+        if unpriced_symbols:
+            ctx['unpriced_holdings'] = {
+                'count': len(unpriced_symbols),
+                'symbols': unpriced_symbols,
+                'note': 'No live price available — may be delisted or missing from CMC feed',
             }
-            for h in holdings
-        ]
         ctx['portfolio_summary'] = summary
     except Exception as e:
         logger.warning(f"Claude context — portfolio error: {e}")

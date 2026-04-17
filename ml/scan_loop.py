@@ -234,12 +234,36 @@ class ScanLoop:
                 from ml.sell_automation import get_sell_automation
                 sell_auto = get_sell_automation()
 
-                # Build live prices from analyser
+                # Build live prices: analyser first, then exchange fallback for
+                # held coins not in the CoinGecko trending feed (which is most of them).
                 import services.app_state as state
                 live_prices = {}
                 if state.analyzer and state.analyzer.coins:
                     for coin in state.analyzer.coins:
-                        live_prices[coin.symbol.upper()] = getattr(coin, "price", 0)
+                        p = getattr(coin, "price", 0)
+                        if p:
+                            live_prices[coin.symbol.upper()] = p
+
+                # Fetch exchange prices for held coins missing from the analyser.
+                # This is the primary price source — the CoinGecko feed only covers
+                # trending coins, not the portfolio.
+                try:
+                    from ml.portfolio_tracker import get_portfolio_tracker
+                    from ml.exchange_manager import get_exchange_manager
+                    tracker = get_portfolio_tracker()
+                    held_syms = [
+                        sym for sym, h in tracker.holdings.items()
+                        if h.get("quantity", 0) > 0 and sym not in live_prices
+                    ]
+                    if held_syms:
+                        exchange_prices = get_exchange_manager().get_live_prices_gbp(held_syms)
+                        live_prices.update(exchange_prices)
+                        logger.info(
+                            f"[Scan {scan_id}] Exchange price fallback: "
+                            f"{len(exchange_prices)}/{len(held_syms)} held coins priced"
+                        )
+                except Exception as price_err:
+                    logger.warning(f"[Scan {scan_id}] Exchange price fetch failed: {price_err}")
 
                 if live_prices:
                     sell_proposals = sell_auto.check_and_propose_sells(live_prices)
@@ -251,6 +275,8 @@ class ScanLoop:
                             "trigger": sp.get("trigger"),
                         })
                     logger.info(f"[Scan {scan_id}] Sell check: {len(sell_proposals)} sell proposals")
+                else:
+                    logger.warning(f"[Scan {scan_id}] No live prices available — sell check skipped")
             except Exception as e:
                 logger.warning(f"[Scan {scan_id}] Sell automation error: {e}")
                 scan_result["errors"].append(f"Sell automation: {str(e)}")
