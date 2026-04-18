@@ -97,6 +97,7 @@ def force_refresh():
 
 
 @coins_bp.route('/api/market/conditions')
+@require_trading_auth
 def get_market_conditions():
     try:
         all_coins = state.analyzer.get_all_coins() if state.analyzer else []

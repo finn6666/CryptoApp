@@ -7,9 +7,10 @@ import hmac
 import html as _html
 import json as _json
 import re
+import secrets
 import logging
 from functools import wraps
-from flask import Blueprint, jsonify, request, redirect, Response, stream_with_context
+from flask import Blueprint, jsonify, request, redirect, Response, stream_with_context, session
 from itsdangerous import SignatureExpired, BadSignature
 
 from extensions import limiter
@@ -130,6 +131,10 @@ def confirm_trade(token):
 
     # ── GET: show confirmation page ───────────────────────────
     if request.method == 'GET':
+        # Generate a one-time CSRF nonce and store in session
+        csrf_nonce = secrets.token_hex(32)
+        session['csrf_nonce'] = csrf_nonce
+
         action_colour = '#38a169' if action == 'approve' else '#e53e3e'
         action_label = 'CONFIRM APPROVE' if action == 'approve' else 'CONFIRM REJECT'
         action_desc = ('Approve and execute this trade' if action == 'approve'
@@ -159,6 +164,7 @@ def confirm_trade(token):
                 </table>
                 <p style="color: #a0aec0; font-size: 13px; margin-bottom: 20px;">{_html.escape(action_desc)}</p>
                 <form method="POST">
+                    <input type="hidden" name="csrf_nonce" value="{csrf_nonce}">
                     <button type="submit"
                             style="width: 100%; padding: 14px; background: {action_colour}; color: white;
                                    border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
@@ -176,6 +182,13 @@ def confirm_trade(token):
         """
 
     # ── POST: execute the action ──────────────────────────────
+    # Verify CSRF nonce from session
+    expected_nonce = session.pop('csrf_nonce', None)
+    submitted_nonce = request.form.get('csrf_nonce', '')
+    if not expected_nonce or not hmac.compare_digest(expected_nonce, submitted_nonce):
+        return _error_page("Invalid Request",
+                           "CSRF validation failed. Please go back and try again."), 403
+
     try:
         if action == 'approve':
             result = engine.approve_trade(proposal_id)
@@ -254,6 +267,8 @@ def _error_page(title: str, message: str) -> str:
 @require_trading_auth
 def approve_trade_api(proposal_id):
     """Approve a pending trade proposal from the web UI."""
+    if not re.match(r'^[a-f0-9]{12}$', proposal_id):
+        return jsonify({'success': False, 'error': 'Invalid proposal ID format'}), 400
     try:
         from ml.trading_engine import get_trading_engine
         engine = get_trading_engine()
@@ -271,6 +286,8 @@ def approve_trade_api(proposal_id):
 @require_trading_auth
 def reject_trade_api(proposal_id):
     """Reject a pending trade proposal from the web UI."""
+    if not re.match(r'^[a-f0-9]{12}$', proposal_id):
+        return jsonify({'success': False, 'error': 'Invalid proposal ID format'}), 400
     try:
         from ml.trading_engine import get_trading_engine
         engine = get_trading_engine()
@@ -551,6 +568,7 @@ def audit_trail():
 # ========================================
 
 @trading_bp.route('/api/monitor/status')
+@require_trading_auth
 def monitor_status():
     """Get market monitor status — intervals, stats, alerts."""
     try:
@@ -563,6 +581,7 @@ def monitor_status():
 
 
 @trading_bp.route('/api/monitor/alerts')
+@require_trading_auth
 def monitor_alerts():
     """Get recent market monitor alerts."""
     try:
@@ -576,6 +595,7 @@ def monitor_alerts():
 
 
 @trading_bp.route('/api/monitor/price-history/<symbol>')
+@require_trading_auth
 def monitor_price_history(symbol):
     """Get recent price snapshots for a symbol from the monitor."""
     try:
@@ -1277,6 +1297,7 @@ def backtest_run():
 
 
 @trading_bp.route('/api/backtest/results')
+@require_trading_auth
 def backtest_results():
     """List saved backtest results."""
     try:
@@ -1294,6 +1315,7 @@ def backtest_results():
 # ========================================
 
 @trading_bp.route('/api/retrain/status')
+@require_trading_auth
 def retrain_status():
     """Get ML retraining scheduler status."""
     try:

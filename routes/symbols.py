@@ -16,6 +16,8 @@ symbols_bp = Blueprint('symbols', __name__)
 
 
 @symbols_bp.route('/api/search', methods=['POST'])
+@limiter.limit('30 per minute')
+@require_trading_auth
 def search_coins():
     if not state.SYMBOLS_AVAILABLE or not state.data_pipeline:
         return jsonify({'success': False, 'error': 'Search service not available.'})
@@ -32,6 +34,7 @@ def search_coins():
 
 
 @symbols_bp.route('/api/symbols/search', methods=['GET'])
+@require_trading_auth
 def search_symbols():
     if not state.SYMBOLS_AVAILABLE or not state.data_pipeline:
         return jsonify({'success': False, 'error': 'Symbol search service not available'}), 503

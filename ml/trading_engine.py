@@ -10,6 +10,7 @@ import uuid
 import math
 import logging
 import smtplib
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date, timedelta
@@ -97,6 +98,9 @@ class TradingEngine:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.server_url = server_url
+
+        # Thread safety — accessed from Flask request threads + background scan/sell threads
+        self._lock = threading.Lock()
 
         # State
         self.proposals: Dict[str, TradeProposal] = {}
@@ -211,9 +215,14 @@ class TradingEngine:
 
     def _should_auto_approve(self, side: str, amount_gbp: float, trigger_type: str) -> bool:
         """Determine whether a trade should auto-execute without email approval."""
+        # Hard ceiling: never auto-approve above this amount regardless of trigger
+        mechanical_cap = float(os.getenv("MECHANICAL_AUTO_APPROVE_MAX_GBP", "100.0"))
+
         is_sell = side.lower() == "sell"
         if is_sell:
-            if trigger_type in self.MECHANICAL_TRIGGERS or amount_gbp <= self.approval_threshold_gbp:
+            if trigger_type in self.MECHANICAL_TRIGGERS:
+                return amount_gbp <= mechanical_cap
+            if amount_gbp <= self.approval_threshold_gbp:
                 return True
             return not self.sell_require_approval
         if amount_gbp > self.approval_threshold_gbp:
@@ -273,6 +282,35 @@ class TradingEngine:
         
         Returns dict with proposal status.
         """
+        with self._lock:
+            return self._propose_trade_locked(
+                symbol=symbol, side=side, amount_gbp=amount_gbp,
+                current_price=current_price, reason=reason,
+                confidence=confidence, recommendation=recommendation,
+                coin_name=coin_name, sell_quantity=sell_quantity,
+                trade_mode=trade_mode, trigger_type=trigger_type,
+                debate_data=debate_data, preferred_exchange=preferred_exchange,
+                skip_cooldown=skip_cooldown,
+            )
+
+    def _propose_trade_locked(
+        self,
+        symbol: str,
+        side: str,
+        amount_gbp: float,
+        current_price: float,
+        reason: str,
+        confidence: int,
+        recommendation: str,
+        coin_name: str = "",
+        sell_quantity: Optional[float] = None,
+        trade_mode: str = "accumulate",
+        trigger_type: str = "",
+        debate_data: Optional[dict] = None,
+        preferred_exchange: str = "",
+        skip_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        """Internal propose_trade — must be called with self._lock held."""
         if self.kill_switch:
             return {"success": False, "error": "Trading is halted (kill switch active)"}
 
@@ -505,6 +543,11 @@ class TradingEngine:
 
     def approve_trade(self, proposal_id: str) -> Dict[str, Any]:
         """Approve and execute a pending trade."""
+        with self._lock:
+            return self._approve_trade_locked(proposal_id)
+
+    def _approve_trade_locked(self, proposal_id: str) -> Dict[str, Any]:
+        """Internal approve — must be called with self._lock held."""
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return {"success": False, "error": "Proposal not found"}
@@ -535,6 +578,11 @@ class TradingEngine:
 
     def reject_trade(self, proposal_id: str) -> Dict[str, Any]:
         """Reject a pending trade."""
+        with self._lock:
+            return self._reject_trade_locked(proposal_id)
+
+    def _reject_trade_locked(self, proposal_id: str) -> Dict[str, Any]:
+        """Internal reject — must be called with self._lock held."""
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return {"success": False, "error": "Proposal not found"}
@@ -598,8 +646,10 @@ class TradingEngine:
                     except Exception:
                         pass
                     if not fx_rate:
-                        approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
-                        fx_rate = approx_fx.get(quote_currency, 1.27)
+                        proposal.status = "rejected"
+                        proposal.error = f"Cannot convert GBP to {quote_currency} — live FX rate unavailable"
+                        logger.error(f"Legacy FX lookup failed for GBP->{quote_currency}, aborting trade")
+                        return {"success": False, "error": proposal.error}
                     amount_in_quote = proposal.amount_gbp * fx_rate
                     logger.info(f"Legacy FX: £{proposal.amount_gbp:.4f} → {amount_in_quote:.4f} {quote_currency} (rate {fx_rate})")
 
@@ -786,7 +836,18 @@ class TradingEngine:
         }
         try:
             audit_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(audit_file, "a") as f:
+            # Rotate if file exceeds 10 MB
+            max_audit_bytes = int(os.getenv("AUDIT_LOG_MAX_BYTES", str(10 * 1024 * 1024)))
+            if audit_file.exists() and audit_file.stat().st_size > max_audit_bytes:
+                rotated = audit_file.with_suffix(".jsonl.old")
+                try:
+                    os.replace(audit_file, rotated)
+                    logger.info(f"Rotated audit log ({max_audit_bytes} bytes exceeded)")
+                except Exception as rot_err:
+                    logger.warning(f"Failed to rotate audit log: {rot_err}")
+            # Open with restrictive permissions (owner read/write only)
+            fd = os.open(str(audit_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            with os.fdopen(fd, "a") as f:
                 f.write(json.dumps(entry, default=str) + "\n")
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
@@ -1121,6 +1182,11 @@ class TradingEngine:
 
     def activate_kill_switch(self) -> Dict[str, Any]:
         """Emergency halt all trading."""
+        with self._lock:
+            return self._activate_kill_switch_locked()
+
+    def _activate_kill_switch_locked(self) -> Dict[str, Any]:
+        """Internal kill switch — must be called with self._lock held."""
         self.kill_switch = True
         # Reject all pending proposals
         rejected = 0
@@ -1135,6 +1201,11 @@ class TradingEngine:
 
     def deactivate_kill_switch(self) -> Dict[str, Any]:
         """Resume trading."""
+        with self._lock:
+            return self._deactivate_kill_switch_locked()
+
+    def _deactivate_kill_switch_locked(self) -> Dict[str, Any]:
+        """Internal deactivate — must be called with self._lock held."""
         self.kill_switch = False
         self._save_state()
         logger.info("Kill switch deactivated — trading resumed")
@@ -1229,7 +1300,8 @@ class TradingEngine:
         state_file = self.data_dir / "trading_state.json"
         tmp = state_file.with_suffix(".tmp")
         try:
-            with open(tmp, "w") as f:
+            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
                 json.dump(state, f, indent=2, default=str)
             os.replace(tmp, state_file)
         except Exception as e:
