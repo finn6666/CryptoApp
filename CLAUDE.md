@@ -69,7 +69,6 @@ ml/                 — All ML, trading, and agent logic
   data_pipeline.py     — Data ingestion and feature engineering
   gem_score_tracker.py — Tracks gem scores over time
   error_handling.py    — Shared error handling utilities
-  agent_memory.py      — Short/long-term agent context (used by legacy 5-agent validator)
   scheduler.py         — Weekly retrain + performance reports
   agents/official/     — debate orchestrator (bull/bear/referee) + quick_screen + legacy 5-agent chain (validator)
 

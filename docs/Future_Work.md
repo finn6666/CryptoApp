@@ -1,62 +1,35 @@
 ## Future Work
 
 ### Crypto Venture Capital System
-Build CryptoApp into an automated VC-style investment platform for crypto. The debate orchestrator already evaluates coins like a due-diligence committee — extend it to operate as a systematic fund.
+Automated VC-style investment platform. AI agents evaluate early-stage tokens like a due-diligence committee — team, traction, tokenomics, competitive moat — then allocate capital with portfolio-level risk management.
 
-**Core thesis:** AI agents evaluate early-stage tokens the way a VC fund evaluates startups — team, traction, market size, tokenomics, competitive moat — then allocate capital with portfolio-level risk management.
-
-**Near-term steps:**
-- Thesis-driven screening: add project fundamentals (team, GitHub activity, TVL, partnerships) alongside price data in the scan pipeline
-- Portfolio construction: position sizing based on conviction tiers, sector diversification limits, max drawdown constraints
-- Fund-style reporting: weekly NAV, attribution by sector/thesis, benchmark vs BTC/ETH
-- LP dashboard: read-only view for external investors showing performance, allocations, and risk metrics
-
-**Revenue model:**
-- Management fee (2%) + performance fee (20%) on external capital — standard VC/hedge fund terms
-- Telegram signal channel for retail subscribers (lower commitment entry point)
-- Exchange affiliate revenue (Kraken, KuCoin, Bitget, MEXC — 20-40% of referred fees)
+- **Screening:** thesis-driven fundamentals (team, GitHub, TVL, partnerships) alongside price data
+- **Portfolio construction:** conviction-tier sizing, sector diversification limits, max drawdown constraints
+- **Reporting:** weekly NAV, sector attribution, benchmark vs BTC/ETH; LP dashboard for external investors
+- **Revenue:** 2/20 fee structure on external capital, Telegram signal channel, exchange affiliate revenue
 
 ---
 
-### Debate orchestrator — tuning
-- Monitor referee verdict quality on real trades vs the old 5-agent chain
-- Tune bear/bull prompt aggression
+### Orchestrator + exchange tuning
+- Monitor referee verdict quality vs old 5-agent chain; tune prompt aggression
+- Pair cache TTL (6h) misses new listings — consider shorter TTL or event-driven invalidation
+- Add bid/ask spread comparison to best-price routing (currently mid-price only)
 
 ---
 
-### Multi-exchange routing — remaining gaps
-- Pair cache (6h TTL) misses new listings until expiry — consider shorter TTL or event-driven invalidation
-- No spread comparison — picks best mid-price, not accounting for bid/ask spread width
+### Advanced ML strategies
+Ideas from [nateemma/strategies](https://github.com/nateemma/strategies) and [FinRL](https://github.com/AI4Finance-Foundation/FinRL):
+
+- **DRL trade timing (FinRL):** PPO/SAC/A2C agents for buy/sell/hold decisions — upgrade Q-learning to proper DRL. FinRL's ensemble approach (multiple DRL agents vote) maps to the existing debate pattern
+- **Turbulence index (FinRL):** market turbulence detector triggers defensive mode — complements the existing regime detection
+- **Anomaly detection entries:** ensemble (IsoForest, LOF, PCA, SVM) trained on "normal" data; anomalies = buy signals filtered by MFI
+- **Wavelet price prediction (DWT):** models expected gain, buys when prediction exceeds rolling threshold
+- **Adaptive exit targets:** `rolling_mean + n * rolling_std` instead of fixed percentage tiers in sell_automation
+- **PCA feature compression:** reduce overfitting in training_pipeline RandomForest on Pi's limited compute
+- **Guard metrics:** RMI, Fisher RSI, BB squeeze as entry/exit filters
 
 ---
 
-### Self-custody / wallet consolidation
-Auto-withdraw bought coins to a hardware wallet after purchase. Portfolio tracking already works exchange-agnostic. Needs per-exchange withdrawal API calls + minimum threshold to avoid fee bleed.
-
----
-
-### Multi-agent strategy teams
-Multiple agent teams with different risk profiles vote on the same coins. Highest-conviction consensus triggers trades. Consider CrewAI — maps naturally to the debate orchestrator pattern and supports Gemini via LiteLLM.
-
----
-
-### Technical analysis enhancements (from nateemma/strategies research)
-Ideas from the [nateemma/strategies](https://github.com/nateemma/strategies) freqtrade repo — adapted for CryptoApp's agent-based architecture.
-
-**Anomaly detection for buy signals:**
-Train on "normal" market data, flag anomalies as potential entry points. Uses ensemble of detectors (Isolation Forest, LOF, PCA, One-Class SVM, KMeans, Elliptic Envelope, Gaussian Mixture). Could supplement or replace the heuristic quick_screen. Filter anomaly signals with MFI (buy if MFI < 50, sell if MFI > 50).
-
-**Wavelet-based price prediction (DWT):**
-Discrete Wavelet Transform models expected price gain, buys when predicted gain exceeds a rolling threshold. Uses rolling-window training to avoid lookahead bias. Could provide a secondary quantitative signal alongside the debate orchestrator.
-
-**Adaptive exit targets:**
-Rolling profit/loss thresholds based on standard deviations — more dynamic than fixed-percentage exits. Formula: `target_profit = rolling_mean(profit) + n * rolling_std(profit)`. Currently sell_automation uses fixed tiers — could be enhanced with adaptive thresholds per holding.
-
-**PCA dimensionality reduction:**
-Compress indicator features via PCA before classification. The training_pipeline.py RandomForest could benefit — reduce overfitting and improve generalisation on the Pi's limited compute.
-
-**Bollinger Band squeeze detection:**
-When Bollinger Band width squeezes inside a Keltner Channel, it signals compressed volatility and potential breakout. Useful as a guard metric for entry timing.
-
-**Guard metrics for entry/exit filtering:**
-Use RMI (Relative Momentum Index), Fisher RSI, and Williams %R as guard conditions to filter false signals. Scale to [-1, +1] range where -ve = oversold, +ve = overbought.
+### Longer-term
+- **Self-custody:** auto-withdraw to hardware wallet post-purchase; per-exchange withdrawal APIs + minimum threshold
+- **Multi-agent strategy teams:** multiple risk-profile agent teams vote on same coins; CrewAI + Gemini via LiteLLM

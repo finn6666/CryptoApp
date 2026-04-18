@@ -229,6 +229,44 @@ class MLScheduler:
 
         return "\n".join(lines)
 
+    def cleanup_old_logs(self, max_age_days: int = 30):
+        """Delete log files older than max_age_days to prevent disk bloat on Pi."""
+        import glob
+        from pathlib import Path
+
+        log_dirs = [
+            "data/agent_runner_logs",
+            "data/monitor_logs",
+            "data/scan_logs",
+        ]
+        cutoff = time.time() - (max_age_days * 86400)
+        total_removed = 0
+
+        for log_dir in log_dirs:
+            dirpath = Path(log_dir)
+            if not dirpath.exists():
+                continue
+            for f in dirpath.iterdir():
+                if f.is_file() and f.stat().st_mtime < cutoff:
+                    try:
+                        f.unlink()
+                        total_removed += 1
+                    except OSError:
+                        pass
+
+        # Also remove old training data CSVs (keep only the newest)
+        training_files = sorted(glob.glob("data/training_data_*.csv"))
+        if len(training_files) > 1:
+            for old_file in training_files[:-1]:
+                try:
+                    Path(old_file).unlink()
+                    total_removed += 1
+                except OSError:
+                    pass
+
+        if total_removed:
+            logger.info(f"Log cleanup: removed {total_removed} old files")
+
     def start_scheduler(self):
         """Start the ML retraining scheduler in a background thread."""
         if self._running:
@@ -241,9 +279,13 @@ class MLScheduler:
         # Schedule weekly performance report every Monday at 9 AM
         schedule.every().monday.at("09:00").do(self.weekly_report_job)
 
+        # Schedule log cleanup every Sunday at 3 AM
+        schedule.every().sunday.at("03:00").do(self.cleanup_old_logs)
+
         logger.info("ML Scheduler started:")
         logger.info("  - Model retraining: Every Sunday at 2:00 AM")
         logger.info("  - Weekly report: Every Monday at 9:00 AM")
+        logger.info("  - Log cleanup: Every Sunday at 3:00 AM")
 
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)

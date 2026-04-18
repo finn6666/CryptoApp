@@ -18,9 +18,16 @@ logger = logging.getLogger(__name__)
 
 # Cache file for exchange trading pairs
 PAIRS_CACHE_FILE = Path("data/exchange_pairs_cache.json")
-PAIRS_CACHE_TTL = 3600 * 6  # 6 hours
+PAIRS_CACHE_TTL = 3600 * 2  # 2 hours — shorter TTL to catch new listings sooner
+# Minimum gap between event-driven refreshes (avoids hammering exchanges on every unknown coin)
+_PAIRS_REFRESH_MIN_GAP = 600  # 10 minutes
 
 FX_RATE_TTL_SECONDS = 3600  # Refresh live FX rates every hour
+
+# Maximum bid/ask spread (as % of mid-price) before skipping an exchange in price-routing.
+# Wide spreads indicate thin liquidity and lead to poor execution.
+# Override via MAX_ROUTING_SPREAD_PCT env var.
+_MAX_ROUTING_SPREAD_PCT: float = float(os.getenv("MAX_ROUTING_SPREAD_PCT", "3.0"))
 
 
 class ExchangeManager:
@@ -38,6 +45,7 @@ class ExchangeManager:
         self._pairs: Dict[str, set] = {}  # exchange_id → set of "BASE/QUOTE" pairs
         self._coin_exchange_map: Dict[str, List[str]] = {}  # symbol → [exchange_ids]
         self._fx_cache: Dict[str, Tuple[float, float]] = {}  # FX rate cache: key → (rate, fetched_at)
+        self._pairs_loaded_at: float = 0.0  # epoch time of last in-memory pairs load
 
         # Exchange priority from env (comma-separated)
         priority_str = os.getenv("EXCHANGE_PRIORITY", "kraken")
@@ -137,13 +145,19 @@ class ExchangeManager:
         """
         Load tradeable pairs for all configured exchanges.
         Uses disk cache if fresh enough, otherwise queries live.
+        In-memory cache also expires after PAIRS_CACHE_TTL to catch new listings.
         """
         if self._pairs_loaded and not force_refresh:
-            return
+            age = time.time() - self._pairs_loaded_at
+            if age < PAIRS_CACHE_TTL:
+                return
+            logger.info(f"Pairs cache expired in memory after {age/3600:.1f}h — refreshing")
+            self._pairs_loaded = False
 
         # Try loading from cache
         if not force_refresh and self._load_pairs_cache():
             self._pairs_loaded = True
+            self._pairs_loaded_at = time.time()
             self._rebuild_coin_exchange_map()
             return
 
@@ -154,6 +168,7 @@ class ExchangeManager:
         self._rebuild_coin_exchange_map()
         self._save_pairs_cache()
         self._pairs_loaded = True
+        self._pairs_loaded_at = time.time()
 
     def _fetch_pairs(self, exchange_id: str):
         """Fetch all trading pairs from an exchange."""
@@ -226,9 +241,20 @@ class ExchangeManager:
         return symbol.upper() in self._coin_exchange_map
 
     def get_exchanges_for_coin(self, symbol: str) -> List[str]:
-        """Get list of exchanges that list this coin, in priority order."""
+        """Get list of exchanges that list this coin, in priority order.
+        If the coin is not found and the cache is older than _PAIRS_REFRESH_MIN_GAP,
+        trigger a forced refresh (event-driven invalidation for new listings).
+        """
         self.load_pairs()
         available = self._coin_exchange_map.get(symbol.upper(), [])
+        if not available:
+            age = time.time() - self._pairs_loaded_at
+            if age > _PAIRS_REFRESH_MIN_GAP:
+                logger.info(
+                    f"{symbol} not found in pairs cache (age {age/60:.0f}min) — forcing refresh"
+                )
+                self.load_pairs(force_refresh=True)
+                available = self._coin_exchange_map.get(symbol.upper(), [])
         # Sort by priority
         return sorted(available, key=lambda e: (
             self.exchange_priority.index(e) if e in self.exchange_priority else 999
@@ -345,6 +371,21 @@ class ExchangeManager:
                         raw_price = ticker.get("bid") or ticker.get("last") or 0
                     if not raw_price or raw_price <= 0:
                         continue
+
+                    # ── Spread filter ─────────────────────────────────────
+                    # Skip exchanges where the bid/ask spread is too wide —
+                    # large spreads indicate thin liquidity and poor execution.
+                    ask = ticker.get("ask") or 0
+                    bid = ticker.get("bid") or 0
+                    mid = ticker.get("last") or ticker.get("close") or 0
+                    if ask > 0 and bid > 0 and mid > 0:
+                        spread_pct = (ask - bid) / mid * 100
+                        if spread_pct > _MAX_ROUTING_SPREAD_PCT:
+                            logger.debug(
+                                f"Skipping {exchange_id} for {pair}: spread {spread_pct:.2f}% "
+                                f"exceeds limit {_MAX_ROUTING_SPREAD_PCT:.1f}%"
+                            )
+                            continue
 
                     # Normalise to GBP for cross-exchange comparison
                     fx_rate = 1.0

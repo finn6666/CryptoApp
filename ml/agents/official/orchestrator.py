@@ -22,15 +22,6 @@ from ml.portfolio_tracker import get_portfolio_tracker
 
 logger = logging.getLogger(__name__)
 
-# Late-import helper to avoid circular imports
-def _get_agent_memory():
-    """Get the persistent agent memory store."""
-    try:
-        from ml.agent_memory import get_memory
-        return get_memory()
-    except Exception:
-        return None
-
 
 class CryptoAnalysisOutput(BaseModel):
     """Structured output for comprehensive crypto analysis with trade decision"""

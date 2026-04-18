@@ -20,7 +20,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ─── Globals ──────────────────────────────────────────────────
 ml_pipeline = None
-ml_service = None
 ML_AVAILABLE = False
 
 data_pipeline = None
@@ -70,12 +69,11 @@ def initialize_official_adk():
 
 
 def initialize_ml():
-    global ml_pipeline, ml_service, ML_AVAILABLE
+    global ml_pipeline, ML_AVAILABLE
     logger.info("Attempting to initialize ML components...")
     try:
         from ml.training_pipeline import CryptoMLPipeline
         ml_pipeline = CryptoMLPipeline()
-        ml_service = None
         ML_AVAILABLE = True
         try:
             ml_pipeline.load_existing_model()
@@ -88,7 +86,6 @@ def initialize_ml():
         logger.error(f"ML components not available: {e}")
         ML_AVAILABLE = False
         ml_pipeline = None
-        ml_service = None
         return False
 
 
@@ -231,60 +228,6 @@ def coin_to_dict(coin, include_highlights=False):
         highlights = coin.investment_highlights
         coin_dict['investment_highlights'] = ' • '.join(highlights) if isinstance(highlights, list) else highlights
     return coin_dict
-
-
-def _sanitize_ai_text(text):
-    """Remove raw JSON objects/fragments from text meant for UI display."""
-    if not text or not isinstance(text, str):
-        return text or ''
-    cleaned = re.sub(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', text)
-    cleaned = re.sub(r'```(?:json)?\s*', '', cleaned)
-    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
-    if not cleaned or len(cleaned) < 10:
-        return None
-    return cleaned
-
-
-def _build_gem_analysis(gem_result):
-    """Build a standardised analysis dict from a gem_detector result.
-    Returns (analysis_dict, ai_sentiment, enhanced_score) or (None, None, None).
-    """
-    if not gem_result:
-        return None, None, None
-
-    gem_prob = gem_result.get('gem_probability', 0)
-    is_gem = gem_prob > 0.6
-    strengths = gem_result.get('key_strengths', [])
-    weaknesses = gem_result.get('key_weaknesses', [])
-    ai_sentiment = gem_result.get('ai_sentiment')
-
-    summary_parts = []
-    if ai_sentiment and ai_sentiment.get('key_points'):
-        key_points = ai_sentiment['key_points']
-        summary_parts.append(key_points[0])
-        if len(key_points) > 2:
-            summary_parts.append(key_points[2])
-    else:
-        if is_gem:
-            summary_parts.append(f"Hidden gem ({gem_prob*100:.0f}% confidence)")
-        if strengths:
-            summary_parts.append(f"{', '.join(strengths[:1])}")
-        if weaknesses:
-            summary_parts.append(weaknesses[0])
-
-    raw_summary = ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...')
-    clean_summary = _sanitize_ai_text(raw_summary) or 'Monitoring...'
-
-    analysis = {
-        'recommendation': 'BUY' if is_gem else 'WATCH',
-        'confidence': f"{gem_prob*100:.0f}%",
-        'summary': clean_summary,
-        'risk_level': gem_result.get('risk_level', 'Medium'),
-        'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-        'analysis_type': 'Gem Detector',
-    }
-    enhanced_score = min(10, gem_result.get('gem_score', 0) / 10)
-    return analysis, ai_sentiment, enhanced_score
 
 
 def parse_market_cap(value):
@@ -438,4 +381,4 @@ def start_idle_monitor():
 
     thread = threading.Thread(target=_monitor, daemon=True)
     thread.start()
-    logger.info(f"⏰ Auto-shutdown enabled: will stop after {IDLE_TIMEOUT}s ({IDLE_TIMEOUT//60} min) of idle time")
+    logger.info(f"Auto-shutdown enabled: will stop after {IDLE_TIMEOUT}s ({IDLE_TIMEOUT//60} min) of idle time")

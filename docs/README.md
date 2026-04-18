@@ -8,7 +8,7 @@
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Raspberry Pi — systemd, nginx, Tailscale SSH |
 | [API.md](API.md) | All REST endpoints |
 | [ML.md](ML.md) | Q-learning RL, ML pipeline, portfolio manager |
-| [Claude.md](Claude.md) | Dev preferences, key patterns, safety mechanisms |
+| [CLAUDE.md](../CLAUDE.md) | Dev preferences, key patterns, safety mechanisms |
 
 ## Architecture
 
