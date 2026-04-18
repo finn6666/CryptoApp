@@ -140,29 +140,237 @@ def analyze_volume_profile(symbol: str, period: str = "24h") -> Dict[str, Any]:
 
 def calculate_indicators(symbol: str, indicators: List[str]) -> Dict[str, Any]:
     """
-    Calculate technical indicators (RSI, MACD, MA, etc.).
-    
+    Calculate technical indicators (RSI, MACD, Bollinger Bands, SMA, EMA)
+    from live OHLCV data via the exchange manager.
+
     Args:
-        symbol: Cryptocurrency symbol
-        indicators: Indicators to calculate (RSI, MACD, SMA, EMA)
-    
+        symbol: Cryptocurrency symbol (e.g. "BTC", "DOT")
+        indicators: Indicators to calculate (RSI, MACD, SMA, EMA, BBANDS)
+
     Returns:
-        Calculated indicator values
+        Calculated indicator values with buy/sell signals
     """
+    import numpy as np
+
+    base = symbol.split("/")[0].upper().strip()
+    candles = _fetch_ohlcv(base)
+
+    if candles is None or len(candles) < 30:
+        return {
+            "symbol": base,
+            "status": "insufficient_data",
+            "indicators": {},
+            "overall_signal": "NEUTRAL",
+        }
+
+    closes = np.array([c[4] for c in candles], dtype=float)
+    highs = np.array([c[2] for c in candles], dtype=float)
+    lows = np.array([c[3] for c in candles], dtype=float)
+
     results = {}
-    
-    for indicator in indicators:
-        if indicator.upper() == "RSI":
-            results["RSI"] = {"value": 55, "signal": "NEUTRAL"}
-        elif indicator.upper() == "MACD":
-            results["MACD"] = {"signal": "BULLISH", "crossover": "POSITIVE"}
-        elif indicator.upper() in ["SMA", "EMA"]:
-            results[indicator.upper()] = {"trend": "UP", "price_vs_ma": "ABOVE"}
-    
+    signals = []  # +1 bullish, -1 bearish per indicator
+
+    for ind in indicators:
+        name = ind.upper().strip()
+
+        if name == "RSI":
+            rsi_val = _calc_rsi(closes, 14)
+            if rsi_val is not None:
+                if rsi_val < 30:
+                    sig = "OVERSOLD"
+                    signals.append(1)
+                elif rsi_val > 70:
+                    sig = "OVERBOUGHT"
+                    signals.append(-1)
+                else:
+                    sig = "NEUTRAL"
+                    signals.append(0)
+                results["RSI"] = {"value": round(rsi_val, 2), "signal": sig}
+
+        elif name == "MACD":
+            macd_line, signal_line, histogram = _calc_macd(closes)
+            if macd_line is not None:
+                cross = "POSITIVE" if macd_line > signal_line else "NEGATIVE"
+                sig = "BULLISH" if histogram > 0 else "BEARISH"
+                signals.append(1 if histogram > 0 else -1)
+                results["MACD"] = {
+                    "macd": round(macd_line, 6),
+                    "signal": round(signal_line, 6),
+                    "histogram": round(histogram, 6),
+                    "crossover": cross,
+                    "trend": sig,
+                }
+
+        elif name == "SMA":
+            sma_20 = float(np.mean(closes[-20:])) if len(closes) >= 20 else None
+            sma_50 = float(np.mean(closes[-50:])) if len(closes) >= 50 else None
+            price = float(closes[-1])
+            if sma_20 is not None:
+                trend = "UP" if price > sma_20 else "DOWN"
+                signals.append(1 if price > sma_20 else -1)
+                results["SMA"] = {
+                    "sma_20": round(sma_20, 6),
+                    "sma_50": round(sma_50, 6) if sma_50 else None,
+                    "price_vs_sma20": "ABOVE" if price > sma_20 else "BELOW",
+                    "trend": trend,
+                }
+
+        elif name == "EMA":
+            ema_12 = _calc_ema(closes, 12)
+            ema_26 = _calc_ema(closes, 26)
+            price = float(closes[-1])
+            if ema_12 is not None:
+                trend = "UP" if price > ema_12 else "DOWN"
+                signals.append(1 if price > ema_12 else -1)
+                results["EMA"] = {
+                    "ema_12": round(ema_12, 6),
+                    "ema_26": round(ema_26, 6) if ema_26 else None,
+                    "price_vs_ema12": "ABOVE" if price > ema_12 else "BELOW",
+                    "trend": trend,
+                }
+
+        elif name in ("BBANDS", "BB", "BOLLINGER"):
+            bb = _calc_bbands(closes, 20, 2)
+            if bb:
+                price = float(closes[-1])
+                width = (bb["upper"] - bb["lower"]) / bb["middle"] if bb["middle"] > 0 else 0
+                if price <= bb["lower"]:
+                    sig = "OVERSOLD"
+                    signals.append(1)
+                elif price >= bb["upper"]:
+                    sig = "OVERBOUGHT"
+                    signals.append(-1)
+                else:
+                    sig = "NEUTRAL"
+                    signals.append(0)
+                results["BBANDS"] = {
+                    "upper": round(bb["upper"], 6),
+                    "middle": round(bb["middle"], 6),
+                    "lower": round(bb["lower"], 6),
+                    "width": round(width, 4),
+                    "signal": sig,
+                }
+
+    # Overall signal from majority vote
+    if signals:
+        avg = sum(signals) / len(signals)
+        if avg > 0.3:
+            overall = "BULLISH"
+        elif avg < -0.3:
+            overall = "BEARISH"
+        else:
+            overall = "NEUTRAL"
+    else:
+        overall = "NEUTRAL"
+
     return {
-        "symbol": symbol,
+        "symbol": base,
         "indicators": results,
-        "overall_signal": "BULLISH"
+        "overall_signal": overall,
+        "candles_used": len(candles),
+    }
+
+
+# ─── OHLCV fetch + indicator math helpers ─────────────────────
+
+# Cache OHLCV data per symbol (15 min TTL)
+_ohlcv_cache: Dict[str, Dict[str, Any]] = {}
+_OHLCV_CACHE_TTL = 900
+
+
+def _fetch_ohlcv(symbol: str, timeframe: str = "1h", limit: int = 100):
+    """Fetch OHLCV candles via exchange manager, with caching."""
+    cache_key = f"{symbol}:{timeframe}"
+    cached = _ohlcv_cache.get(cache_key)
+    if cached and time.time() - cached.get("fetched_at", 0) < _OHLCV_CACHE_TTL:
+        return cached["data"]
+
+    try:
+        from ml.exchange_manager import get_exchange_manager
+        mgr = get_exchange_manager()
+        result = mgr.find_best_pair(symbol)
+        if not result:
+            return None
+        exchange_id, pair = result
+        exchange = mgr.get_exchange(exchange_id)
+        if not exchange:
+            return None
+        candles = exchange.fetch_ohlcv(pair, timeframe=timeframe, limit=limit)
+        _ohlcv_cache[cache_key] = {"data": candles, "fetched_at": time.time()}
+        return candles
+    except Exception as e:
+        logger.debug(f"OHLCV fetch failed for {symbol}: {e}")
+        return None
+
+
+def _calc_rsi(closes, period=14):
+    """Compute RSI from close prices."""
+    import numpy as np
+    if len(closes) < period + 1:
+        return None
+    deltas = np.diff(closes)
+    gains = np.where(deltas > 0, deltas, 0.0)
+    losses = np.where(deltas < 0, -deltas, 0.0)
+    avg_gain = np.mean(gains[-period:])
+    avg_loss = np.mean(losses[-period:])
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100.0 - (100.0 / (1.0 + rs))
+
+
+def _calc_ema(data, period):
+    """Compute Exponential Moving Average."""
+    import numpy as np
+    if len(data) < period:
+        return None
+    multiplier = 2.0 / (period + 1)
+    ema = float(np.mean(data[:period]))
+    for price in data[period:]:
+        ema = (float(price) - ema) * multiplier + ema
+    return ema
+
+
+def _calc_macd(closes, fast=12, slow=26, signal=9):
+    """Compute MACD line, signal line, and histogram."""
+    ema_fast = _calc_ema(closes, fast)
+    ema_slow = _calc_ema(closes, slow)
+    if ema_fast is None or ema_slow is None:
+        return None, None, None
+    macd_val = ema_fast - ema_slow
+    # Approximate signal line from recent MACD values
+    import numpy as np
+    if len(closes) < slow + signal:
+        return macd_val, 0.0, macd_val
+    # Build MACD series for signal EMA
+    macd_series = []
+    for i in range(slow, len(closes)):
+        ef = _calc_ema(closes[:i + 1], fast)
+        es = _calc_ema(closes[:i + 1], slow)
+        if ef is not None and es is not None:
+            macd_series.append(ef - es)
+    if len(macd_series) >= signal:
+        signal_val = _calc_ema(np.array(macd_series), signal)
+    else:
+        signal_val = 0.0
+    if signal_val is None:
+        signal_val = 0.0
+    histogram = macd_val - signal_val
+    return macd_val, signal_val, histogram
+
+
+def _calc_bbands(closes, period=20, num_std=2):
+    """Compute Bollinger Bands."""
+    import numpy as np
+    if len(closes) < period:
+        return None
+    window = closes[-period:]
+    middle = float(np.mean(window))
+    std = float(np.std(window))
+    return {
+        "upper": middle + num_std * std,
+        "middle": middle,
+        "lower": middle - num_std * std,
     }
 
 

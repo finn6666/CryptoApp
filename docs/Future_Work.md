@@ -37,3 +37,26 @@ Auto-withdraw bought coins to a hardware wallet after purchase. Portfolio tracki
 
 ### Multi-agent strategy teams
 Multiple agent teams with different risk profiles vote on the same coins. Highest-conviction consensus triggers trades. Consider CrewAI — maps naturally to the debate orchestrator pattern and supports Gemini via LiteLLM.
+
+---
+
+### Technical analysis enhancements (from nateemma/strategies research)
+Ideas from the [nateemma/strategies](https://github.com/nateemma/strategies) freqtrade repo — adapted for CryptoApp's agent-based architecture.
+
+**Anomaly detection for buy signals:**
+Train on "normal" market data, flag anomalies as potential entry points. Uses ensemble of detectors (Isolation Forest, LOF, PCA, One-Class SVM, KMeans, Elliptic Envelope, Gaussian Mixture). Could supplement or replace the heuristic quick_screen. Filter anomaly signals with MFI (buy if MFI < 50, sell if MFI > 50).
+
+**Wavelet-based price prediction (DWT):**
+Discrete Wavelet Transform models expected price gain, buys when predicted gain exceeds a rolling threshold. Uses rolling-window training to avoid lookahead bias. Could provide a secondary quantitative signal alongside the debate orchestrator.
+
+**Adaptive exit targets:**
+Rolling profit/loss thresholds based on standard deviations — more dynamic than fixed-percentage exits. Formula: `target_profit = rolling_mean(profit) + n * rolling_std(profit)`. Currently sell_automation uses fixed tiers — could be enhanced with adaptive thresholds per holding.
+
+**PCA dimensionality reduction:**
+Compress indicator features via PCA before classification. The training_pipeline.py RandomForest could benefit — reduce overfitting and improve generalisation on the Pi's limited compute.
+
+**Bollinger Band squeeze detection:**
+When Bollinger Band width squeezes inside a Keltner Channel, it signals compressed volatility and potential breakout. Useful as a guard metric for entry timing.
+
+**Guard metrics for entry/exit filtering:**
+Use RMI (Relative Momentum Index), Fisher RSI, and Williams %R as guard conditions to filter false signals. Scale to [-1, +1] range where -ve = oversold, +ve = overbought.
