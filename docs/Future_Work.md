@@ -5,13 +5,8 @@ Run `ml/backtesting.py` over historical data and feed outcomes into `ql.record_o
 
 ---
 
-### Self-custody / wallet consolidation
+### Self-custody / wallet consolidation (longer term)
 Auto-withdraw bought coins to a hardware wallet after purchase. Portfolio tracking already works exchange-agnostic. Needs per-exchange withdrawal API calls + minimum threshold to avoid fee bleed.
-
----
-
-### Weekly report email
-`MLScheduler.weekly_report_job()` is already scheduled for Monday 9 AM — needs the email content and send logic implemented.
 
 ---
 

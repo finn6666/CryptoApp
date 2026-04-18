@@ -208,3 +208,8 @@ def alert_scan_failure(error: str):
         body=f"The automated scan loop encountered an error.\n\nError: {error}",
         category="scan_failure",
     )
+
+
+def send_email_alert(subject: str, body: str, category: str = "general"):
+    """Convenience alias used by scheduler and market monitor."""
+    send_error_alert(subject=subject, body=body, category=category, force=True)

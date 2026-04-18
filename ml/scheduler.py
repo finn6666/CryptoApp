@@ -3,7 +3,7 @@ import time
 import logging
 import asyncio
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from ml.training_pipeline import CryptoMLPipeline
 import os
 
@@ -100,6 +100,135 @@ class MLScheduler:
         except Exception:
             logger.error(f"ALERT (email failed): {message}")
 
+    def weekly_report_job(self):
+        """Weekly performance report emailed Monday 9 AM."""
+        logger.info("Generating weekly performance report")
+        try:
+            report = self._build_weekly_report()
+            from ml.error_handling import send_error_alert
+            sent = send_error_alert(
+                subject="Weekly Performance Report",
+                body=report,
+                category="weekly_report",
+                force=True,
+            )
+            if sent:
+                logger.info("Weekly report email sent")
+            else:
+                logger.warning("Weekly report email not sent (SMTP not configured?)")
+        except Exception as e:
+            logger.error(f"Weekly report failed: {e}")
+
+    def _build_weekly_report(self) -> str:
+        """Collect data from portfolio, trading engine, and scans into a report."""
+        lines = []
+        now = datetime.utcnow()
+        week_ago = now - timedelta(days=7)
+        lines.append(f"Weekly Report: {week_ago.strftime('%d %b')} - {now.strftime('%d %b %Y')}")
+        lines.append("")
+
+        # ── Portfolio summary ──
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            pt = get_portfolio_tracker()
+            totals = pt.get_total_value()
+            perf = pt.get_performance_summary()
+            lines.append("-- PORTFOLIO --")
+            lines.append(f"Active holdings: {totals.get('active_holdings', 0)}")
+            lines.append(f"Total cost: GBP {totals.get('total_cost_gbp', 0):.2f}")
+            lines.append(f"Unrealised P&L: GBP {totals.get('unrealised_pnl_gbp', 0):.2f}")
+            lines.append(f"Realised P&L: GBP {totals.get('realised_pnl_gbp', 0):.2f}")
+            lines.append(f"Total fees: GBP {totals.get('total_fees_gbp', 0):.2f}")
+            lines.append(f"Win rate: {perf.get('win_rate_pct', 0)}%")
+            if perf.get("best_trade"):
+                lines.append(f"Best trade: {perf['best_trade']['symbol']} (+GBP {perf['best_trade']['pnl_gbp']:.2f})")
+            if perf.get("worst_trade"):
+                lines.append(f"Worst trade: {perf['worst_trade']['symbol']} (GBP {perf['worst_trade']['pnl_gbp']:.2f})")
+            lines.append("")
+        except Exception as e:
+            lines.append(f"Portfolio data unavailable: {e}")
+            lines.append("")
+
+        # ── This week's trades ──
+        try:
+            from ml.portfolio_tracker import get_portfolio_tracker
+            pt = get_portfolio_tracker()
+            history = pt.get_trade_history(limit=200)
+            week_trades = [
+                t for t in history
+                if t.get("timestamp", "") >= week_ago.isoformat()
+            ]
+            buys = [t for t in week_trades if t.get("side") == "buy"]
+            sells = [t for t in week_trades if t.get("side") == "sell"]
+            lines.append("-- TRADES THIS WEEK --")
+            lines.append(f"Buys: {len(buys)}  |  Sells: {len(sells)}")
+            for t in week_trades:
+                side = t.get("side", "?").upper()
+                sym = t.get("symbol", "?")
+                amt = t.get("amount_gbp", 0)
+                pnl = t.get("realised_pnl_gbp")
+                pnl_str = f"  P&L: GBP {pnl:.2f}" if pnl is not None else ""
+                lines.append(f"  {side} {sym} GBP {amt:.2f}{pnl_str}")
+            if not week_trades:
+                lines.append("  No trades this week")
+            lines.append("")
+        except Exception as e:
+            lines.append(f"Trade history unavailable: {e}")
+            lines.append("")
+
+        # ── Trading engine status ──
+        try:
+            from ml.trading_engine import get_trading_engine
+            te = get_trading_engine()
+            status = te.get_status()
+            lines.append("-- TRADING ENGINE --")
+            lines.append(f"Active: {status.get('active', False)}")
+            lines.append(f"Daily budget: GBP {status.get('daily_budget_gbp', 0):.2f}")
+            lines.append(f"Remaining today: GBP {status.get('remaining_today_gbp', 0):.2f}")
+            lines.append("")
+        except Exception as e:
+            lines.append(f"Trading engine data unavailable: {e}")
+            lines.append("")
+
+        # ── Gemini budget ──
+        try:
+            from services.gemini_budget import get_gemini_budget
+            gb = get_gemini_budget()
+            gs = gb.get_status()
+            lines.append("-- GEMINI BUDGET (today) --")
+            lines.append(f"Spent: GBP {gs.get('estimated_spent_gbp', 0):.4f} / {gs.get('daily_limit_gbp', 0):.2f}")
+            lines.append(f"Usage: {gs.get('pct_used', 0)}%")
+            calls = gs.get("calls", {})
+            if calls:
+                lines.append(f"Calls: {calls}")
+            lines.append("")
+        except Exception as e:
+            lines.append(f"Gemini budget data unavailable: {e}")
+            lines.append("")
+
+        # ── Scan status ──
+        try:
+            from ml.scan_loop import get_scan_loop
+            sl = get_scan_loop()
+            ss = sl.get_status()
+            lines.append("-- SCAN LOOP --")
+            lines.append(f"Scheduler running: {ss.get('scheduler_running', False)}")
+            lines.append(f"Last scan: {ss.get('last_scan', 'never')}")
+            lines.append(f"Next scan: {ss.get('next_scan', 'unknown')}")
+            lines.append("")
+        except Exception as e:
+            lines.append(f"Scan data unavailable: {e}")
+            lines.append("")
+
+        # ── Model retraining ──
+        lines.append("-- ML RETRAINING --")
+        lines.append(f"Last retrain: {self._last_retrain or 'never'}")
+        if self._last_retrain_status:
+            lines.append(f"Status: {'OK' if self._last_retrain_status.get('success') else 'FAILED'}")
+        lines.append("")
+
+        return "\n".join(lines)
+
     def start_scheduler(self):
         """Start the ML retraining scheduler in a background thread."""
         if self._running:
@@ -109,8 +238,12 @@ class MLScheduler:
         # Schedule retraining every Sunday at 2 AM
         schedule.every().sunday.at("02:00").do(self.weekly_retrain)
 
+        # Schedule weekly performance report every Monday at 9 AM
+        schedule.every().monday.at("09:00").do(self.weekly_report_job)
+
         logger.info("ML Scheduler started:")
         logger.info("  - Model retraining: Every Sunday at 2:00 AM")
+        logger.info("  - Weekly report: Every Monday at 9:00 AM")
 
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
