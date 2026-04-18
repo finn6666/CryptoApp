@@ -648,7 +648,7 @@ class ExchangeManager:
     @retry(max_attempts=3, base_delay=1.0, backoff=2.0)
     def _fetch_ticker_with_retry(exchange, pair: str):
         """Fetch ticker with retry on transient network errors."""
-        return exchange.fetch_ticker(pair)
+        return exchange.fetch_ticker(pair, params={"timeout": 5000})
 
     @staticmethod
     @retry(max_attempts=2, base_delay=1.5, backoff=2.0)
@@ -1054,7 +1054,14 @@ class ExchangeManager:
 
     def get_live_prices_gbp(self, symbols: List[str]) -> Dict[str, float]:
         """Fetch current GBP prices for a list of symbols from exchanges."""
-        prices = {}
+        return {sym: data["price"] for sym, data in self.get_live_prices_with_changes_gbp(symbols).items()}
+
+    def get_live_prices_with_changes_gbp(self, symbols: List[str]) -> Dict[str, Dict]:
+        """Fetch current GBP prices and 24h change % for a list of symbols.
+
+        Returns {symbol: {"price": float, "change_24h": float|None}}
+        """
+        results = {}
         for sym in symbols:
             try:
                 result = self.find_best_pair(sym)
@@ -1068,16 +1075,21 @@ class ExchangeManager:
                 price = ticker.get("last") or ticker.get("close")
                 if not price:
                     continue
+                change_24h = ticker.get("percentage")
+                if change_24h is None:
+                    open_price = ticker.get("open")
+                    if open_price and open_price > 0:
+                        change_24h = ((price - open_price) / open_price) * 100
                 quote = pair.split("/")[1] if "/" in pair else "GBP"
-                if quote == "GBP":
-                    prices[sym.upper()] = price
-                else:
+                if quote != "GBP":
                     fx_rate = self._get_fx_rate("GBP", quote, exchange)
-                    if fx_rate:
-                        prices[sym.upper()] = price / fx_rate
+                    if not fx_rate:
+                        continue
+                    price = price / fx_rate
+                results[sym.upper()] = {"price": price, "change_24h": change_24h}
             except Exception as e:
-                logger.debug(f"Could not fetch price for {sym}: {e}")
-        return prices
+                logger.debug(f"Could not fetch price/change for {sym}: {e}")
+        return results
 
     def get_status(self) -> Dict[str, Any]:
         """Get connectivity and configuration status for all exchanges."""

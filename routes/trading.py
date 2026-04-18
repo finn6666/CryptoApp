@@ -621,6 +621,7 @@ def portfolio_holdings():
 
         # Get live prices for held coins
         live_prices = {}
+        ticker_changes = {}  # sym -> 24h change % from exchange tickers
         holdings_raw = tracker.get_holdings()
         if holdings_raw:
             held_symbols = {h["symbol"] for h in holdings_raw}
@@ -630,6 +631,7 @@ def portfolio_holdings():
                 from ml.market_monitor import get_market_monitor
                 monitor = get_market_monitor()
                 live_prices.update(monitor.get_portfolio_prices())
+                ticker_changes.update(monitor.get_portfolio_price_changes())
             except Exception:
                 pass
 
@@ -640,9 +642,19 @@ def portfolio_holdings():
                         if coin.symbol.upper() not in live_prices:
                             live_prices[coin.symbol.upper()] = coin.price
 
-            # 3) Fallback: fetch from exchange for any still missing — parallel per-symbol
+            # 3) Fallback: fetch from exchange for any still missing a price.
+            # 24h changes come from the monitor cache (refreshed every 5 min).
+            # On cold start, trigger a background monitor refresh so changes are
+            # available within seconds for the next request.
+            try:
+                from ml.market_monitor import get_market_monitor
+                _mon = get_market_monitor()
+                if _mon.portfolio_cache_is_cold:
+                    _mon.trigger_portfolio_refresh_async()
+            except Exception:
+                pass
+
             missing = [h["symbol"] for h in holdings_raw if h["symbol"] not in live_prices]
-            ticker_changes = {}  # sym -> 24h change % captured from exchange tickers
             if missing:
                 try:
                     import concurrent.futures
@@ -663,7 +675,11 @@ def portfolio_holdings():
                             price = ticker.get("last") or ticker.get("close")
                             if not price:
                                 return sym, None, None
-                            change_pct = ticker.get("percentage")  # 24h % from exchange
+                            change_pct = ticker.get("percentage")
+                            if change_pct is None:
+                                open_price = ticker.get("open")
+                                if open_price and open_price > 0:
+                                    change_pct = ((price - open_price) / open_price) * 100
                             quote = pair.split("/")[1] if "/" in pair else "GBP"
                             if quote == "GBP":
                                 return sym, price, change_pct
@@ -672,10 +688,10 @@ def portfolio_holdings():
                         except Exception:
                             return sym, None, None
 
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(missing), 20)) as pool:
                         done, _ = concurrent.futures.wait(
                             {pool.submit(_fetch_one, s): s for s in missing},
-                            timeout=6,
+                            timeout=20,
                             return_when=concurrent.futures.ALL_COMPLETED,
                         )
                         for f in done:

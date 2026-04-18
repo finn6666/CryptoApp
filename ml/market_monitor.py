@@ -162,20 +162,45 @@ class MarketMonitor:
 
             from ml.exchange_manager import get_exchange_manager
             mgr = get_exchange_manager()
-            prices = mgr.get_live_prices_gbp(held)
+            results = mgr.get_live_prices_with_changes_gbp(held)
 
             now = datetime.utcnow().isoformat()
-            for sym, price in prices.items():
-                self._portfolio_prices[sym] = {"price_gbp": price, "updated_at": now}
+            for sym, data in results.items():
+                self._portfolio_prices[sym] = {
+                    "price_gbp": data["price"],
+                    "change_24h": data.get("change_24h"),
+                    "updated_at": now,
+                }
 
             self._last_portfolio_refresh = datetime.utcnow()
-            logger.debug(f"[Monitor] Portfolio prices refreshed: {len(prices)}/{len(held)} coins")
+            logger.debug(f"[Monitor] Portfolio prices refreshed: {len(results)}/{len(held)} coins")
         except Exception as e:
             logger.warning(f"[Monitor] Portfolio price refresh error: {e}")
 
     def get_portfolio_prices(self) -> Dict[str, float]:
         """Return cached portfolio prices as {symbol: price_gbp}."""
         return {sym: data["price_gbp"] for sym, data in self._portfolio_prices.items()}
+
+    def get_portfolio_price_changes(self) -> Dict[str, float]:
+        """Return cached 24h price change percentages as {symbol: change_pct}.
+        Only includes symbols where the exchange ticker provided a percentage.
+        """
+        return {
+            sym: data["change_24h"]
+            for sym, data in self._portfolio_prices.items()
+            if data.get("change_24h") is not None
+        }
+
+    @property
+    def portfolio_cache_is_cold(self) -> bool:
+        """True if the portfolio price cache has never been populated (e.g. fresh restart)."""
+        return self._last_portfolio_refresh == datetime.min
+
+    def trigger_portfolio_refresh_async(self) -> None:
+        """Kick off a background portfolio price refresh without blocking the caller."""
+        import threading
+        t = threading.Thread(target=self._refresh_portfolio_prices, daemon=True, name="portfolio-refresh")
+        t.start()
 
     def _run_price_check(self):
         """Check held positions against exit thresholds using cached prices."""
