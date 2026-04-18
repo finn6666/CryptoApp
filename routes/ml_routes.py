@@ -4,7 +4,6 @@ ML pipeline, gem detection, agent analysis, and portfolio routes.
 
 import os
 import logging
-from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from services.app_state import run_async, parse_market_cap, parse_volume, project_root
@@ -151,6 +150,7 @@ def debug_ml_system():
 # ─── Agent Analysis ───────────────────────────────────────────────
 
 @ml_bp.route('/api/agents/analyze/<symbol>')
+@require_trading_auth
 def analyze_with_agents(symbol):
     if not state.official_adk_available:
         return jsonify({'error': 'ADK not available'}), 503
@@ -188,6 +188,7 @@ def analyze_with_agents(symbol):
 
 
 @ml_bp.route('/api/agents/metrics')
+@require_trading_auth
 def get_agent_metrics():
     if not state.official_adk_available:
         return jsonify({'error': 'ADK not available'}), 503
@@ -202,6 +203,7 @@ def get_agent_metrics():
 # ─── Portfolio ───────────────────────────────────────────────
 
 @ml_bp.route('/api/portfolio/analyze')
+@require_trading_auth
 def analyze_portfolio():
     if not state.official_adk_available:
         return jsonify({'error': 'ADK not available'}), 503
@@ -248,20 +250,26 @@ def analyze_portfolio():
 # ─── Gem Score History ────────────────────────────────────────
 
 @ml_bp.route('/api/gems/history')
+@require_trading_auth
 def gem_score_history():
     """Get historical gem score predictions. Optional ?symbol=X filter."""
     try:
         from ml.gem_score_tracker import get_gem_score_tracker
         tracker = get_gem_score_tracker()
         symbol = request.args.get('symbol')
-        limit = min(int(request.args.get('limit', 200)), 1000)
+        try:
+            limit = min(int(request.args.get('limit', 200)), 1000)
+        except (ValueError, TypeError):
+            return jsonify({"error": "limit must be an integer"}), 400
         history = tracker.get_history(symbol=symbol, limit=limit)
         return jsonify({"entries": len(history), "history": history})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Gem score history error: {e}")
+        return jsonify({"error": "Failed to load gem score history"}), 500
 
 
 @ml_bp.route('/api/gems/history/<symbol>/trend')
+@require_trading_auth
 def gem_score_trend(symbol):
     """Get trend analysis for a specific coin's gem scores over time."""
     try:
@@ -270,10 +278,12 @@ def gem_score_trend(symbol):
         trend = tracker.get_symbol_trend(symbol.upper())
         return jsonify(trend)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Gem score trend error for {symbol}: {e}")
+        return jsonify({"error": "Failed to load gem score trend"}), 500
 
 
 @ml_bp.route('/api/gems/accuracy')
+@require_trading_auth
 def gem_accuracy_report():
     """Get gem score tracker accuracy metrics."""
     try:
@@ -282,12 +292,14 @@ def gem_accuracy_report():
         report = tracker.get_accuracy_report()
         return jsonify(report)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Gem accuracy report error: {e}")
+        return jsonify({"error": "Failed to load accuracy report"}), 500
 
 
 # ─── Heatmap Data ─────────────────────────────────────────────
 
 @ml_bp.route('/api/heatmap-data')
+@require_trading_auth
 def heatmap_data():
     """Return top coins with gem scores for the dashboard heatmap.
     Sorted by attractiveness_score descending; max 60 coins.
@@ -319,4 +331,4 @@ def heatmap_data():
         })
     except Exception as e:
         logger.error(f"Heatmap data error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to load heatmap data"}), 500

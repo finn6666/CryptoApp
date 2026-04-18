@@ -12,44 +12,77 @@ async function loadOverviewCards() {
 
 // ─── Portfolio Summary ───────────────────────────────────────
 async function loadPortfolioCard() {
+    const valEl  = document.getElementById('sidebarPortfolioValue');
+    const pnlEl  = document.getElementById('sidebarPortfolioPnl');
+    const subEl  = document.getElementById('sidebarPortfolioSub');
+    const listEl = document.getElementById('sidebarHoldingsList');
+    if (!valEl) return;
+
     try {
-        const res = await fetch('/api/portfolio/holdings', { headers: authHeaders() });
-        const data = await res.json();
+        const data = await fetchPortfolioHoldings();
         if (data.error) throw new Error(data.error);
 
-        const summary = data.summary || {};
+        const summary  = data.summary  || {};
         const holdings = data.holdings || [];
 
         const totalValue = summary.total_value_gbp ?? 0;
-        const totalPnL = summary.unrealised_pnl_gbp ?? 0;
-        const totalCost = summary.total_cost_gbp ?? 0;
-        const pnlPct = totalCost > 0 ? ((totalPnL / totalCost) * 100) : null;
-
-        const valEl = document.getElementById('portfolioValue');
-        const subEl = document.getElementById('portfolioPnL');
+        const totalPnL   = summary.unrealised_pnl_gbp ?? 0;
+        const totalCost  = summary.total_cost_gbp ?? 0;
+        const pnlPct     = totalCost > 0 ? (totalPnL / totalCost) * 100 : null;
 
         if (holdings.length === 0) {
             valEl.textContent = '£0.00';
-            subEl.textContent = 'No open positions';
-            subEl.className = 'overview-card-sub neutral';
+            if (pnlEl) { pnlEl.textContent = 'No open positions'; pnlEl.className = 'portfolio-card__pnl'; pnlEl.onclick = null; }
+            if (subEl) subEl.textContent = '';
+            if (listEl) listEl.style.display = 'none';
             return;
         }
 
         valEl.textContent = `£${Number(totalValue).toFixed(2)}`;
 
-        const sign = totalPnL >= 0 ? '+' : '-';
-        let subText = `${sign}£${Math.abs(Number(totalPnL)).toFixed(2)}`;
-        if (pnlPct !== null) {
-            subText += ` (${sign}${Math.abs(Number(pnlPct)).toFixed(1)}%)`;
+        if (pnlEl) {
+            const sign = totalPnL >= 0 ? '+' : '';
+            let txt = `${sign}£${Math.abs(Number(totalPnL)).toFixed(2)}`;
+            if (pnlPct !== null) txt += ` (${sign}${Math.abs(Number(pnlPct)).toFixed(1)}%)`;
+            pnlEl.textContent = txt;
+            pnlEl.className = 'portfolio-card__pnl ' + (totalPnL >= 0 ? 'positive' : 'negative');
+            pnlEl.onclick = null;
+            pnlEl.style.cursor = '';
         }
-        subText += ` · ${holdings.length} position${holdings.length !== 1 ? 's' : ''}`;
-        subEl.textContent = subText;
-        subEl.className = 'overview-card-sub ' + (totalPnL >= 0 ? 'positive' : 'negative');
+
+        if (listEl) {
+            const activeHoldings = holdings.filter(h => (h.current_value_gbp ?? 0) > 0.01);
+            if (activeHoldings.length === 0) {
+                listEl.style.display = 'none';
+                if (subEl) subEl.textContent = 'No open positions';
+            } else {
+                listEl.style.display = '';
+                if (subEl) subEl.textContent = `${activeHoldings.length} position${activeHoldings.length !== 1 ? 's' : ''}`;
+                const sortedHoldings = [...activeHoldings].sort((a, b) => (b.unrealised_pnl_pct ?? 0) - (a.unrealised_pnl_pct ?? 0));
+                listEl.innerHTML = sortedHoldings.map(h => {
+                    const pct = h.unrealised_pnl_pct ?? 0;
+                    const val = h.current_value_gbp ?? 0;
+                    const cls = pct >= 0 ? 'positive' : 'negative';
+                    const sign = pct >= 0 ? '+' : '';
+                    const stale = h.price_stale ? ' style="opacity: 0.5"' : '';
+                    const est = h.price_stale ? ' (est.)' : '';
+                    return `<div class="holding-row"${stale}>
+                        <span class="holding-row__symbol">${escapeHtml(h.symbol)}</span>
+                        <span class="holding-row__value">£${Number(val).toFixed(2)}${est}</span>
+                        <span class="holding-row__pnl ${cls}">${sign}${Number(pct).toFixed(1)}%</span>
+                    </div>`;
+                }).join('');
+            }
+        }
     } catch (e) {
-        console.warn('Portfolio card:', e.message);
-        document.getElementById('portfolioValue').textContent = '—';
-        document.getElementById('portfolioPnL').textContent = 'Unavailable';
-        document.getElementById('portfolioPnL').className = 'overview-card-sub neutral';
+        if (e.status === 401) {
+            valEl.textContent = '—';
+            if (pnlEl) { pnlEl.textContent = 'Tap to set API key'; pnlEl.className = 'portfolio-card__pnl'; pnlEl.style.cursor = 'pointer'; pnlEl.onclick = () => openAuthModal(); }
+        } else {
+            console.warn('Portfolio card:', e.message);
+            valEl.textContent = '—';
+            if (pnlEl) { pnlEl.textContent = 'Could not load'; pnlEl.className = 'portfolio-card__pnl'; }
+        }
     }
 }
 
@@ -60,7 +93,7 @@ async function loadTradingCard() {
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 
-        const budget = data.remaining_budget ?? data.budget_remaining ?? data.daily_budget ?? null;
+        const budget = data.remaining_today_gbp ?? data.remaining_budget ?? data.budget_remaining ?? data.daily_budget ?? null;
         const active = data.active_trades ?? data.open_trades ?? 0;
         const killSwitch = data.kill_switch ?? data.kill_switch_active ?? false;
 
@@ -76,7 +109,7 @@ async function loadTradingCard() {
         }
 
         if (budget !== null) {
-            valEl.textContent = `$${Number(budget).toFixed(2)}`;
+            valEl.textContent = `£${Number(budget).toFixed(2)}`;
         } else {
             valEl.textContent = 'Active';
         }
@@ -203,7 +236,7 @@ async function loadMonitorCard() {
 // ─── Exchange Status ─────────────────────────────────────────
 async function loadExchangeCard() {
     try {
-        const res = await fetch('/api/exchanges/status');
+        const res = await fetch('/api/exchanges/status', { headers: authHeaders() });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
 

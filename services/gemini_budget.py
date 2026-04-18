@@ -1,0 +1,165 @@
+"""
+Gemini API daily cost tracker and budget guard.
+
+Tracks estimated API spend in GBP and refuses new calls once the daily
+budget is exhausted. Resets automatically at midnight UTC.
+
+Usage:
+    from services.gemini_budget import get_gemini_budget, BudgetExceededError
+
+    budget = get_gemini_budget()
+    budget.check_or_raise("quick_screen")   # raises if budget exceeded
+    budget.record("quick_screen")           # record after the call
+
+Call types and their estimated cost (conservative, based on flash-lite pricing
+with ~10K input + 2K output tokens per call):
+    quick_screen    — 1 Gemini call   — £0.0010
+    full_analysis   — 6 Gemini calls  — £0.0060 (per coin, all 5 agents + orchestrator)
+    agent_recheck   — 6 Gemini calls  — £0.0060 (per coin, full orchestrator pipeline)
+    claude_runner   — 1 Gemini call   — £0.0015
+    generic         — 1 Gemini call   — £0.0015
+"""
+
+import json
+import logging
+import threading
+from datetime import date
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Conservative per-call-type cost estimates in GBP (overestimates intentionally)
+CALL_COSTS_GBP: dict[str, float] = {
+    "quick_screen":  0.0010,
+    "full_analysis": 0.0060,
+    "agent_recheck": 0.0060,
+    "claude_runner": 0.0015,
+    "generic":       0.0015,
+}
+
+_BUDGET_FILE = Path("data/gemini_budget.json")
+
+
+class BudgetExceededError(RuntimeError):
+    """Raised when the daily Gemini API budget would be exceeded."""
+
+
+class GeminiBudget:
+    """Thread-safe daily Gemini API cost tracker."""
+
+    def __init__(self, daily_limit_gbp: float = 1.0):
+        self.daily_limit_gbp = daily_limit_gbp
+        self._lock = threading.Lock()
+        self._state: dict = {}
+        self._load()
+
+    # ─── Persistence ──────────────────────────────────────────────────────────
+
+    def _load(self) -> None:
+        today = str(date.today())
+        try:
+            if _BUDGET_FILE.exists():
+                data = json.loads(_BUDGET_FILE.read_text())
+                if data.get("date") == today:
+                    self._state = data
+                    return
+        except Exception:
+            pass
+        self._state = {"date": today, "calls": {}, "estimated_gbp": 0.0}
+
+    def _save(self) -> None:
+        try:
+            _BUDGET_FILE.parent.mkdir(parents=True, exist_ok=True)
+            _BUDGET_FILE.write_text(json.dumps(self._state, indent=2))
+        except Exception as e:
+            logger.warning("GeminiBudget: could not save state: %s", e)
+
+    def _reset_if_new_day(self) -> None:
+        today = str(date.today())
+        if self._state.get("date") != today:
+            self._state = {"date": today, "calls": {}, "estimated_gbp": 0.0}
+
+    # ─── Public API ───────────────────────────────────────────────────────────
+
+    def check_or_raise(self, call_type: str = "generic") -> None:
+        """
+        Raise BudgetExceededError if adding this call would exceed the daily limit.
+        Call before every Gemini API call.
+        """
+        cost = CALL_COSTS_GBP.get(call_type, CALL_COSTS_GBP["generic"])
+        with self._lock:
+            self._reset_if_new_day()
+            current = float(self._state.get("estimated_gbp", 0.0))
+            if current + cost > self.daily_limit_gbp:
+                raise BudgetExceededError(
+                    f"Gemini daily budget would be exceeded: "
+                    f"£{current:.4f} spent + £{cost:.4f} for '{call_type}' "
+                    f"> £{self.daily_limit_gbp:.2f} limit"
+                )
+
+    def record(self, call_type: str = "generic") -> None:
+        """Record a completed API call and update estimated cost."""
+        cost = CALL_COSTS_GBP.get(call_type, CALL_COSTS_GBP["generic"])
+        with self._lock:
+            self._reset_if_new_day()
+            self._state["estimated_gbp"] = round(
+                float(self._state.get("estimated_gbp", 0.0)) + cost, 6
+            )
+            calls = self._state.setdefault("calls", {})
+            calls[call_type] = calls.get(call_type, 0) + 1
+            self._save()
+        logger.debug(
+            "GeminiBudget: recorded '%s' (£%.4f) — today total £%.4f / £%.2f",
+            call_type, cost, self._state["estimated_gbp"], self.daily_limit_gbp,
+        )
+
+    def check_and_record(self, call_type: str = "generic") -> None:
+        """Atomically check budget and record the call. Raises BudgetExceededError if over limit."""
+        cost = CALL_COSTS_GBP.get(call_type, CALL_COSTS_GBP["generic"])
+        with self._lock:
+            self._reset_if_new_day()
+            current = float(self._state.get("estimated_gbp", 0.0))
+            if current + cost > self.daily_limit_gbp:
+                raise BudgetExceededError(
+                    f"Gemini daily budget exceeded: "
+                    f"£{current:.4f} + £{cost:.4f} > £{self.daily_limit_gbp:.2f}"
+                )
+            self._state["estimated_gbp"] = round(current + cost, 6)
+            calls = self._state.setdefault("calls", {})
+            calls[call_type] = calls.get(call_type, 0) + 1
+            self._save()
+        logger.debug(
+            "GeminiBudget: '%s' approved+recorded (£%.4f) — today £%.4f / £%.2f",
+            call_type, cost, self._state["estimated_gbp"], self.daily_limit_gbp,
+        )
+
+    def get_status(self) -> dict:
+        with self._lock:
+            self._reset_if_new_day()
+            spent = float(self._state.get("estimated_gbp", 0.0))
+            return {
+                "date": self._state.get("date"),
+                "estimated_spent_gbp": round(spent, 4),
+                "daily_limit_gbp": self.daily_limit_gbp,
+                "remaining_gbp": round(max(0.0, self.daily_limit_gbp - spent), 4),
+                "pct_used": round(100 * spent / self.daily_limit_gbp, 1) if self.daily_limit_gbp else 0,
+                "calls": dict(self._state.get("calls", {})),
+            }
+
+
+# ─── Singleton ────────────────────────────────────────────────────────────────
+
+_budget_instance: GeminiBudget | None = None
+_budget_lock = threading.Lock()
+
+
+def get_gemini_budget() -> GeminiBudget:
+    """Return the module-level GeminiBudget singleton."""
+    global _budget_instance
+    if _budget_instance is None:
+        with _budget_lock:
+            if _budget_instance is None:
+                import os
+                limit = float(os.getenv("GEMINI_DAILY_BUDGET_GBP", "1.0"))
+                _budget_instance = GeminiBudget(daily_limit_gbp=limit)
+    return _budget_instance

@@ -10,14 +10,14 @@ import uuid
 import math
 import logging
 import smtplib
-import asyncio
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, date, timedelta
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from itsdangerous import URLSafeTimedSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,10 @@ class TradeProposal:
     order_id: Optional[str] = None
     error: Optional[str] = None
     sell_quantity: Optional[float] = None  # Exact coin qty to sell (bypasses amount→qty reconversion)
+    trade_mode: str = "accumulate"  # "accumulate" (hold weeks/months) or "swing" (tight exit, short hold)
+    trigger_type: str = ""  # type of trigger that prompted this sell (e.g. "stop_loss", "agent_recheck")
+    debate_data: dict = field(default_factory=dict)  # bull/bear/referee texts + conviction scores
+    preferred_exchange: str = ""  # exchange where tokens are held (for sells — route there first)
 
     def __post_init__(self):
         if not self.created_at:
@@ -66,7 +70,7 @@ class DailyBudget:
 class TradingEngine:
     """
     Core trading engine with safety limits and email approval.
-    
+
     Safety features:
     - Hard daily spend limit (from DAILY_TRADE_BUDGET_GBP env var)
     - Per-trade max (never exceed daily limit in one trade)
@@ -75,6 +79,9 @@ class TradingEngine:
     - All trades logged to disk
     - Kill switch to halt all trading
     """
+
+    # Time-sensitive triggers that always auto-execute regardless of SELL_REQUIRE_APPROVAL
+    MECHANICAL_TRIGGERS = {"stop_loss", "trailing_stop", "profit_tier_1", "profit_tier_2", "profit_target", "pump_exit"}
 
     def __init__(
         self,
@@ -91,6 +98,9 @@ class TradingEngine:
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.server_url = server_url
+
+        # Thread safety — accessed from Flask request threads + background scan/sell threads
+        self._lock = threading.Lock()
 
         # State
         self.proposals: Dict[str, TradeProposal] = {}
@@ -128,7 +138,7 @@ class TradingEngine:
 
         # Sell-side control
         self.sell_require_approval = os.getenv(
-            "SELL_REQUIRE_APPROVAL", "false"
+            "SELL_REQUIRE_APPROVAL", "true"
         ).lower() in ("1", "true", "yes")
         if self.sell_require_approval:
             logger.info("Sell-side: manual approval REQUIRED for ALL sells")
@@ -144,8 +154,7 @@ class TradingEngine:
         # Token signing for approve/reject links
         secret = os.getenv('SECRET_KEY')
         if not secret:
-            logger.error('SECRET_KEY not set — trade approval tokens will be insecure!')
-            secret = os.urandom(32).hex()  # random per-instance; tokens won't survive restarts
+            raise RuntimeError('SECRET_KEY is not set — refusing to start without it. Set SECRET_KEY in .env.')
         self._serializer = URLSafeTimedSerializer(secret, salt='trade-approval')
 
         # Load persisted state
@@ -153,7 +162,7 @@ class TradingEngine:
 
         logger.info(
             f"Trading engine initialized: budget=£{daily_budget_gbp}/day, "
-            f"exchange={exchange_id}, email={self.email_to}"
+            f"exchange={self.exchange_id}, email={self.email_to}"
         )
         logger.info(
             f"Safety: max_trade={self.max_trade_pct*100:.0f}% of budget, "
@@ -204,6 +213,22 @@ class TradingEngine:
                 raise
         return self._exchange
 
+    def _should_auto_approve(self, side: str, amount_gbp: float, trigger_type: str) -> bool:
+        """Determine whether a trade should auto-execute without email approval."""
+        # Hard ceiling: never auto-approve above this amount regardless of trigger
+        mechanical_cap = float(os.getenv("MECHANICAL_AUTO_APPROVE_MAX_GBP", "100.0"))
+
+        is_sell = side.lower() == "sell"
+        if is_sell:
+            if trigger_type in self.MECHANICAL_TRIGGERS:
+                return amount_gbp <= mechanical_cap
+            if amount_gbp <= self.approval_threshold_gbp:
+                return True
+            return not self.sell_require_approval
+        if amount_gbp > self.approval_threshold_gbp:
+            return False
+        return self.buy_auto_approve
+
     # ─── Budget Tracking ──────────────────────────────────────
 
     def _get_today_budget(self) -> DailyBudget:
@@ -246,12 +271,46 @@ class TradingEngine:
         recommendation: str,
         coin_name: str = "",
         sell_quantity: Optional[float] = None,
+        trade_mode: str = "accumulate",
+        trigger_type: str = "",
+        debate_data: Optional[dict] = None,
+        preferred_exchange: str = "",
+        skip_cooldown: bool = False,
     ) -> Dict[str, Any]:
         """
         Create a trade proposal and send approval email.
         
         Returns dict with proposal status.
         """
+        with self._lock:
+            return self._propose_trade_locked(
+                symbol=symbol, side=side, amount_gbp=amount_gbp,
+                current_price=current_price, reason=reason,
+                confidence=confidence, recommendation=recommendation,
+                coin_name=coin_name, sell_quantity=sell_quantity,
+                trade_mode=trade_mode, trigger_type=trigger_type,
+                debate_data=debate_data, preferred_exchange=preferred_exchange,
+                skip_cooldown=skip_cooldown,
+            )
+
+    def _propose_trade_locked(
+        self,
+        symbol: str,
+        side: str,
+        amount_gbp: float,
+        current_price: float,
+        reason: str,
+        confidence: int,
+        recommendation: str,
+        coin_name: str = "",
+        sell_quantity: Optional[float] = None,
+        trade_mode: str = "accumulate",
+        trigger_type: str = "",
+        debate_data: Optional[dict] = None,
+        preferred_exchange: str = "",
+        skip_cooldown: bool = False,
+    ) -> Dict[str, Any]:
+        """Internal propose_trade — must be called with self._lock held."""
         if self.kill_switch:
             return {"success": False, "error": "Trading is halted (kill switch active)"}
 
@@ -276,11 +335,22 @@ class TradingEngine:
             # Hard cap — never exceed daily budget in a single trade
             amount_gbp = min(amount_gbp, self.daily_budget_gbp)
 
-            # Safety: cap single trade to max_trade_pct of daily budget
-            max_single = self.daily_budget_gbp * self.max_trade_pct
+            # Conviction-tiered sizing: scale up position for high-confidence signals.
+            # At 80%+ conviction deploy up to 80% of daily budget; 65%+ up to 60%;
+            # below 65% use the standard 50% cap.
+            if confidence >= 80:
+                max_pct = float(os.getenv("MAX_TRADE_PCT_HIGH", "80")) / 100
+            elif confidence >= 65:
+                max_pct = float(os.getenv("MAX_TRADE_PCT_MED", "60")) / 100
+            else:
+                max_pct = self.max_trade_pct
+            max_single = self.daily_budget_gbp * max_pct
             if amount_gbp > max_single:
                 amount_gbp = max_single
-                logger.info(f"Capped trade to max single trade: £{amount_gbp:.4f}")
+                logger.info(
+                    f"Capped trade to conviction-tiered max: £{amount_gbp:.4f} "
+                    f"({max_pct*100:.0f}% at {confidence}% conviction)"
+                )
 
             # Enforce exchange minimum order size — bump up if needed
             min_order_gbp = self._get_min_order_gbp(symbol)
@@ -299,16 +369,50 @@ class TradingEngine:
                         ),
                     }
 
-        # Per-side cooldown check (buys and sells have independent cooldowns)
-        last_time = self._last_sell_proposal_time if is_sell else self._last_buy_proposal_time
-        if last_time:
-            elapsed = (datetime.utcnow() - last_time).total_seconds() / 60
-            if elapsed < self.trade_cooldown_min:
-                remaining_min = self.trade_cooldown_min - elapsed
-                return {
-                    "success": False,
-                    "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
-                }
+            # Sellability gate: ensure the position will be large enough to exit
+            # via Tier 1 partial sell (33% of position by default — the smallest
+            # exit we'd ever make). If even a full exit would be below the exchange
+            # minimum we'd be locked in, so reject the buy now.
+            if min_order_gbp > 0 and current_price and current_price > 0:
+                tier1_fraction = float(os.getenv("SELL_TIER1_FRACTION", "0.33"))
+                existing_qty = 0.0
+                try:
+                    from ml.portfolio_tracker import get_portfolio_tracker
+                    holding = get_portfolio_tracker().holdings.get(symbol.upper(), {})
+                    existing_qty = holding.get("quantity", 0.0)
+                except Exception:
+                    pass
+                existing_value_gbp = existing_qty * current_price
+                total_position_gbp = amount_gbp + existing_value_gbp
+                if (total_position_gbp * tier1_fraction) < min_order_gbp:
+                    min_needed_gbp = min_order_gbp / tier1_fraction
+                    logger.warning(
+                        f"{symbol}: buy rejected — tier 1 sell ({tier1_fraction*100:.0f}% = "
+                        f"£{total_position_gbp * tier1_fraction:.2f}) would be below exchange "
+                        f"min £{min_order_gbp:.2f}. Need at least £{min_needed_gbp:.2f} total."
+                    )
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Position of £{total_position_gbp:.2f} would not be sellable — "
+                            f"tier 1 sell (£{total_position_gbp * tier1_fraction:.2f}) is below "
+                            f"exchange minimum £{min_order_gbp:.2f}. "
+                            f"Need at least £{min_needed_gbp:.2f} total."
+                        ),
+                    }
+
+        # Per-side cooldown check (buys and sells have independent cooldowns).
+        # Sell automation batch-processes multiple holdings — skip cooldown for those.
+        if not skip_cooldown:
+            last_time = self._last_sell_proposal_time if is_sell else self._last_buy_proposal_time
+            if last_time:
+                elapsed = (datetime.utcnow() - last_time).total_seconds() / 60
+                if elapsed < self.trade_cooldown_min:
+                    remaining_min = self.trade_cooldown_min - elapsed
+                    return {
+                        "success": False,
+                        "error": f"{'Sell' if is_sell else 'Buy'} cooldown active — wait {remaining_min:.0f} more minutes",
+                    }
 
         # Reject if no valid price (can happen if coin data has price=None)
         if not current_price or current_price <= 0:
@@ -336,6 +440,10 @@ class TradingEngine:
             agent_recommendation=recommendation,
             coin_name=coin_name,
             sell_quantity=sell_quantity,
+            trade_mode=trade_mode,
+            trigger_type=trigger_type,
+            debate_data=debate_data or {},
+            preferred_exchange=preferred_exchange,
         )
 
         self.proposals[proposal.id] = proposal
@@ -349,15 +457,8 @@ class TradingEngine:
         budget.trades_proposed += 1
 
         # Send approval email only when manual approval is needed.
-        # Auto-approved trades skip this — the execution email covers it.
-        will_auto_approve = False
-        if is_sell:
-            will_auto_approve = not self.sell_require_approval
-        else:
-            will_auto_approve = self.buy_auto_approve
-
         email_sent = False
-        if not will_auto_approve:
+        if not self._should_auto_approve(side, amount_gbp, trigger_type):
             email_sent = self._send_approval_email(proposal)
 
         self._save_state()
@@ -385,13 +486,20 @@ class TradingEngine:
         recommendation: str,
         coin_name: str = "",
         sell_quantity: Optional[float] = None,
+        trade_mode: str = "accumulate",
+        trigger_type: str = "",
+        debate_data: Optional[dict] = None,
+        preferred_exchange: str = "",
+        skip_cooldown: bool = False,
     ) -> Dict[str, Any]:
         """
         Propose a trade and, if auto-approve is enabled for that side,
         immediately approve and execute it.  Falls back to the normal
         email-approval flow when auto-approve is off.
 
-        Sells auto-execute unless SELL_REQUIRE_APPROVAL is set.
+        Mechanical sell triggers (stop_loss, trailing_stop, profit tiers) always
+        auto-execute regardless of SELL_REQUIRE_APPROVAL — they are time-sensitive.
+        Discretionary triggers (agent_recheck, stagnation_exit) honour the flag.
         """
         result = self.propose_trade(
             symbol=symbol,
@@ -403,37 +511,28 @@ class TradingEngine:
             recommendation=recommendation,
             coin_name=coin_name,
             sell_quantity=sell_quantity,
+            trade_mode=trade_mode,
+            trigger_type=trigger_type,
+            debate_data=debate_data,
+            preferred_exchange=preferred_exchange,
+            skip_cooldown=skip_cooldown,
         )
 
         if not result.get("success"):
             return result
 
         proposal_id = result["proposal_id"]
-        is_sell = side.lower() == "sell"
 
-        # Determine whether to auto-approve this trade
-        should_auto = False
-        if is_sell:
-            should_auto = not self.sell_require_approval
-        else:
-            # Buys: honour existing buy_auto_approve flag
-            should_auto = self.buy_auto_approve
-
-        # Override: trades above approval threshold always require manual approval
-        if amount_gbp > self.approval_threshold_gbp:
-            logger.info(
-                f"Trade £{amount_gbp:.2f} exceeds approval threshold "
-                f"£{self.approval_threshold_gbp:.2f} — requiring manual approval"
-            )
-            should_auto = False
-
+        should_auto = self._should_auto_approve(side, amount_gbp, trigger_type)
         if not should_auto:
+            logger.info(
+                f"{side.upper()} {symbol} £{amount_gbp:.2f} — requiring manual approval"
+            )
             return result  # normal email-approval flow
 
         # Auto-approve: execute immediately
-        side_label = "SELL" if is_sell else "BUY"
         logger.info(
-            f"Auto-approving {side_label} {symbol} £{amount_gbp:.4f} "
+            f"Auto-approving {side.upper()} {symbol} £{amount_gbp:.4f} "
             f"(confidence {confidence}%)"
         )
         exec_result = self.approve_trade(proposal_id)
@@ -444,6 +543,11 @@ class TradingEngine:
 
     def approve_trade(self, proposal_id: str) -> Dict[str, Any]:
         """Approve and execute a pending trade."""
+        with self._lock:
+            return self._approve_trade_locked(proposal_id)
+
+    def _approve_trade_locked(self, proposal_id: str) -> Dict[str, Any]:
+        """Internal approve — must be called with self._lock held."""
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return {"success": False, "error": "Proposal not found"}
@@ -474,6 +578,11 @@ class TradingEngine:
 
     def reject_trade(self, proposal_id: str) -> Dict[str, Any]:
         """Reject a pending trade."""
+        with self._lock:
+            return self._reject_trade_locked(proposal_id)
+
+    def _reject_trade_locked(self, proposal_id: str) -> Dict[str, Any]:
+        """Internal reject — must be called with self._lock held."""
         proposal = self.proposals.get(proposal_id)
         if not proposal:
             return {"success": False, "error": "Proposal not found"}
@@ -530,9 +639,17 @@ class TradingEngine:
                 quote_currency = symbol_pair.split("/")[1] if "/" in symbol_pair else "GBP"
                 amount_in_quote = proposal.amount_gbp
                 if quote_currency != "GBP":
-                    # Approximate GBP → quote conversion
-                    approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
-                    fx_rate = approx_fx.get(quote_currency, 1.27)
+                    fx_rate = None
+                    try:
+                        from ml.exchange_manager import get_exchange_manager
+                        fx_rate = get_exchange_manager()._get_fx_rate("GBP", quote_currency, exchange)
+                    except Exception:
+                        pass
+                    if not fx_rate:
+                        proposal.status = "rejected"
+                        proposal.error = f"Cannot convert GBP to {quote_currency} — live FX rate unavailable"
+                        logger.error(f"Legacy FX lookup failed for GBP->{quote_currency}, aborting trade")
+                        return {"success": False, "error": proposal.error}
                     amount_in_quote = proposal.amount_gbp * fx_rate
                     logger.info(f"Legacy FX: £{proposal.amount_gbp:.4f} → {amount_in_quote:.4f} {quote_currency} (rate {fx_rate})")
 
@@ -543,20 +660,44 @@ class TradingEngine:
                 else:
                     quantity = amount_in_quote / current_price
 
-                # Enforce exchange minimum order quantity (buy-side only)
-                if proposal.side != "sell":
-                    try:
-                        market = exchange.market(symbol_pair)
-                        min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
-                        min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                # Enforce exchange minimum order quantity
+                try:
+                    market = exchange.market(symbol_pair)
+                    min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
+                    min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
+                    if proposal.side == "sell":
+                        # For sells we cannot bump — abort if below exchange minimum
+                        if min_qty and quantity < min_qty:
+                            proposal.status = "rejected"
+                            proposal.error = (
+                                f"Sell quantity {quantity:.8f} below exchange minimum {min_qty:.8f} "
+                                f"— position too small to sell"
+                            )
+                            logger.info(
+                                f"Legacy sell {proposal.symbol}: quantity {quantity:.8f} < min {min_qty:.8f} "
+                                f"— skipping to avoid exchange rejection"
+                            )
+                            return {"success": False, "error": proposal.error}
+                        if min_cost and (quantity * current_price) < min_cost:
+                            proposal.status = "rejected"
+                            proposal.error = (
+                                f"Sell cost £{quantity * current_price / fx_rate if quote_currency != 'GBP' else quantity * current_price:.4f} "
+                                f"below exchange minimum — position too small to sell"
+                            )
+                            logger.info(
+                                f"Legacy sell {proposal.symbol}: cost below min {min_cost:.4f} "
+                                f"— skipping to avoid exchange rejection"
+                            )
+                            return {"success": False, "error": proposal.error}
+                    else:
                         if min_qty and quantity < min_qty:
                             quantity = min_qty * 1.02  # 2% buffer
                             logger.info(f"Legacy: bumped quantity to min {quantity:.8f} (min={min_qty:.8f})")
                         if min_cost and (quantity * current_price) < min_cost:
                             quantity = (min_cost * 1.02) / current_price
                             logger.info(f"Legacy: bumped quantity to meet cost min {min_cost:.4f}")
-                    except Exception as e:
-                        logger.debug(f"Could not check min order for {symbol_pair}: {e}")
+                except Exception as e:
+                    logger.debug(f"Could not check min order for {symbol_pair}: {e}")
 
                 if proposal.side == "buy":
                     order = exchange.create_market_buy_order(symbol_pair, quantity)
@@ -605,7 +746,11 @@ class TradingEngine:
             self._record_to_portfolio(proposal, exchange_used, fee_gbp=fee_gbp)
 
             # Send confirmation email
-            self._send_execution_email(proposal)
+            if not self._send_execution_email(proposal):
+                logger.warning(
+                    f"Execution email not sent for {proposal.side.upper()} {proposal.symbol} "
+                    f"— check SMTP config or logs above"
+                )
 
             logger.info(
                 f"TRADE EXECUTED: {proposal.side.upper()} {(proposal.quantity or 0):.6f} "
@@ -614,14 +759,41 @@ class TradingEngine:
             )
 
             # Write to shared audit log for Activity Log UI
-            self._write_audit("trade_executed", {
+            audit_entry: Dict[str, Any] = {
                 "symbol": proposal.symbol,
                 "side": proposal.side,
                 "amount_gbp": round(proposal.amount_gbp, 2),
                 "price": proposal.execution_price,
                 "exchange": exchange_used,
                 "confidence": proposal.confidence,
-            })
+            }
+            if proposal.debate_data:
+                audit_entry["bull_conviction"] = proposal.debate_data.get("bull_conviction")
+                audit_entry["bear_conviction"] = proposal.debate_data.get("bear_conviction")
+                audit_entry["regime"] = proposal.debate_data.get("regime")
+            self._write_audit("trade_executed", audit_entry)
+
+            # After a sell executes, kick off a background scan to redeploy the
+            # freed capital rather than waiting up to 12h for the next scheduled scan.
+            # Only triggers for sells above RECYCLE_MIN_GBP to avoid dust exits
+            # burning Gemini budget. Scan loop's own cooldown prevents spam.
+            if proposal.side == "sell":
+                recycle_min = float(os.getenv("RECYCLE_MIN_GBP", "2.00"))
+                if proposal.amount_gbp >= recycle_min:
+                    try:
+                        import threading
+                        from ml.scan_loop import get_scan_loop
+                        threading.Thread(
+                            target=get_scan_loop().run_scan,
+                            kwargs={"triggered_by": "post_sell_recycle"},
+                            daemon=True,
+                        ).start()
+                        logger.info(
+                            f"Post-sell recycle scan triggered for {proposal.symbol} "
+                            f"(freed £{proposal.amount_gbp:.2f})"
+                        )
+                    except Exception as _e:
+                        logger.debug(f"Post-sell recycle scan failed to start: {_e}")
 
             return {
                 "success": True,
@@ -656,8 +828,6 @@ class TradingEngine:
 
     def _write_audit(self, event: str, data: Dict[str, Any]):
         """Append an event to the shared audit log (JSONL) for the Activity Log UI."""
-        from pathlib import Path
-        import json as _json
         audit_file = Path("data/trades/audit_log.jsonl")
         entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -666,8 +836,19 @@ class TradingEngine:
         }
         try:
             audit_file.parent.mkdir(parents=True, exist_ok=True)
-            with open(audit_file, "a") as f:
-                f.write(_json.dumps(entry, default=str) + "\n")
+            # Rotate if file exceeds 10 MB
+            max_audit_bytes = int(os.getenv("AUDIT_LOG_MAX_BYTES", str(10 * 1024 * 1024)))
+            if audit_file.exists() and audit_file.stat().st_size > max_audit_bytes:
+                rotated = audit_file.with_suffix(".jsonl.old")
+                try:
+                    os.replace(audit_file, rotated)
+                    logger.info(f"Rotated audit log ({max_audit_bytes} bytes exceeded)")
+                except Exception as rot_err:
+                    logger.warning(f"Failed to rotate audit log: {rot_err}")
+            # Open with restrictive permissions (owner read/write only)
+            fd = os.open(str(audit_file), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+            with os.fdopen(fd, "a") as f:
+                f.write(json.dumps(entry, default=str) + "\n")
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
 
@@ -688,6 +869,8 @@ class TradingEngine:
                 amount_gbp=proposal.amount_gbp,
                 max_amount_gbp=remaining,
                 quantity=proposal.sell_quantity,
+                expected_price=proposal.price_at_proposal,
+                preferred_exchange=proposal.preferred_exchange or None,
             )
             if result.get("success"):
                 return result
@@ -696,6 +879,12 @@ class TradingEngine:
             error = result.get("error", "")
             if "nsufficient" in error or "budget" in error or "minimum" in error:
                 raise RuntimeError(error)
+            # For sells: the exchange manager tried all available exchanges.
+            # Don't fall through to the legacy Kraken-only path — it won't find
+            # coins listed only on KuCoin/Bitget and produces a misleading
+            # "No trading pair found" error.
+            if proposal.side == "sell":
+                raise RuntimeError(error or "Sell failed on all available exchanges")
             return None
         except RuntimeError:
             raise  # re-raise our own insufficient-funds errors
@@ -708,6 +897,18 @@ class TradingEngine:
         try:
             from ml.portfolio_tracker import get_portfolio_tracker
             tracker = get_portfolio_tracker()
+
+            # For buys: retrieve the Q-learning state that was computed at scan time.
+            # Stored in the holding so record_outcome() at close time has the correct
+            # buy-time state even after a process restart (bypasses the in-memory cache).
+            ql_state = ""
+            if proposal.side.lower() == "buy":
+                try:
+                    from ml.q_learning import get_q_learner
+                    ql_state = get_q_learner()._symbol_state_cache.get(proposal.symbol, "")
+                except Exception:
+                    pass
+
             tracker.record_trade(
                 symbol=proposal.symbol,
                 side=proposal.side,
@@ -721,6 +922,8 @@ class TradingEngine:
                 proposal_id=proposal.id,
                 fee_gbp=fee_gbp,
                 coin_name=proposal.coin_name or "",
+                trade_mode=getattr(proposal, "trade_mode", "accumulate"),
+                ql_state=ql_state,
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")
@@ -762,8 +965,14 @@ class TradingEngine:
                 return 0
 
             quote = pair.split("/")[1] if "/" in pair else "GBP"
-            approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
-            fx_rate = approx_fx.get(quote, 1.0) if quote != "GBP" else 1.0
+            fx_rate = 1.0
+            if quote != "GBP":
+                try:
+                    from ml.exchange_manager import get_exchange_manager
+                    fx_rate = get_exchange_manager()._get_fx_rate("GBP", quote, exchange) or 1.0
+                except Exception:
+                    approx_fx = {"USD": 1.27, "USDT": 1.27, "USDC": 1.27, "EUR": 1.17}
+                    fx_rate = approx_fx.get(quote, 1.0)
 
             min_qty = (market.get("limits", {}).get("amount", {}).get("min", 0) or 0)
             min_cost = (market.get("limits", {}).get("cost", {}).get("min", 0) or 0)
@@ -802,7 +1011,7 @@ class TradingEngine:
         approve_url = f"{self.server_url}/api/trades/confirm/{approve_token}"
         reject_url = f"{self.server_url}/api/trades/confirm/{reject_token}"
 
-        subject = f"{'[SELL]' if proposal.side == 'sell' else '[Trade]'} Proposal: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
+        subject = f"{'[SELL]' if proposal.side == 'sell' else '[BUY]'} Proposal: {proposal.side.upper()} {proposal.symbol}{' (' + proposal.coin_name + ')' if proposal.coin_name else ''} - GBP {proposal.amount_gbp:.4f}"
 
         is_sell = proposal.side == "sell"
         header_gradient = "linear-gradient(90deg, #e53e3e, #c53030)" if is_sell else "linear-gradient(90deg, #667eea, #764ba2)"
@@ -814,7 +1023,7 @@ class TradingEngine:
         if is_sell:
             sell_warning = """
                     <div style="background: rgba(229,62,62,0.15); border: 1px solid rgba(229,62,62,0.4); border-radius: 8px; padding: 12px; margin: 12px 0; font-size: 13px; color: #fc8181;">
-                        &#9888;&#65039; <strong>SELL order</strong> &#8212; This will liquidate your position. Review carefully before approving.
+                        <strong>SELL order</strong> &#8212; This will liquidate your position. Review carefully before approving.
                     </div>"""
 
         body = f"""
@@ -824,7 +1033,7 @@ class TradingEngine:
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
                 <div style="background: {header_gradient}; padding: 16px 20px;">
                     <h2 style="margin: 0; color: white; font-size: 18px;">
-                        {'&#x1F7E2;' if proposal.side == 'buy' else '&#x1F534;'} {proposal.side.upper()} {display_name}
+                        {proposal.side.upper()} {display_name}
                     </h2>
                 </div>
                 
@@ -887,7 +1096,9 @@ class TradingEngine:
         exec_price_str = f"{_ep:.{_exec_dp}f}"
 
         body = f"""
-        <html>        <head><meta charset="utf-8"></head>        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; padding: 20px;">
                 <h2 style="color: #48bb78; margin-top: 0;">Trade Executed</h2>
                 <table style="width: 100%; border-collapse: collapse;">
@@ -922,7 +1133,7 @@ class TradingEngine:
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d14; color: #e2e8f0; padding: 20px;">
             <div style="max-width: 500px; margin: 0 auto; background: #151520; border-radius: 12px; border: 1px solid #2d3748; overflow: hidden;">
                 <div style="background: linear-gradient(90deg, #e53e3e, #c53030); padding: 16px 20px;">
-                    <h2 style="margin: 0; color: white; font-size: 18px;">&#x274C; Trade Failed</h2>
+                    <h2 style="margin: 0; color: white; font-size: 18px;">FAILED: Trade Not Executed</h2>
                 </div>
                 <div style="padding: 20px;">
                     <table style="width: 100%; border-collapse: collapse;">
@@ -971,6 +1182,11 @@ class TradingEngine:
 
     def activate_kill_switch(self) -> Dict[str, Any]:
         """Emergency halt all trading."""
+        with self._lock:
+            return self._activate_kill_switch_locked()
+
+    def _activate_kill_switch_locked(self) -> Dict[str, Any]:
+        """Internal kill switch — must be called with self._lock held."""
         self.kill_switch = True
         # Reject all pending proposals
         rejected = 0
@@ -985,6 +1201,11 @@ class TradingEngine:
 
     def deactivate_kill_switch(self) -> Dict[str, Any]:
         """Resume trading."""
+        with self._lock:
+            return self._deactivate_kill_switch_locked()
+
+    def _deactivate_kill_switch_locked(self) -> Dict[str, Any]:
+        """Internal deactivate — must be called with self._lock held."""
         self.kill_switch = False
         self._save_state()
         logger.info("Kill switch deactivated — trading resumed")
@@ -1050,16 +1271,37 @@ class TradingEngine:
 
     def _save_state(self):
         """Save engine state to disk (atomic write to prevent corruption)."""
+        # Prune expired/rejected proposals older than 7 days to prevent unbounded growth
+        cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        self.proposals = {
+            k: v for k, v in self.proposals.items()
+            if v.status == "pending" or v.created_at > cutoff
+        }
+        # Keep only the last 500 trades in memory (full history lives on disk)
+        if len(self.trade_history) > 500:
+            self.trade_history = self.trade_history[-500:]
+        # Prune daily budgets older than 30 days
+        budget_cutoff = (date.today() - timedelta(days=30)).isoformat()
+        self.daily_budgets = {
+            k: v for k, v in self.daily_budgets.items() if k >= budget_cutoff
+        }
         state = {
             "proposals": {k: asdict(v) for k, v in self.proposals.items()},
             "trade_history": self.trade_history,
             "daily_budgets": {k: asdict(v) for k, v in self.daily_budgets.items()},
             "kill_switch": self.kill_switch,
+            "last_buy_proposal_time": (
+                self._last_buy_proposal_time.isoformat() if self._last_buy_proposal_time else None
+            ),
+            "last_sell_proposal_time": (
+                self._last_sell_proposal_time.isoformat() if self._last_sell_proposal_time else None
+            ),
         }
         state_file = self.data_dir / "trading_state.json"
         tmp = state_file.with_suffix(".tmp")
         try:
-            with open(tmp, "w") as f:
+            fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w") as f:
                 json.dump(state, f, indent=2, default=str)
             os.replace(tmp, state_file)
         except Exception as e:
@@ -1086,6 +1328,18 @@ class TradingEngine:
 
             self.trade_history = state.get("trade_history", [])
             self.kill_switch = state.get("kill_switch", False)
+
+            # Restore per-side cooldown timers so they survive restarts
+            for attr, key in [
+                ("_last_buy_proposal_time", "last_buy_proposal_time"),
+                ("_last_sell_proposal_time", "last_sell_proposal_time"),
+            ]:
+                raw = state.get(key)
+                if raw:
+                    try:
+                        setattr(self, attr, datetime.fromisoformat(raw))
+                    except Exception:
+                        pass
 
             for did, ddata in state.get("daily_budgets", {}).items():
                 self.daily_budgets[did] = DailyBudget(**ddata)

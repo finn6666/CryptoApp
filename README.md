@@ -18,7 +18,7 @@ python app.py           # http://localhost:5001
 | [Deployment](docs/DEPLOYMENT.md) | Raspberry Pi systemd + nginx |
 | [API](docs/API.md) | All endpoints |
 | [ML](docs/ML.md) | Agents, gem detection, RL |
-| [Architecture](docs/ARCHITECTURE.md) | Codebase structure, flows |
+| [Architecture](docs/architecture/overview.md) | Codebase structure, flows |
 
 ## Disclaimer
 

@@ -11,9 +11,18 @@ function escapeHtml(str) {
 
 // ─── Auth ──────────────────────────────────────────────────
 
-/** Return stored API key (no prompt — key only needed for agent trade proposals). */
+/** Return stored API key from sessionStorage (cleared on tab close). */
 function getApiKey() {
     return sessionStorage.getItem('tradingApiKey');
+}
+
+/** Persist API key to sessionStorage. */
+function setApiKey(key) {
+    if (key) {
+        sessionStorage.setItem('tradingApiKey', key.trim());
+    } else {
+        sessionStorage.removeItem('tradingApiKey');
+    }
 }
 
 /** Headers for authenticated GET requests. Returns {} if no key stored. */
@@ -34,12 +43,12 @@ function authHeadersJson() {
 function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
     const lastUpdatedEl = document.getElementById('lastUpdated');
     const nextRefreshEl = document.getElementById('nextRefresh');
-    
-    if (lastUpdated) {
+
+    if (lastUpdated && lastUpdatedEl) {
         const date = new Date(lastUpdated);
         const now = new Date();
         const minutesAgo = Math.floor((now - date) / 60000);
-        
+
         if (minutesAgo < 1) {
             lastUpdatedEl.textContent = 'Just now';
         } else if (minutesAgo < 60) {
@@ -49,11 +58,11 @@ function updateRefreshStatus(lastUpdated, cacheExpiresIn) {
             lastUpdatedEl.textContent = `${hoursAgo}h ago`;
         }
     }
-    
-    if (cacheExpiresIn !== undefined && cacheExpiresIn !== null) {
+
+    if (cacheExpiresIn !== undefined && cacheExpiresIn !== null && nextRefreshEl) {
         const minutes = Math.floor(cacheExpiresIn / 60);
         const seconds = cacheExpiresIn % 60;
-        
+
         if (minutes > 0) {
             nextRefreshEl.textContent = `${minutes}m ${seconds}s`;
         } else {
@@ -66,6 +75,36 @@ function startRefreshTimer() {
     setInterval(() => {
         refreshData();
     }, 300000); // 5 minutes — fallback when SSE is unavailable
+}
+
+// ─── Portfolio Holdings Cache ───────────────────────────────
+// Deduplicates concurrent calls to /api/portfolio/holdings.
+// loadPortfolioCard (SSE-driven, ~30s) and loadHeatmap (60s interval)
+// both need this data — the cache prevents double-fetching when they fire close together.
+
+let _holdingsCache = { data: null, expiry: 0, promise: null };
+
+async function fetchPortfolioHoldings() {
+    const now = Date.now();
+    if (_holdingsCache.data && now < _holdingsCache.expiry) return _holdingsCache.data;
+    if (_holdingsCache.promise) return _holdingsCache.promise;
+
+    _holdingsCache.promise = fetch('/api/portfolio/holdings', { headers: authHeaders() })
+        .then(r => {
+            if (!r.ok) { const err = new Error('HTTP ' + r.status); err.status = r.status; throw err; }
+            return r.json();
+        })
+        .then(data => {
+            _holdingsCache.data = data;
+            _holdingsCache.expiry = Date.now() + 30000; // 30s TTL
+            _holdingsCache.promise = null;
+            return data;
+        })
+        .catch(e => {
+            _holdingsCache.promise = null;
+            throw e;
+        });
+    return _holdingsCache.promise;
 }
 
 // ─── SSE Dashboard Stream ───────────────────────────────────
@@ -94,6 +133,7 @@ function startDashboardSSE() {
             if (typeof loadPendingProposals  === 'function') loadPendingProposals(d.pending_proposals ?? null);
             if (typeof loadScanStatusDetail  === 'function') loadScanStatusDetail(d.scan_detail ?? null);
             if (typeof loadActivityLog       === 'function') loadActivityLog(d.activity ?? null);
+            if (typeof loadPortfolioCard     === 'function') loadPortfolioCard();
         } catch (e) {
             console.warn('SSE parse error:', e);
         }

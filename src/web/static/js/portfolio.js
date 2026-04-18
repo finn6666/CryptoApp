@@ -16,7 +16,7 @@ async function analyzePortfolio() {
     content.innerHTML = '<div class="loading">AI agents analyzing portfolio opportunities...</div>';
     
     try {
-        const response = await fetch('/api/portfolio/analyze?max_coins=15');
+        const response = await fetch('/api/portfolio/analyze?max_coins=15', { headers: authHeaders() });
         
         if (!response.ok) {
             throw new Error(`API returned ${response.status}`);

@@ -75,13 +75,28 @@ TRADE_SERVER_URL=http://<PI_IP>
 
 Then restart: `sudo systemctl restart cryptoapp`
 
-## 5. Firewall
+## 5. Firewall & SSH Hardening
+
+Restrict SSH to your local network and Tailscale only — never expose port 22 to the internet:
 
 ```bash
 sudo apt install -y ufw
-sudo ufw allow 22
+
+# Allow SSH from local network only (adjust subnet if yours differs)
+sudo ufw allow from 192.168.0.0/16 to any port 22
+# Allow SSH via Tailscale range
+sudo ufw allow from 100.64.0.0/10 to any port 22
+# Allow HTTP/HTTPS
 sudo ufw allow 80
+sudo ufw allow 443
 sudo ufw enable
+```
+
+Disable SSH password authentication (key auth is already working — this locks out brute-force):
+
+```bash
+sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo systemctl restart ssh
 ```
 
 Lock down the env file:
@@ -89,6 +104,30 @@ Lock down the env file:
 ```bash
 chmod 600 ~/CryptoApp/.env
 ```
+
+> **Note on passwordless SSH:** You're connecting without a password because your SSH public key is in `~/.ssh/authorized_keys` on the Pi. This is more secure than password auth. Tailscale is only needed when accessing from outside your home network.
+
+## 6. Weekly Security Checks
+
+Install the automated security check (CVE scan, .env permissions, port audit, secret scan, nginx headers):
+
+```bash
+sudo cp ~/CryptoApp/deploy/cryptoapp-security.service /etc/systemd/system/
+sudo cp ~/CryptoApp/deploy/cryptoapp-security.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now cryptoapp-security.timer
+```
+
+Run manually at any time:
+
+```bash
+sudo systemctl start cryptoapp-security.service
+journalctl -u cryptoapp-security.service -n 50
+# Or directly:
+bash ~/CryptoApp/deploy/security-check.sh
+```
+
+Log is written to `data/security_audit.log`.
 
 ## Updates
 

@@ -16,6 +16,8 @@ symbols_bp = Blueprint('symbols', __name__)
 
 
 @symbols_bp.route('/api/search', methods=['POST'])
+@limiter.limit('30 per minute')
+@require_trading_auth
 def search_coins():
     if not state.SYMBOLS_AVAILABLE or not state.data_pipeline:
         return jsonify({'success': False, 'error': 'Search service not available.'})
@@ -32,6 +34,7 @@ def search_coins():
 
 
 @symbols_bp.route('/api/symbols/search', methods=['GET'])
+@require_trading_auth
 def search_symbols():
     if not state.SYMBOLS_AVAILABLE or not state.data_pipeline:
         return jsonify({'success': False, 'error': 'Symbol search service not available'}), 503
@@ -88,7 +91,7 @@ def add_symbol():
                 return jsonify({'success': True, 'symbol': symbol, 'message': f'Symbol {symbol} added successfully and data fetched'})
             except Exception as e:
                 logger.error(f"Failed to fetch data for {symbol}: {e}", exc_info=True)
-                return jsonify({'success': False, 'symbol': symbol, 'error': f'Symbol added but data fetch failed'}), 500
+                return jsonify({'success': False, 'symbol': symbol, 'error': 'Symbol added but data fetch failed'}), 500
         return jsonify({'success': False, 'symbol': symbol, 'error': f'Failed to add symbol {symbol}. It may not exist or is already supported.'}), 400
     except Exception as e:
         logger.error(f"Failed to add symbol: {e}")

@@ -1,0 +1,14 @@
+# CryptoApp Claude agent runner timer -- fires every 6 hours
+# Interleaves with the 12h deep scan without hammering the Gemini API
+
+[Unit]
+Description=CryptoApp Claude Agent Runner Timer
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=6h
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

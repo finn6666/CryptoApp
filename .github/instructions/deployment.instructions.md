@@ -42,26 +42,40 @@ sudo journalctl -u cryptoapp -f          # live logs
 sudo journalctl -u cryptoapp --since '1h ago'
 ```
 
-## Remote Access (SSH via Tailscale)
+## SSH Access
 
-Tailscale provides a stable private IP for SSH and dashboard access regardless of network.
+**On local network (no Tailscale needed):** SSH key auth works directly — no password required because the public key is in `~/.ssh/authorized_keys` on the Pi. Port 22 is firewalled to local network + Tailscale range only (not public internet).
 
-**On the Pi (one-time setup):**
 ```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
+ssh finnbryant@<pi-local-ip>
 ```
 
-**On your dev machine / phone:** Install Tailscale app and sign in with the same account.
+**From outside home network (Tailscale):** Tailscale provides a stable private IP that works from any network.
 
-**SSH to Pi from anywhere:**
 ```bash
-ssh finnbryant@<tailscale-ip>   # stable across reboots and networks
+# One-time Pi setup:
+curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up
+
+# SSH from anywhere:
+ssh finnbryant@<tailscale-ip>
 ```
 
-Find the Pi's Tailscale IP: `tailscale ip -4` on the Pi, or check https://login.tailscale.com/admin/machines.
+Find Tailscale IP: `tailscale ip -4` on the Pi, or https://login.tailscale.com/admin/machines.
 
-Tailscale persists across reboots automatically once set up.
+## Weekly Security Checks
+
+Automated checks run via systemd timer (CVE scan, .env permissions, nginx headers, secret scan):
+
+```bash
+# Setup (one-time on Pi):
+sudo cp deploy/cryptoapp-security.service /etc/systemd/system/
+sudo cp deploy/cryptoapp-security.timer   /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now cryptoapp-security.timer
+
+# Run manually:
+bash deploy/security-check.sh
+# Logs: data/security_audit.log
+```
 
 ## Deployment Workflow
 

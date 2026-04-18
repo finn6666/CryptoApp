@@ -8,7 +8,7 @@
     <meta http-equiv="Expires" content="0">
     <title>Crypto Investment Dashboard</title>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}?v={{ asset_version }}">
 </head>
 <body>
@@ -26,13 +26,6 @@
 
         <!-- Header -->
         <div class="header">
-            <div class="refresh-controls">
-                <div class="refresh-status">
-                    <div>Last: <span id="lastUpdated">Loading...</span></div>
-                    <div>Next: <span id="nextRefresh">-</span></div>
-                </div>
-                <button class="btn" onclick="forceRefresh()" id="refreshBtn">Refresh</button>
-            </div>
             <h1>Crypto Investment Dashboard</h1>
         </div>
 
@@ -43,30 +36,11 @@
                 <a href="/health-dashboard" class="site-nav__link">Health</a>
             </nav>
             <div class="status-strip">
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Daily Budget</div>
-                        <div class="status-pill__value" id="pillBudget">—</div>
-                    </div>
-                </div>
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Portfolio P&L</div>
-                        <div class="status-pill__value" id="pillPnl">—</div>
-                    </div>
-                </div>
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Scanner</div>
-                        <div class="status-pill__value" id="pillScanner">—</div>
-                    </div>
-                </div>
-                <div class="status-pill">
-                    <div class="status-pill__body">
-                        <div class="status-pill__label">Monitor</div>
-                        <div class="status-pill__value" id="pillMonitor">—</div>
-                    </div>
-                </div>
+                <span class="st-item"><span class="st-label">Budget</span><span class="st-val" id="pillBudget">—</span></span>
+                <span class="st-sep">·</span>
+                <span class="st-item"><span class="st-val" id="pillScanner">—</span></span>
+                <span class="st-sep">·</span>
+                <span class="st-item"><span class="st-val" id="pillMonitor">—</span></span>
             </div>
         </div>
 
@@ -103,6 +77,17 @@
                 <span id="globalStats" style="display:none;"></span>
                 <span id="marketHeadlines" style="display:none;"></span>
 
+                <!-- Portfolio Summary Card -->
+                <div class="portfolio-card">
+                    <div class="portfolio-card__header">
+                        <span class="portfolio-card__label">Portfolio</span>
+                        <span class="portfolio-card__sub" id="sidebarPortfolioSub"></span>
+                    </div>
+                    <div class="portfolio-card__value" id="sidebarPortfolioValue">—</div>
+                    <div class="portfolio-card__pnl" id="sidebarPortfolioPnl">—</div>
+                    <div class="portfolio-card__holdings" id="sidebarHoldingsList" style="display:none;"></div>
+                </div>
+
                 <!-- Live Trading Panel (open) -->
                 <div class="sidebar-panel panel-open">
                     <div class="sidebar-panel__header open" onclick="toggleSidebarPanel(this)">
@@ -116,9 +101,6 @@
                         </div>
                     </div>
                     <div class="sidebar-panel__body open">
-                        <div id="configWarning" class="config-warning" style="display: none;">
-                            Setup required: add Kraken API keys and SMTP credentials to <code>.env</code>
-                        </div>
                         <div class="sidebar-stats-grid sidebar-stats-grid--3">
                             <div class="sidebar-stat">
                                 <div class="sidebar-stat__value" id="totalTrades">0</div>
@@ -139,7 +121,7 @@
                         </div>
                         <div id="executedSection">
                             <div class="sidebar-section-label" style="display: flex; justify-content: space-between; align-items: center;">
-                                Trade Log
+                                <span style="cursor:pointer;" onclick="toggleTradeLog()">Trade Log <span id="tradeLogToggleIcon">▴</span></span>
                                 <button onclick="loadTradeLog(); loadExecutedTrades();" class="btn-ghost">Refresh</button>
                             </div>
                             <div id="tradeLogUnified" class="trade-log-scroll">
@@ -157,7 +139,6 @@
                             <span id="scanStatusDetail" class="status-badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary);">—</span>
                         </div>
                         <div class="sidebar-panel__actions">
-                            <button id="scanNowBtn" onclick="triggerScan(); event.stopPropagation();" class="btn-ghost btn-ghost--accent">Scan Now</button>
                             <span class="sidebar-panel__toggle">▾</span>
                         </div>
                     </div>
@@ -181,6 +162,7 @@
                             </div>
                         </div>
                         <div id="scanResultMsg" class="scan-result" style="display: none;"></div>
+                        <button id="scanNowBtn" onclick="triggerScan()" class="btn-ghost btn-ghost--accent" style="width:100%;margin-top:8px;">Scan Now</button>
                     </div>
                 </div>
 
@@ -207,7 +189,23 @@
 
     </div><!-- end container -->
 
+    <!-- API Key Modal -->
+    <div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center;">
+        <div style="background:var(--surface,#1a1a2e);border:1px solid var(--border,#333);border-radius:12px;padding:28px 32px;width:360px;max-width:90vw;">
+            <h3 style="margin:0 0 8px;font-size:1rem;color:var(--text-primary,#fff);">API Key Required</h3>
+            <p style="margin:0 0 16px;font-size:0.8rem;color:var(--text-secondary,#aaa);">Enter your <code>TRADING_API_KEY</code> to view portfolio and trade data.</p>
+            <input id="authKeyInput" type="password" placeholder="Paste API key here"
+                style="width:100%;box-sizing:border-box;padding:9px 12px;background:var(--bg,#0d0d1a);border:1px solid var(--border,#333);border-radius:6px;color:var(--text-primary,#fff);font-size:0.85rem;outline:none;margin-bottom:12px;"
+                onkeydown="if(event.key==='Enter')saveApiKey()" />
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="btn" onclick="document.getElementById('authModal').style.display='none'">Cancel</button>
+                <button class="btn btn-gold" onclick="saveApiKey()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+    // API key must be entered via the auth modal — never injected from server
     function toggleSidebarPanel(headerEl) {
         const isOpen = headerEl.classList.contains('open');
         const body = headerEl.nextElementSibling;
@@ -215,6 +213,14 @@
         headerEl.classList.toggle('open', !isOpen);
         body.classList.toggle('open', !isOpen);
         panel.classList.toggle('panel-open', !isOpen);
+    }
+    function toggleTradeLog() {
+        const log = document.getElementById('tradeLogUnified');
+        const icon = document.getElementById('tradeLogToggleIcon');
+        if (!log) return;
+        const hidden = log.style.display === 'none';
+        log.style.display = hidden ? '' : 'none';
+        if (icon) icon.textContent = hidden ? '▴' : '▾';
     }
     </script>
 

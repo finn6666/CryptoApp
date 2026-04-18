@@ -40,8 +40,8 @@ class ScanLoop:
         self.scan_interval_hours = float(os.getenv("SCAN_INTERVAL_HOURS", "12"))
         self.max_coins_per_scan = int(os.getenv("SCAN_MAX_COINS", "10"))
         self.min_gem_score = float(os.getenv("SCAN_MIN_GEM_SCORE", "6.0"))
-        self.quick_screen_min_confidence = int(os.getenv("SCAN_QUICK_SCREEN_MIN", "60"))
-        # Max coins that proceed to the expensive 6-call full analysis per scan
+        self.quick_screen_min_confidence = int(os.getenv("SCAN_QUICK_SCREEN_MIN", "70"))
+        # Max coins that proceed to full debate analysis per scan (3 calls each vs 6 previously)
         self.max_full_analysis = int(os.getenv("SCAN_MAX_FULL_ANALYSIS", "5"))
         self.scan_running = False
         self._scheduler_thread: Optional[threading.Thread] = None
@@ -113,7 +113,10 @@ class ScanLoop:
             # ── Step 1: Refresh coin data ──
             logger.info(f"[Scan {scan_id}] Step 1: Refreshing coin data...")
             refresh_ok = self._refresh_data()
-            if not refresh_ok:
+            if refresh_ok:
+                import services.app_state as state
+                scan_result["coins_refreshed"] = len(state.analyzer.coins) if state.analyzer else 0
+            else:
                 scan_result["errors"].append("Data refresh failed — using cached data")
             self._audit("scan_start", {"scan_id": scan_id, "triggered_by": triggered_by})
 
@@ -219,17 +222,48 @@ class ScanLoop:
             scan_result["success"] = True
             self._last_scan_time = datetime.utcnow()
 
-            # ── Step 6: Sell-side automation ──
+            # ── Step 6a: Gem score daily summary ──
+            try:
+                from ml.gem_score_tracker import get_gem_score_tracker
+                get_gem_score_tracker().generate_daily_summary()
+            except Exception as e:
+                logger.debug(f"[Scan] Gem score daily summary failed: {e}")
+
+            # ── Step 6c: Sell-side automation ──
             try:
                 from ml.sell_automation import get_sell_automation
                 sell_auto = get_sell_automation()
 
-                # Build live prices from analyser
+                # Build live prices: analyser first, then exchange fallback for
+                # held coins not in the CoinGecko trending feed (which is most of them).
                 import services.app_state as state
                 live_prices = {}
                 if state.analyzer and state.analyzer.coins:
                     for coin in state.analyzer.coins:
-                        live_prices[coin.symbol.upper()] = getattr(coin, "price", 0)
+                        p = getattr(coin, "price", 0)
+                        if p:
+                            live_prices[coin.symbol.upper()] = p
+
+                # Fetch exchange prices for held coins missing from the analyser.
+                # This is the primary price source — the CoinGecko feed only covers
+                # trending coins, not the portfolio.
+                try:
+                    from ml.portfolio_tracker import get_portfolio_tracker
+                    from ml.exchange_manager import get_exchange_manager
+                    tracker = get_portfolio_tracker()
+                    held_syms = [
+                        sym for sym, h in tracker.holdings.items()
+                        if h.get("quantity", 0) > 0 and sym not in live_prices
+                    ]
+                    if held_syms:
+                        exchange_prices = get_exchange_manager().get_live_prices_gbp(held_syms)
+                        live_prices.update(exchange_prices)
+                        logger.info(
+                            f"[Scan {scan_id}] Exchange price fallback: "
+                            f"{len(exchange_prices)}/{len(held_syms)} held coins priced"
+                        )
+                except Exception as price_err:
+                    logger.warning(f"[Scan {scan_id}] Exchange price fetch failed: {price_err}")
 
                 if live_prices:
                     sell_proposals = sell_auto.check_and_propose_sells(live_prices)
@@ -241,6 +275,8 @@ class ScanLoop:
                             "trigger": sp.get("trigger"),
                         })
                     logger.info(f"[Scan {scan_id}] Sell check: {len(sell_proposals)} sell proposals")
+                else:
+                    logger.warning(f"[Scan {scan_id}] No live prices available — sell check skipped")
             except Exception as e:
                 logger.warning(f"[Scan {scan_id}] Sell automation error: {e}")
                 scan_result["errors"].append(f"Sell automation: {str(e)}")
@@ -331,14 +367,35 @@ class ScanLoop:
         """Step 3: Select top N candidates from tradeable coins."""
         import services.app_state as state
 
+        # Build set of recently-skipped symbols to exclude — they won't yield a trade
+        # until the cache expires, so selecting them wastes a quick_screen Gemini call
+        # and hides fresh coins that haven't been looked at yet.
+        recently_skipped: set = set()
+        if self.analysis_reuse_hours > 0:
+            for coin in tradeable_coins:
+                symbol = coin["symbol"]
+                cached = state.get_cached_analysis(symbol)
+                if cached:
+                    cached_at = cached.get("_cached_at", 0)
+                    age_hours = (time.time() - cached_at) / 3600
+                    if age_hours <= self.analysis_reuse_hours:
+                        prev_decision = cached.get("analysis", {}).get("trade_decision", {})
+                        if not prev_decision.get("should_trade", False):
+                            recently_skipped.add(symbol)
+        if recently_skipped:
+            logger.info(
+                f"[Scan] Excluding {len(recently_skipped)} recently-skipped coins from "
+                f"candidates (cached within {self.analysis_reuse_hours}h): {sorted(recently_skipped)}"
+            )
+
         candidates = []
 
-        # Priority 1: Favorites that are tradeable
+        # Priority 1: Favorites that are tradeable (not excluded)
         favorites = state.load_favorites()
         fav_symbols = {f.upper() for f in favorites}
 
         for coin in tradeable_coins:
-            if coin["symbol"] in fav_symbols:
+            if coin["symbol"] in fav_symbols and coin["symbol"] not in recently_skipped:
                 candidates.append(coin)
 
         # Priority 2: High attractiveness score, filtered by min_gem_score
@@ -346,12 +403,31 @@ class ScanLoop:
             remaining = [
                 c for c in tradeable_coins
                 if c["symbol"] not in {x["symbol"] for x in candidates}
+                and c["symbol"] not in recently_skipped
                 and c.get("attractiveness_score", 0) >= self.min_gem_score
             ]
             remaining.sort(
                 key=lambda c: c.get("attractiveness_score", 0), reverse=True
             )
             candidates.extend(remaining)
+
+        # Fallback: if fresh coins don't fill the quota, top up with the least-recently-skipped
+        # coins so we never run a completely empty scan when the pool is exhausted.
+        if len(candidates) < self.max_coins_per_scan and recently_skipped:
+            seen = {c["symbol"] for c in candidates}
+            fallback = [
+                c for c in tradeable_coins
+                if c["symbol"] not in seen
+                and c.get("attractiveness_score", 0) >= self.min_gem_score
+            ]
+            fallback.sort(key=lambda c: c.get("attractiveness_score", 0), reverse=True)
+            filled = self.max_coins_per_scan - len(candidates)
+            if fallback:
+                logger.info(
+                    f"[Scan] Fresh-coin pool exhausted — topping up with "
+                    f"{min(filled, len(fallback))} cached-skip coins"
+                )
+                candidates.extend(fallback[:filled])
 
         # Cap to max
         return candidates[: self.max_coins_per_scan]
@@ -379,10 +455,31 @@ class ScanLoop:
 
         passed = []
 
+        # Regime-aware threshold: lower bar in bull markets (more opportunities),
+        # higher bar in bear markets (filter weak coins before spending API budget).
+        regime = self._get_market_regime()
+        regime_screen_thresholds = {
+            "bull":    int(os.getenv("SCAN_QUICK_SCREEN_BULL",    "60")),
+            "neutral": int(os.getenv("SCAN_QUICK_SCREEN_NEUTRAL", str(self.quick_screen_min_confidence))),
+            "bear":    int(os.getenv("SCAN_QUICK_SCREEN_BEAR",    "78")),
+        }
+        effective_threshold = regime_screen_thresholds.get(regime, self.quick_screen_min_confidence)
+        if effective_threshold != self.quick_screen_min_confidence:
+            logger.info(
+                f"[Scan] Quick-screen threshold: {effective_threshold}% ({regime} regime)"
+            )
+
         for coin in candidates:
             symbol = coin["symbol"]
 
             try:
+                from services.gemini_budget import get_gemini_budget, BudgetExceededError
+                try:
+                    get_gemini_budget().check_and_record("quick_screen")
+                except BudgetExceededError as _be:
+                    logger.warning("[Scan %s] Gemini budget exceeded — stopping quick screen: %s", scan_id, _be)
+                    break
+
                 from ml.agents.official.quick_screen import quick_screen_coin
                 result = state.run_async(
                     quick_screen_coin(symbol, coin, trade_ctx)
@@ -392,12 +489,13 @@ class ScanLoop:
                 confidence = result.get("confidence", 0)
                 one_liner = result.get("one_liner", "")
 
-                if did_pass and confidence >= self.quick_screen_min_confidence:
+                if did_pass and confidence >= effective_threshold:
                     logger.info(
                         f"[Scan {scan_id}] {symbol}: PASS ({confidence}%) — {one_liner}"
                     )
                     coin["screen_confidence"] = confidence
                     coin["screen_note"] = one_liner
+                    coin["play_type"] = result.get("play_type", "accumulate")
                     passed.append(coin)
                 else:
                     logger.info(
@@ -444,12 +542,20 @@ class ScanLoop:
                             "reason": f"Recent analysis ({age_hours:.1f}h ago) found no trade — reusing result",
                         }
 
-        # Check budget before spending API credits
+        # Check trading budget before spending API credits
         if engine.is_budget_exhausted():
             return {"outcome": "skipped", "reason": "Daily budget exhausted", "proposed": False}
 
         if engine.kill_switch:
             return {"outcome": "skipped", "reason": "Kill switch active", "proposed": False}
+
+        # Check Gemini API cost budget
+        try:
+            from services.gemini_budget import get_gemini_budget, BudgetExceededError
+            get_gemini_budget().check_and_record("full_analysis")
+        except BudgetExceededError as _be:
+            logger.warning("[Scan] Gemini budget exceeded — skipping %s: %s", symbol, _be)
+            return {"outcome": "skipped", "reason": "Gemini daily budget exceeded", "proposed": False}
 
         # Run ADK orchestrator analysis (Gemini)
         analysis = None
@@ -505,8 +611,8 @@ class ScanLoop:
             trade_decision = analysis.get("trade_decision", {})
 
             should_trade = trade_decision.get("should_trade", False)
-            conviction = trade_decision.get("trade_conviction", 0)
-            allocation_pct = trade_decision.get("trade_allocation_pct", 0)
+            conviction = int(trade_decision.get("trade_conviction", 0) or 0)
+            allocation_pct = float(trade_decision.get("trade_allocation_pct", 0) or 0)
             trade_reasoning = trade_decision.get("trade_reasoning", "")
             trade_side = trade_decision.get("trade_side", "buy")
 
@@ -520,8 +626,8 @@ class ScanLoop:
                     try:
                         parsed = _json.loads(json_match.group())
                         should_trade = parsed.get("should_trade", False)
-                        conviction = parsed.get("trade_conviction", parsed.get("conviction", 0))
-                        allocation_pct = parsed.get("trade_allocation_pct", parsed.get("suggested_allocation_pct", 0))
+                        conviction = int(parsed.get("trade_conviction", parsed.get("conviction", 0)) or 0)
+                        allocation_pct = float(parsed.get("trade_allocation_pct", parsed.get("suggested_allocation_pct", 0)) or 0)
                         trade_reasoning = parsed.get("trade_reasoning", parsed.get("reasoning", ""))
                         trade_side = parsed.get("trade_side", parsed.get("side", "buy"))
                     except _json.JSONDecodeError:
@@ -536,6 +642,53 @@ class ScanLoop:
                     conviction = conf
                     allocation_pct = min(80, conf - 10)
                     trade_reasoning = analysis.get("analysis", "Gem detector recommended trade")[:500]
+
+            # ── Option B: 5-agent deep validator (high-conviction second opinion) ──
+            # When the debate returns high conviction, run the legacy 5-agent chain
+            # as an independent cross-check before committing real money.
+            # Only adds cost on the ~1-2 coins per scan most likely to trade.
+            validator_enabled = os.getenv("DEBATE_VALIDATOR_ENABLED", "true").lower() in ("1", "true", "yes")
+            validator_threshold = int(os.getenv("DEBATE_VALIDATOR_THRESHOLD", "75"))
+            if validator_enabled and should_trade and conviction >= validator_threshold:
+                try:
+                    from ml.agents.official.orchestrator import analyze_crypto
+                    from services.gemini_budget import get_gemini_budget, BudgetExceededError
+                    get_gemini_budget().check_and_record("validator")
+                    logger.info(
+                        f"[Scan] {symbol}: conviction={conviction}% >= {validator_threshold}% — "
+                        f"running 5-agent validator as second opinion"
+                    )
+                    validator_analysis = state.run_async(
+                        analyze_crypto(symbol, coin_data, session_id=f"validator_{symbol}")
+                    )
+                    if validator_analysis and validator_analysis.get("success"):
+                        v_decision = validator_analysis.get("trade_decision", {})
+                        v_conviction = int(v_decision.get("trade_conviction", 0) or 0)
+                        v_should_trade = v_decision.get("should_trade", False)
+                        logger.info(
+                            f"[Scan] {symbol}: validator conviction={v_conviction}%, "
+                            f"should_trade={v_should_trade}"
+                        )
+                        if v_should_trade and v_conviction >= 45:
+                            # Both agree — take the max conviction (validator validates the buy)
+                            conviction = max(conviction, v_conviction)
+                            trade_reasoning = (
+                                f"Debate: {trade_reasoning[:200]} | "
+                                f"Validator: {v_decision.get('trade_reasoning', '')[:200]}"
+                            )
+                            logger.info(f"[Scan] {symbol}: validator CONFIRMED — conviction={conviction}%")
+                        else:
+                            # Validator disagrees — use the average, making it harder to clear threshold
+                            old_conviction = conviction
+                            conviction = (conviction + v_conviction) // 2
+                            logger.warning(
+                                f"[Scan] {symbol}: validator DISAGREED (v_conviction={v_conviction}%) — "
+                                f"conviction downgraded {old_conviction} -> {conviction}"
+                            )
+                except BudgetExceededError as _be:
+                    logger.warning(f"[Scan] {symbol}: Gemini budget exceeded — skipping validator: {_be}")
+                except Exception as e:
+                    logger.warning(f"[Scan] {symbol}: 5-agent validator failed (continuing with debate result): {e}")
 
             # ── Q-learning adjustment ──
             # Let the RL agent nudge conviction based on past outcomes
@@ -565,7 +718,16 @@ class ScanLoop:
             except Exception as e:
                 logger.debug(f"Q-learning adjustment skipped: {e}")
 
-            if should_trade and conviction >= 45:
+            # Adjust conviction threshold by market regime
+            regime = self._get_market_regime()
+            regime_thresholds = {"bull": 40, "neutral": 45, "bear": 60}
+            conviction_threshold = regime_thresholds[regime]
+            if regime != "neutral":
+                logger.info(
+                    f"[Scan] {symbol}: market regime={regime}, conviction threshold={conviction_threshold}%"
+                )
+
+            if should_trade and conviction >= conviction_threshold:
                 remaining = engine.get_remaining_budget()
                 if remaining < engine.min_useful_budget_gbp:
                     return {"outcome": "skipped", "proposed": False, "reason": "Daily budget exhausted"}
@@ -590,8 +752,43 @@ class ScanLoop:
                     f"computed_alloc={sized_pct:.1f}%, amount=£{amount:.2f}"
                 )
 
+                trade_mode = "accumulate"
+
+                # Portfolio concentration guard: require higher conviction when
+                # the book is already crowded to avoid low-quality add-ons.
+                try:
+                    from ml.portfolio_tracker import get_portfolio_tracker
+                    open_positions = len(get_portfolio_tracker().get_holdings({}))
+                    concentration_limit = int(os.getenv("SCAN_CONCENTRATION_LIMIT", "5"))
+                    concentration_min_conviction = int(os.getenv("SCAN_CONCENTRATION_MIN_CONVICTION", "65"))
+                    if open_positions >= concentration_limit and conviction < concentration_min_conviction:
+                        logger.info(
+                            f"[Scan] {symbol}: skipping — {open_positions} open positions and "
+                            f"conviction {conviction}% < concentration minimum {concentration_min_conviction}%"
+                        )
+                        return {
+                            "outcome": "skipped",
+                            "proposed": False,
+                            "reason": (
+                                f"Portfolio concentration limit reached ({open_positions} positions); "
+                                f"need {concentration_min_conviction}%+ conviction, got {conviction}%"
+                            ),
+                        }
+                except Exception as e:
+                    logger.debug(f"Portfolio concentration check failed: {e}")
+
                 # Use auto-execute for scheduled scans so trades don't
                 # sit waiting for manual approval overnight.
+                agent_texts = analysis.get("all_agent_texts", {})
+                debate_meta = analysis.get("debate", {})
+                debate_data = {
+                    "bull_text": agent_texts.get("bull_advocate", ""),
+                    "bear_text": agent_texts.get("bear_advocate", ""),
+                    "referee_text": agent_texts.get("referee", ""),
+                    "bull_conviction": debate_meta.get("bull_conviction"),
+                    "bear_conviction": debate_meta.get("bear_conviction"),
+                    "regime": debate_meta.get("regime"),
+                } if agent_texts else {}
                 result = engine.propose_and_auto_execute(
                     symbol=symbol,
                     side=trade_side,
@@ -601,9 +798,18 @@ class ScanLoop:
                     confidence=conviction,
                     recommendation=analysis.get("recommendation", "BUY"),
                     coin_name=coin_data.get("name", ""),
+                    trade_mode=trade_mode,
+                    debate_data=debate_data,
                 )
 
                 outcome = "executed" if result.get("auto_approved") else "proposed"
+                # Auto-approved but execution failed — report as error
+                if result.get("auto_approved") and not result.get("success"):
+                    return {
+                        "outcome": "error",
+                        "proposed": False,
+                        "reason": result.get("error", "Trade execution failed"),
+                    }
                 return {
                     "outcome": outcome,
                     "proposed": result.get("success", False),
@@ -622,6 +828,29 @@ class ScanLoop:
         except Exception as e:
             logger.error(f"Trade decision extraction failed for {symbol}: {e}")
             return {"outcome": "error", "reason": str(e), "proposed": False}
+
+    # ─── Market Regime ────────────────────────────────────────
+
+    def _get_market_regime(self) -> str:
+        """
+        Classify current market regime from BTC 7-day performance.
+        Returns 'bull', 'bear', or 'neutral'.
+        Used to dynamically adjust the conviction threshold per scan.
+        """
+        try:
+            import services.app_state as state
+            if state.analyzer and state.analyzer.coins:
+                for coin in state.analyzer.coins:
+                    if getattr(coin, "symbol", "").upper() in ("BTC", "WBTC"):
+                        pct = float(getattr(coin, "price_change_7d", 0) or 0)
+                        if pct > 10:
+                            return "bull"
+                        if pct < -10:
+                            return "bear"
+                        return "neutral"
+        except Exception:
+            pass
+        return "neutral"
 
     # ─── Audit Trail ──────────────────────────────────────────
 

@@ -20,7 +20,6 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ─── Globals ──────────────────────────────────────────────────
 ml_pipeline = None
-ml_service = None
 ML_AVAILABLE = False
 
 data_pipeline = None
@@ -58,10 +57,10 @@ def initialize_official_adk():
     global official_adk_available, analyze_crypto_adk
     logger.info("Attempting to initialize Official Google ADK...")
     try:
-        from ml.agents.official import analyze_crypto
-        analyze_crypto_adk = analyze_crypto
+        from ml.agents.official import analyze_crypto_debate
+        analyze_crypto_adk = analyze_crypto_debate
         official_adk_available = True
-        logger.info("Official Google ADK initialized successfully")
+        logger.info("Official Google ADK initialized (debate orchestrator)")
         return True
     except Exception as e:
         logger.warning(f"Official ADK not available: {e}")
@@ -70,12 +69,11 @@ def initialize_official_adk():
 
 
 def initialize_ml():
-    global ml_pipeline, ml_service, ML_AVAILABLE
+    global ml_pipeline, ML_AVAILABLE
     logger.info("Attempting to initialize ML components...")
     try:
         from ml.training_pipeline import CryptoMLPipeline
         ml_pipeline = CryptoMLPipeline()
-        ml_service = None
         ML_AVAILABLE = True
         try:
             ml_pipeline.load_existing_model()
@@ -88,7 +86,6 @@ def initialize_ml():
         logger.error(f"ML components not available: {e}")
         ML_AVAILABLE = False
         ml_pipeline = None
-        ml_service = None
         return False
 
 
@@ -140,31 +137,20 @@ def cache_analysis(symbol: str, result: dict):
     """Store an analysis result in the cache (Redis + disk)."""
     result["_cached_at"] = time.time()
     agent_analysis_cache[symbol] = result
+    # Prune stale entries so the cache doesn't grow unboundedly between restarts
+    now = time.time()
+    expired = [k for k, v in agent_analysis_cache.items()
+               if now - v.get("_cached_at", 0) > CACHE_EXPIRY_SECONDS]
+    for k in expired:
+        del agent_analysis_cache[k]
     save_analysis_cache()
-    # Also store in Redis if available
-    try:
-        from services.redis_cache import cache_set
-        cache_set(f"analysis:{symbol}", result, CACHE_EXPIRY_SECONDS)
-    except Exception:
-        pass
 
 
 def get_cached_analysis(symbol: str):
     """Return cached analysis for symbol if still valid, else None."""
-    # Try in-memory first
     entry = agent_analysis_cache.get(symbol)
     if entry and time.time() - entry.get("_cached_at", 0) <= CACHE_EXPIRY_SECONDS:
         return entry
-    # Try Redis
-    try:
-        from services.redis_cache import cache_get
-        redis_entry = cache_get(f"analysis:{symbol}")
-        if redis_entry:
-            agent_analysis_cache[symbol] = redis_entry
-            return redis_entry
-    except Exception:
-        pass
-    # Expired or missing
     agent_analysis_cache.pop(symbol, None)
     return None
 
@@ -233,6 +219,8 @@ def coin_to_dict(coin, include_highlights=False):
         'volume_24h': safe_float(getattr(coin, 'total_volume', 0)),
         'price_change_24h': coin.price_change_24h or 0,
         'price_change_7d': getattr(coin, 'price_change_7d', None) or 0,
+        'price_change_30d': getattr(coin, 'price_change_percentage_30d', None),
+        'ath_change_pct': getattr(coin, 'ath_change_pct', None),
         'market_cap_rank': coin.market_cap_rank,
         'attractiveness_score': safe_float(getattr(coin, 'attractiveness_score', 0)),
     }
@@ -240,60 +228,6 @@ def coin_to_dict(coin, include_highlights=False):
         highlights = coin.investment_highlights
         coin_dict['investment_highlights'] = ' • '.join(highlights) if isinstance(highlights, list) else highlights
     return coin_dict
-
-
-def _sanitize_ai_text(text):
-    """Remove raw JSON objects/fragments from text meant for UI display."""
-    if not text or not isinstance(text, str):
-        return text or ''
-    cleaned = re.sub(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', '', text)
-    cleaned = re.sub(r'```(?:json)?\s*', '', cleaned)
-    cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
-    if not cleaned or len(cleaned) < 10:
-        return None
-    return cleaned
-
-
-def _build_gem_analysis(gem_result):
-    """Build a standardised analysis dict from a gem_detector result.
-    Returns (analysis_dict, ai_sentiment, enhanced_score) or (None, None, None).
-    """
-    if not gem_result:
-        return None, None, None
-
-    gem_prob = gem_result.get('gem_probability', 0)
-    is_gem = gem_prob > 0.6
-    strengths = gem_result.get('key_strengths', [])
-    weaknesses = gem_result.get('key_weaknesses', [])
-    ai_sentiment = gem_result.get('ai_sentiment')
-
-    summary_parts = []
-    if ai_sentiment and ai_sentiment.get('key_points'):
-        key_points = ai_sentiment['key_points']
-        summary_parts.append(key_points[0])
-        if len(key_points) > 2:
-            summary_parts.append(key_points[2])
-    else:
-        if is_gem:
-            summary_parts.append(f"Hidden gem ({gem_prob*100:.0f}% confidence)")
-        if strengths:
-            summary_parts.append(f"{', '.join(strengths[:1])}")
-        if weaknesses:
-            summary_parts.append(weaknesses[0])
-
-    raw_summary = ' '.join(summary_parts) if summary_parts else gem_result.get('recommendation', 'Monitoring...')
-    clean_summary = _sanitize_ai_text(raw_summary) or 'Monitoring...'
-
-    analysis = {
-        'recommendation': 'BUY' if is_gem else 'WATCH',
-        'confidence': f"{gem_prob*100:.0f}%",
-        'summary': clean_summary,
-        'risk_level': gem_result.get('risk_level', 'Medium'),
-        'gem_score': f"{gem_result.get('gem_score', 0)/10:.1f}/10",
-        'analysis_type': 'Gem Detector',
-    }
-    enhanced_score = min(10, gem_result.get('gem_score', 0) / 10)
-    return analysis, ai_sentiment, enhanced_score
 
 
 def parse_market_cap(value):
@@ -447,4 +381,4 @@ def start_idle_monitor():
 
     thread = threading.Thread(target=_monitor, daemon=True)
     thread.start()
-    logger.info(f"⏰ Auto-shutdown enabled: will stop after {IDLE_TIMEOUT}s ({IDLE_TIMEOUT//60} min) of idle time")
+    logger.info(f"Auto-shutdown enabled: will stop after {IDLE_TIMEOUT}s ({IDLE_TIMEOUT//60} min) of idle time")

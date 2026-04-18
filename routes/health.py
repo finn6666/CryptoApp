@@ -17,6 +17,7 @@ health_bp = Blueprint('health', __name__)
 
 
 @health_bp.route('/api/status/idle')
+@require_trading_auth
 def get_idle_status():
     """Get current idle time and auto-shutdown status"""
     idle_time = time.time() - state.last_request_time
@@ -127,10 +128,14 @@ def api_health():
         },
         'system': system_metrics,
         'uptime_hours': round((time.time() - state.start_time) / 3600, 2),
+        'gemini_budget': (lambda b: b.get_status())(
+            __import__('services.gemini_budget', fromlist=['get_gemini_budget']).get_gemini_budget()
+        ),
     }), 200
 
 
 @health_bp.route('/api/metrics')
+@require_trading_auth
 def api_metrics():
     """System metrics for SIEM dashboard"""
     import psutil
@@ -160,10 +165,12 @@ def debug_coins():
             'coins': coins_list
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Debug coins error: {e}")
+        return jsonify({'error': 'Debug info unavailable'}), 500
 
 
 @health_bp.route('/api/market/state')
+@require_trading_auth
 def market_state():
     """Current crypto market state — Fear & Greed + news headlines + global stats"""
     try:
@@ -174,4 +181,5 @@ def market_state():
         fng["global_stats"] = news.get("global_stats", {})
         return jsonify(fng)
     except Exception as e:
-        return jsonify({'error': str(e), 'current_value': None, 'classification': 'UNKNOWN'}), 500
+        logger.error(f"Market state error: {e}")
+        return jsonify({'error': 'Market state unavailable', 'current_value': None, 'classification': 'UNKNOWN'}), 500

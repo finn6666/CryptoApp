@@ -18,7 +18,7 @@ for file in $STAGED; do
     [[ "$file" == *example* ]] && continue
 
     if git show ":$file" 2>/dev/null | grep -iE "$SECRET_PATTERN" >/dev/null 2>&1; then
-        echo "❌ Possible secret detected in staged file: $file"
+        echo "BLOCKED: Possible secret detected in staged file: $file"
         echo "   Pattern matched: $SECRET_PATTERN"
         echo "   Use 'git diff --cached $file' to review, then add to .gitignore or remove the value."
         FAIL=1

@@ -51,6 +51,8 @@ class PortfolioTracker:
         proposal_id: str = "",
         fee_gbp: float = 0.0,
         coin_name: str = "",
+        trade_mode: str = "accumulate",
+        ql_state: str = "",
     ) -> Dict[str, Any]:
         """
         Record a trade execution and update holdings.
@@ -69,6 +71,7 @@ class PortfolioTracker:
             "reasoning": reasoning,
             "confidence": confidence,
             "proposal_id": proposal_id,
+            "trade_mode": trade_mode,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -94,6 +97,9 @@ class PortfolioTracker:
                 h["total_fees_gbp"] = h.get("total_fees_gbp", 0) + fee_gbp
                 if coin_name and not h.get("coin_name"):
                     h["coin_name"] = coin_name
+                # Preserve original trade_mode — don't overwrite on subsequent buys
+                if "trade_mode" not in h:
+                    h["trade_mode"] = trade_mode
             else:
                 self.holdings[sym] = {
                     "symbol": sym,
@@ -107,6 +113,8 @@ class PortfolioTracker:
                     "trades": 1,
                     "total_fees_gbp": fee_gbp,
                     "coin_name": coin_name,
+                    "trade_mode": trade_mode,
+                    "ql_state": ql_state,  # buy-time state for reliable close-time Q-learning lookup
                 }
         elif side.lower() == "sell":
             if sym in self.holdings:
@@ -177,7 +185,9 @@ class PortfolioTracker:
         """Get total portfolio value and P&L summary."""
         holdings = self.get_holdings(live_prices)
 
-        total_cost = sum(h.get("total_cost_gbp", 0) for h in holdings)
+        # Use position_cost_gbp (avg_entry * qty) not total_cost_gbp which
+        # never decrements on sells and would inflate the P&L percentage denominator.
+        total_cost = sum(h.get("position_cost_gbp", 0) for h in holdings)
         total_value = sum(h.get("current_value_gbp", 0) for h in holdings)
         total_unrealised = sum(h.get("unrealised_pnl_gbp", 0) for h in holdings)
         total_realised = sum(
@@ -203,13 +213,42 @@ class PortfolioTracker:
         """Get full trade log, most recent first."""
         return list(reversed(self.trade_log[-limit:]))
 
+    def cleanup_dust(self, min_value_gbp: float = 0.50) -> List[str]:
+        """
+        Mark dust positions (remaining value < min_value_gbp) as closed.
+        Also closes any zero-quantity positions missing closed_at.
+        Returns list of symbols cleaned up.
+        """
+        cleaned = []
+        now = datetime.now(timezone.utc).isoformat()
+        for sym, h in self.holdings.items():
+            qty = h.get("quantity", 0)
+            if qty <= 0:
+                if not h.get("closed_at"):
+                    h["closed_at"] = now
+                    cleaned.append(sym)
+                continue
+            entry = h.get("avg_entry_price", 0)
+            remaining_value = qty * entry if entry > 0 else 0
+            if remaining_value < min_value_gbp:
+                h["quantity"] = 0
+                h["closed_at"] = now
+                cleaned.append(sym)
+                logger.info(
+                    f"Dust cleanup: closed {sym} "
+                    f"(qty={qty:.8f}, value=£{remaining_value:.4f})"
+                )
+        if cleaned:
+            self._save()
+            logger.info(f"Dust cleanup complete — closed {len(cleaned)} positions: {cleaned}")
+        return cleaned
+
     def get_closed_positions(self) -> List[Dict[str, Any]]:
         """Get all fully sold (closed) positions with outcomes."""
         # Treat dust quantities (< 0.1% of original buy) as fully closed
         closed = []
         for sym, h in self.holdings.items():
             qty = h.get("quantity", 0)
-            cost = h.get("total_cost_gbp", 0)
             entry = h.get("avg_entry_price", 0)
             # Consider closed if quantity is zero, or remaining value is < £0.01
             remaining_value = qty * entry if entry > 0 else qty
@@ -224,9 +263,28 @@ class PortfolioTracker:
                 "first_buy_at": h.get("first_buy_at", ""),
                 "closed_at": h.get("closed_at", "") or h.get("last_sell_at", ""),
                 "exchange": h.get("exchange", ""),
+                "trade_mode": h.get("trade_mode", "accumulate"),
                 "won": h.get("realised_pnl_gbp", 0) > 0,
             })
         return sorted(closed, key=lambda x: x.get("closed_at", ""), reverse=True)
+
+    def get_portfolio_summary_for_agents(self) -> Dict[str, Any]:
+        """
+        Compact portfolio snapshot passed to the debate referee agent.
+        Lets the referee factor in concentration before recommending a trade.
+        """
+        holdings = self.get_holdings()
+        active = [h for h in holdings if h.get("quantity", 0) > 0]
+        total_cost = sum(h.get("total_cost_gbp", 0) for h in active)
+        symbols = [h["symbol"] for h in active]
+        pnl_pcts = [h["unrealised_pnl_pct"] for h in active if "unrealised_pnl_pct" in h]
+        return {
+            "held_symbols": symbols,
+            "position_count": len(active),
+            "total_cost_gbp": round(total_cost, 2),
+            "worst_position_pct": round(min(pnl_pcts), 1) if pnl_pcts else None,
+            "best_position_pct": round(max(pnl_pcts), 1) if pnl_pcts else None,
+        }
 
     def get_performance_summary(self) -> Dict[str, Any]:
         """

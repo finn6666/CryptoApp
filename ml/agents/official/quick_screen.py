@@ -6,7 +6,7 @@ Saves ~80% of API calls by filtering out obvious skips early.
 
 import os
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
@@ -18,7 +18,7 @@ _session_service = InMemorySessionService()
 
 # Use a lighter/cheaper model for quick screen — it's a binary triage filter,
 # not a deep analysis. Override via QUICK_SCREEN_MODEL env var if needed.
-_QUICK_SCREEN_MODEL = os.getenv("QUICK_SCREEN_MODEL", "gemini-2.0-flash-lite")
+_QUICK_SCREEN_MODEL = os.getenv("QUICK_SCREEN_MODEL", "gemini-2.0-flash")
 
 
 class QuickScreenResult(BaseModel):
@@ -26,6 +26,7 @@ class QuickScreenResult(BaseModel):
     action: str = Field(description="PASS or SKIP")
     confidence: int = Field(ge=0, le=100, description="How confident 0-100 that this coin is worth full analysis")
     one_liner: str = Field(description="One sentence explanation")
+    play_type: str = Field(default="accumulate", description="accumulate or swing — only relevant when action is PASS")
 
 
 quick_screen_agent = Agent(
@@ -50,6 +51,10 @@ SKIP criteria:
 - Pure scam/rugpull signals (tiny mcap + no community + suspicious tokenomics)
 - Stagnant coin with no catalysts and declining volume
 - Already overextended (massive recent pump with no substance)
+
+When action is PASS, also set play_type:
+- "swing": strong short-term momentum signal (large 24h spike, volume surge) but limited fundamental story. Best held hours to a few days.
+- "accumulate": strong fundamentals, undervalued, growing ecosystem — hold weeks to months. Default if uncertain.
 
 Keep your reasoning to ONE sentence. Speed matters — don't overthink it.
 Remember: primary focus is low-cap gems (under £1, sub-$100M mcap) for asymmetric upside. But if a mid-cap or higher-priced coin has a legitimately strong setup — strong momentum, upcoming catalyst, clear fundamentals — do NOT skip it just because of price or market cap. A great trade is a great trade. Be biased toward finding opportunities.""",
@@ -92,7 +97,7 @@ async def quick_screen_coin(
     history_block = f"\n{trade_history_ctx}" if trade_history_ctx else ""
 
     prompt = f"""Quick screen: {data_line}{history_block}
-Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "one_liner": "..."}}"""
+Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accumulate"|"swing", "one_liner": "..."}}"""
 
     try:
         message = types.Content(
@@ -140,15 +145,16 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "one_liner": "..."}
                 "pass": action == "PASS",
                 "confidence": max(0, min(100, confidence)),
                 "one_liner": one_liner,
+                "play_type": str(parsed.get("play_type", "accumulate")).lower(),
             }
 
         logger.warning(f"Quick screen for {symbol}: could not parse response — passing to be safe")
         # Pass through so parse failures never silently block coins from analysis.
         # Confidence=100 ensures this reaches the full pipeline regardless of the
         # SCAN_QUICK_SCREEN_MIN threshold.
-        return {"pass": True, "confidence": 100, "one_liner": "Could not parse screen result — passing to be safe"}
+        return {"pass": True, "confidence": 100, "one_liner": "Could not parse screen result — passing to be safe", "play_type": "accumulate"}
 
     except Exception as e:
         logger.warning(f"Quick screen failed for {symbol}: {e}")
         # On error, pass through to avoid missing opportunities
-        return {"pass": True, "confidence": 100, "one_liner": f"Screen error: {e}"}
+        return {"pass": True, "confidence": 100, "one_liner": f"Screen error: {e}", "play_type": "accumulate"}

@@ -1,6 +1,55 @@
 // Trade Journal & Live Trading Functions
 // Extracted from trades.html inline script for merged dashboard
 
+// ─── Debate Panel ────────────────────────────────────
+
+function renderDebatePanel(p) {
+    const d = p.debate_data;
+    if (!d || (!d.bull_text && !d.bear_text && !d.referee_text)) return '';
+
+    const bullConv = Number(d.bull_conviction || 0);
+    const bearConv = Number(d.bear_conviction || 0);
+    const total = bullConv + bearConv;
+    const bullPct = total > 0 ? Math.round((bullConv / total) * 100) : 50;
+    const regime = d.regime || '';
+
+    const truncate = (text, len) => {
+        if (!text) return 'No data.';
+        return text.length > len ? text.slice(0, len) + '...' : text;
+    };
+
+    const regimeBadge = regime
+        ? `<span class="debate-regime-badge debate-regime-${regime}">${regime.toUpperCase()}</span>`
+        : '';
+
+    const bullLabel = bullConv ? ` ${bullConv}%` : '';
+    const bearLabel = bearConv ? ` ${bearConv}%` : '';
+
+    return `
+        <div class="debate-toggle" onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none'">
+            View debate ${regimeBadge}<span style="color:#48bb78">Bull${bullLabel}</span> vs <span style="color:#fc8181">Bear${bearLabel}</span>
+        </div>
+        <div class="debate-body" style="display:none">
+            <div class="debate-conviction-bar">
+                <div class="debate-bull-bar" style="width:${bullPct}%"></div>
+                <div class="debate-bear-bar" style="width:${100 - bullPct}%"></div>
+            </div>
+            <div class="debate-section bull">
+                <div class="debate-section-label">Bull Case</div>
+                <div class="debate-section-text">${escapeHtml(truncate(d.bull_text, 500))}</div>
+            </div>
+            <div class="debate-section bear">
+                <div class="debate-section-label">Bear Case</div>
+                <div class="debate-section-text">${escapeHtml(truncate(d.bear_text, 500))}</div>
+            </div>
+            <div class="debate-section referee">
+                <div class="debate-section-label">Referee</div>
+                <div class="debate-section-text">${escapeHtml(truncate(d.referee_text, 500))}</div>
+            </div>
+        </div>
+    `;
+}
+
 // ─── Live Trading Functions ──────────────────────────
 
 async function loadTradingStatus(data = null) {
@@ -10,7 +59,7 @@ async function loadTradingStatus(data = null) {
             data = await response.json();
         }
 
-        document.getElementById('budgetRemaining').textContent = `£${data.remaining_today_gbp.toFixed(2)}`;
+        document.getElementById('budgetRemaining').textContent = `£${(data.remaining_today_gbp ?? 0).toFixed(2)}`;
         document.getElementById('tradesToday').textContent = data.trades_today || 0;
 
         const statusEl = document.getElementById('tradingStatus');
@@ -26,16 +75,6 @@ async function loadTradingStatus(data = null) {
             document.getElementById('killSwitchBtn').textContent = 'Kill Switch';
         }
 
-        const configWarning = document.getElementById('configWarning');
-        if (!data.exchange_configured || !data.email_configured) {
-            configWarning.style.display = 'block';
-            let warnings = [];
-            if (!data.exchange_configured) warnings.push('Kraken API keys');
-            if (!data.email_configured) warnings.push('Gmail SMTP credentials');
-            configWarning.innerHTML = `<strong>Setup required:</strong> Add ${warnings.map(escapeHtml).join(' and ')} to <code>.env</code> — see <code>.env.example</code>`;
-        } else {
-            configWarning.style.display = 'none';
-        }
     } catch (e) {
         console.error('Error loading trading status:', e);
     }
@@ -75,6 +114,7 @@ async function loadPendingProposals(prefetchedProposals = null) {
                             <div style="margin-bottom: 4px;">${escapeHtml(p.reason)}</div>
                             <div>Confidence: ${Number(p.confidence)}% • Price: £${Number(p.price_at_proposal).toFixed(6)} • ${created}</div>
                         </div>
+                        ${renderDebatePanel(p)}
                     </div>
                 `;
             }).join('');
@@ -269,11 +309,19 @@ async function toggleKillSwitch() {
     if (!isHalted && !confirm('This will HALT all trading and reject pending proposals. Continue?')) return;
 
     try {
-        await fetch('/api/trades/kill-switch', {
+        const res = await fetch('/api/trades/kill-switch', {
             method: 'POST',
             headers: authHeadersJson(),
             body: JSON.stringify({action})
         });
+        if (res.status === 401 || res.status === 403) {
+            showTradeAlert('Unauthorised — check your API key is set in browser storage', 'error');
+            return;
+        }
+        if (!res.ok) {
+            showTradeAlert('Server error — could not toggle kill switch', 'error');
+            return;
+        }
         showTradeAlert(isHalted ? 'Trading resumed' : 'Trading HALTED — all pending proposals rejected', isHalted ? 'success' : 'error');
         loadTradingStatus();
         loadPendingProposals();
@@ -465,8 +513,8 @@ async function loadTradesPortfolio() {
                             <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${formatPrice(h.avg_entry_price)}</div>
                         </div>
                         <div>
-                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">Live Price</div>
-                            <div style="font-size: 13px; font-weight: 600; color: ${h.current_price ? pnlColor : 'var(--text-primary)'};">${h.current_price ? formatPrice(h.current_price) : '—'}</div>
+                            <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;">${h.price_stale ? 'Est. Price' : 'Live Price'}</div>
+                            <div style="font-size: 13px; font-weight: 600; color: ${h.price_stale ? 'var(--text-secondary)' : (h.current_price ? pnlColor : 'var(--text-primary)')};">${h.current_price ? formatPrice(h.current_price) + (h.price_stale ? ' (est.)' : '') : '—'}</div>
                         </div>
                     </div>
                     <!-- Invested + Holdings -->
@@ -603,6 +651,8 @@ async function loadRlInsights() {
         const response = await fetch('/api/rl/insights');
         const data = await response.json();
         const insights = data.insights || [];
+        const record   = data.record   || {};
+        const patterns = data.patterns || {};
         const container = document.getElementById('rlInsights');
 
         if (insights.length === 0) {
@@ -610,32 +660,72 @@ async function loadRlInsights() {
             return;
         }
 
-        // Categorise each insight so we can sort and label them
-        const categorised = insights.map(text => {
-            const lower = text.toLowerCase();
-            if (/loss|losses|underperform|worst|penalty|avoid|mistake/.test(lower)) {
-                return { text, type: 'avoid',   tag: 'AVOID'   };
-            } else if (/winner|winning|wins|promis|lean toward|worked|profit/.test(lower)) {
-                return { text, type: 'signal',  tag: 'SIGNAL'  };
-            }
-            return { text, type: 'pattern', tag: 'PATTERN' };
-        });
+        // ── Win/loss record header ──────────────────────────────
+        let recordHtml = '';
+        if (record.total > 0) {
+            const winRate = Math.round((record.wins / record.total) * 100);
+            recordHtml = `
+                <div class="rl-record">
+                    <span class="rl-record__item rl-record__item--win">${record.wins}W</span>
+                    <span class="rl-record__divider">/</span>
+                    <span class="rl-record__item rl-record__item--loss">${record.losses}L</span>
+                    <span class="rl-record__winrate">${winRate}% win rate</span>
+                </div>`;
+        }
 
-        // Signals first, then avoids, then patterns
-        const ordered = [
-            ...categorised.filter(i => i.type === 'signal'),
-            ...categorised.filter(i => i.type === 'avoid'),
-            ...categorised.filter(i => i.type === 'pattern'),
-        ];
+        // ── Best / worst patterns ───────────────────────────────
+        let patternHtml = '';
+        if (patterns.best || patterns.worst) {
+            patternHtml = '<div class="rl-patterns">';
+            if (patterns.best) {
+                patternHtml += `
+                    <div class="rl-pattern rl-pattern--best">
+                        <div class="rl-pattern__label">Best setup</div>
+                        <div class="rl-pattern__value">${escapeHtml(patterns.best.label)}</div>
+                    </div>`;
+            }
+            if (patterns.worst) {
+                patternHtml += `
+                    <div class="rl-pattern rl-pattern--worst">
+                        <div class="rl-pattern__label">Avoid</div>
+                        <div class="rl-pattern__value">${escapeHtml(patterns.worst.label)}</div>
+                    </div>`;
+            }
+            patternHtml += '</div>';
+        }
+
+        // ── Insight cards (filter out W/L record line — shown above) ──
+        const categorised = insights
+            .filter(text => !/^Recent record:/.test(text))
+            .map(text => {
+                const lower = text.toLowerCase();
+                if (/loss|losses|underperform|worst|penalty|avoid|mistake/.test(lower)) {
+                    return { text, type: 'avoid',   tag: 'AVOID'   };
+                } else if (/winner|winning|wins|promis|lean toward|worked|profit/.test(lower)) {
+                    return { text, type: 'signal',  tag: 'SIGNAL'  };
+                }
+                return { text, type: 'pattern', tag: 'PATTERN' };
+            });
+
+        const sections = [
+            { type: 'signal',  label: "What's Working", items: categorised.filter(i => i.type === 'signal') },
+            { type: 'avoid',   label: 'What to Avoid',  items: categorised.filter(i => i.type === 'avoid') },
+            { type: 'pattern', label: 'Patterns',        items: categorised.filter(i => i.type === 'pattern') },
+        ].filter(s => s.items.length > 0);
+
+        const sectionsHtml = sections.map(({ type, label, items }) => `
+            <div class="rl-section rl-section--${type}">
+                <div class="rl-section__label">${label}</div>
+                <ul class="rl-list">
+                    ${items.map(({ text }) => `<li class="rl-list__item">${escapeHtml(text)}</li>`).join('')}
+                </ul>
+            </div>
+        `).join('');
 
         container.innerHTML = `
-            <div class="rl-summary">${insights.length} insight${insights.length !== 1 ? 's' : ''} from recent trades</div>
-            ${ordered.map(({ text, type, tag }) => `
-                <div class="rl-insight rl-insight--${type}">
-                    <span class="rl-tag rl-tag--${type}">${tag}</span>
-                    <span class="rl-text">${escapeHtml(text)}</span>
-                </div>
-            `).join('')}
+            ${recordHtml}
+            ${patternHtml}
+            ${sectionsHtml}
         `;
     } catch (e) {
         console.error('Error loading RL insights:', e);

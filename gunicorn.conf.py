@@ -7,7 +7,7 @@ bind = "127.0.0.1:5001"
 # 1 worker to stay within Pi 4 (4GB) memory budget.
 workers = 1
 worker_class = "gthread"  # good for mixed I/O
-threads = 2
+threads = 4  # 2 was too few: SSE + health poll + ticker can saturate both slots
 # NOTE: preload_app disabled — with 1 worker it has no COW benefit,
 # and it kills the scan scheduler thread on fork.
 

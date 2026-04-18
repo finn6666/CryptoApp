@@ -1,52 +1,47 @@
 ---
-description: Google ADK agent architecture, orchestrator, sub-agents, tools, and analysis entry points.
+description: Google ADK agent architecture, debate orchestrator, sub-agents, tools, and analysis entry points.
 applyTo: "ml/agents/**,ml/tools/**,ml/orchestrator_wrapper.py"
 ---
 
 # AI Agents (Google ADK)
 
-Five specialised agents on `gemini-flash` coordinated by `crypto_orchestrator`. Entry point: `analyze_crypto()` in `ml/agents/official/orchestrator.py`.
+3-agent sequential debate on `gemini-2.0-flash`. Replaced the 5-agent parallel chain in April 2026. Costs 3 Gemini calls per coin vs 6, allowing `SCAN_MAX_FULL_ANALYSIS` to be raised to 5. Entry point: `analyze_crypto_debate()` in `ml/agents/official/debate_orchestrator.py`.
 
 ## Architecture
 
 ```
-crypto_orchestrator (master agent)
-    ├── research_specialist   — fundamentals, partnerships, red flags
-    ├── technical_specialist  — chart patterns, indicators, support/resistance
-    ├── risk_specialist       — position sizing, stop-loss, exit strategy (advisory only)
-    ├── sentiment_specialist  — social sentiment, FUD/FOMO detection
-    └── trading_specialist    — final trade decision (no tools, pure LLM)
+BullAdvocate   → builds strongest buy case from coin data
+    ↓ (bull case passed as context)
+BearAdvocate   → reads bull case, dismantles it
+    ↓ (both cases passed as context)
+RefereeAgent   → weighs both cases with portfolio context + market regime
+               → produces final trade verdict
 ```
 
-**Dynamic weighting:**
-- High hype: Sentiment 40%, Technical 25%, Research 25%, Risk 10%
-- Neutral: Research 30%, Technical 30%, Sentiment 25%, Risk 15%
-- Bearish: Research 35%, Technical 35%, Sentiment 20%, Risk 10%
+Returns the same dict shape as the old `analyze_crypto()` — drop-in compatible.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `ml/agents/official/orchestrator.py` | Master agent, `analyze_crypto()` |
-| `ml/agents/official/research_agent.py` | Research sub-agent |
-| `ml/agents/official/technical_agent.py` | Technical sub-agent |
-| `ml/agents/official/risk_agent.py` | Risk sub-agent |
-| `ml/agents/official/sentiment_agent.py` | Sentiment sub-agent |
-| `ml/agents/official/trading_agent.py` | Trading decision sub-agent |
+| `ml/agents/official/debate_orchestrator.py` | All 3 agents + `analyze_crypto_debate()` coroutine (active) |
+| `ml/agents/official/orchestrator.py` | 5-agent chain — used as high-conviction validator (Option B) |
+| `ml/agents/official/quick_screen.py` | Single-call Tier 1 triage (unchanged) |
 | `ml/tools/adk_tools.py` | 16 ADK tool functions |
 | `ml/orchestrator_wrapper.py` | Thin adapter: `analyze_coin()` coroutine for portfolio analysis |
 
-## analyze_crypto()
+## analyze_crypto_debate()
 
 ```python
-analyze_crypto(symbol, coin_data, session_id, use_memory=False) → Dict
+analyze_crypto_debate(symbol, coin_data, session_id, use_memory=False) → Dict
 ```
 
 Returns: `success`, `symbol`, `analysis`, `all_agent_texts`, `trade_decision`, `confidence`, `agents_used`
 
 - `use_memory=False` by default — reduces API costs
-- Creates `Runner` with `InMemorySessionService`
-- Extracts JSON trade decision from `trading_specialist` via regex
+- Sequential: each agent receives previous agent's output as context
+- Referee has access to `get_portfolio_summary_for_agents()` for concentration context
+- Active via `services/app_state.py` → `analyze_crypto_adk = analyze_crypto_debate`
 
 ## Quick Screen
 
@@ -54,9 +49,9 @@ Returns: `success`, `symbol`, `analysis`, `all_agent_texts`, `trade_decision`, `
 quick_screen_coin(symbol, coin_data) → Dict  # ml/agents/official/quick_screen.py
 ```
 
-Single ADK call for Tier 1 triage. Used by scan loop before full analysis.
+Single ADK call for Tier 1 triage. Used by scan loop before full debate analysis.
 
-## Trading Agent Rules
+## Trading Agent Rules (Referee)
 
 - BUY conviction threshold: ≥55% (scan loop uses ≥45%)
 - Allocation: 55-70% conviction → 40-60% of budget; 70%+ → up to 100%
@@ -84,3 +79,5 @@ metrics = wrapper.get_metrics()
 | Var | Purpose |
 |-----|---------|
 | `GOOGLE_API_KEY` | Gemini API key (required) |
+| `ORCHESTRATOR_MODEL` | Model for all 3 debate agents (default: `gemini-2.0-flash`) |
+| `QUICK_SCREEN_MODEL` | Model for quick-screen triage |

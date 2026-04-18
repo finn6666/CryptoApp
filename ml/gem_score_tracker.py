@@ -6,7 +6,6 @@ detector accuracy over time.
 
 import json
 import logging
-import os
 from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Any, List, Optional

@@ -1,100 +1,63 @@
 # ADK Agent Architecture
 
-Five specialised agents on Gemini Flash coordinated by `crypto_orchestrator`. Full pipeline takes 30–120 seconds depending on Gemini API response times.
+3-agent sequential debate on Gemini Flash. Each coin that passes the quick-screen gets a full bull/bear/referee analysis costing 3 Gemini calls.
 
-## Agent Tree
+For current model names, thresholds, and env vars, see [agents.instructions.md](../../.github/instructions/agents.instructions.md).
+
+## Why a Debate?
+
+Independent agents (the previous 5-agent parallel chain) produced analysis in isolation -- each agent's opinion was unaware of the others. The debate format forces the bear to directly respond to the bull's arguments, and the referee to weigh both sides with portfolio context. This catches blind spots that independent analysis misses.
+
+The tradeoff: sequential means higher latency per coin (~10-15s vs ~5s parallel), but the scan pipeline caps how many coins reach full analysis anyway.
+
+## Debate Flow
 
 ```
-crypto_orchestrator (master agent)
-    ├── research_specialist   — on-chain fundamentals, partnerships, red flags
-    ├── technical_specialist  — chart patterns, indicators, support/resistance
-    ├── risk_specialist       — position sizing, stop-loss, exit strategy (advisory)
-    ├── sentiment_specialist  — social sentiment, FUD/FOMO detection
-    └── trading_specialist    — final trade decision (no tools, pure LLM)
+BullAdvocate   -- builds strongest buy case from coin data
+    |
+    v (bull case passed as context)
+BearAdvocate   -- reads bull case, dismantles it point by point
+    |
+    v (both cases passed as context)
+RefereeAgent   -- weighs both arguments with portfolio concentration
+                  and market regime context, produces final verdict
 ```
 
-## Files
+Returns: `trade_decision` dict with `should_trade`, `trade_side`, `trade_conviction`, `trade_reasoning`.
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `ml/agents/official/orchestrator.py` | ~302 | Master agent, `analyze_crypto()` |
-| `ml/agents/official/research_agent.py` | ~112 | Research sub-agent |
-| `ml/agents/official/technical_agent.py` | ~120 | Technical sub-agent |
-| `ml/agents/official/risk_agent.py` | ~120 | Risk sub-agent |
-| `ml/agents/official/sentiment_agent.py` | ~110 | Sentiment sub-agent |
-| `ml/agents/official/trading_agent.py` | ~145 | Trading decision sub-agent |
-| `ml/agents/official/quick_screen.py` | — | Single-call Tier 1 triage |
-| `ml/tools/adk_tools.py` | ~495 | 16 ADK tool functions |
-| `ml/orchestrator_wrapper.py` | — | Thin ADK adapter for portfolio analysis |
+## Two-Tier Filtering
 
-## Analysis Entry Point
-
-```python
-from ml.agents.official import analyze_crypto
-result = await analyze_crypto(symbol, coin_data, session_id, use_memory=False)
+```
+All tracked coins (CoinGecko)
+    |
+    v  Quick Screen (1 Gemini call each, regime-aware threshold)
+Tier 1 survivors (capped)
+    |
+    v  Full Debate (3 Gemini calls each)
+Tier 2 decisions --> Trading Engine
 ```
 
-**Returns:** `success`, `symbol`, `analysis`, `all_agent_texts`, `trade_decision`, `confidence`, `agents_used`
+Quick screen exists to save API budget. A single cheap call filters out obvious skips before committing the full 3-call debate budget.
 
-- `use_memory=False` by default — reduces API costs
-- Uses `InMemorySessionService` (no cross-session state unless enabled)
-- Trade decision extracted via regex JSON from `trading_specialist` output
+## Key Files
 
-## Dynamic Weighting
-
-Sentiment state drives agent weighting:
-
-| Condition | Research | Technical | Sentiment | Risk |
-|-----------|----------|-----------|-----------|------|
-| High hype | 25% | 25% | 40% | 10% |
-| Neutral | 30% | 30% | 25% | 15% |
-| Bearish | 35% | 35% | 20% | 10% |
-
-## Quick Screen
-
-```python
-from ml.agents.official.quick_screen import quick_screen_coin
-result = await quick_screen_coin(symbol, coin_data)
-```
-
-Single ADK call for Tier 1 triage — fast pass before committing full 5-agent analysis budget.
-
-## Trading Agent Rules
-
-- BUY conviction: ≥55% (scan loop fires at ≥45%)
-- Allocation: 55–70% → 40–60% of budget; 70%+ → up to 100%
-- SELL only on fundamental deterioration — never short-term dips
-- Strategy: accumulate and hold medium-to-long-term
-- Must recognise the coin — no trades on unknown assets
+| File | Role |
+|------|------|
+| `ml/agents/official/debate_orchestrator.py` | 3-agent debate -- primary analysis path |
+| `ml/agents/official/orchestrator.py` | 5-agent chain -- used by sell automation rechecks and scan fallback |
+| `ml/agents/official/quick_screen.py` | Single-call Tier 1 triage |
+| `ml/tools/adk_tools.py` | ADK tool functions (mostly placeholders; real data flows via prompt) |
+| `ml/orchestrator_wrapper.py` | Thin adapter for portfolio batch analysis |
 
 ## ADK Tools
 
-Most tool functions in `ml/tools/adk_tools.py` are **placeholder implementations** — real market data flows through the prompt, not the tools. Exceptions:
+Most tool functions are placeholder implementations -- real market data is injected into the agent prompt via `coin_data`, not fetched by tools at runtime. The exceptions that do real work: `calculate_position_size` (Kelly Criterion), `calculate_risk_reward`, `generate_exit_strategy`, `check_trade_budget`, `detect_fud_fomo`.
 
-- `calculate_position_size` — Kelly Criterion sizing
-- `calculate_risk_reward` — real R:R calculation
-- `generate_exit_strategy` — volatility-adjusted targets
-- `check_trade_budget` — calls `TradingEngine.get_status()`
-- `detect_fud_fomo` — keyword-based scoring
+## Cost Control
 
-## OrchestratorWrapper
-
-`ml/orchestrator_wrapper.py` — module-level singleton used by `PortfolioManager` for batch analysis.
-
-```python
-from ml.orchestrator_wrapper import get_orchestrator_wrapper
-wrapper = get_orchestrator_wrapper()
-result = await wrapper.analyze_coin(symbol, coin_data)
-```
-
-## Orchestrator Personality
-
-- "Sharp crypto analyst" — direct, opinionated, no corporate hedging
-- Opportunity-seeking bias: "think like a venture investor"
-- Output: `CryptoAnalysisOutput` (Pydantic, 16 fields)
-
-## Costs & Limits
-
-- ~£2.50/month at normal scan rates
-- 12h analysis cache (in-memory + Redis + disk) minimises repeat calls
-- Rate limit (HTTP 429) triggers `alert_api_quota()` notification
+The main cost driver is Gemini API calls. The system controls spend through:
+- Quick-screen filtering (reduces coins reaching full debate)
+- Regime-aware thresholds (bear market = stricter filter = fewer calls)
+- Daily Gemini budget cap with 80% warning
+- 12h analysis cache (avoids re-analysing the same coin)
+- Scan cooldown preventing rapid re-scans

@@ -18,16 +18,30 @@ import os
 import json
 import logging
 import threading
-import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
 MONITOR_LOG_DIR = Path("data/monitor_logs")
 MONITOR_STATE_FILE = Path("data/monitor_state.json")
+
+
+def _to_float(val, default: float = 0.0) -> float:
+    """Safely convert a potentially £/$ formatted string value to float."""
+    if val is None:
+        return default
+    if isinstance(val, str):
+        try:
+            return float(val.replace('£', '').replace('$', '').replace(',', ''))
+        except ValueError:
+            return default
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return default
 
 
 @dataclass
@@ -233,10 +247,10 @@ class MarketMonitor:
                 if symbol in state.STABLECOINS:
                     continue
 
-                price = getattr(coin, "price", 0) or 0
-                volume = getattr(coin, "volume_24h", 0) or getattr(coin, "total_volume", 0) or 0
-                pct_1h = getattr(coin, "percent_change_1h", 0) or getattr(coin, "price_change_percentage_1h", 0) or 0
-                pct_24h = getattr(coin, "percent_change_24h", 0) or getattr(coin, "price_change_percentage_24h", 0) or 0
+                price = _to_float(getattr(coin, "price", None))
+                volume = _to_float(getattr(coin, "volume_24h", None) or getattr(coin, "total_volume", None))
+                pct_1h = _to_float(getattr(coin, "percent_change_1h", None) or getattr(coin, "price_change_percentage_1h", None))
+                pct_24h = _to_float(getattr(coin, "percent_change_24h", None) or getattr(coin, "price_change_percentage_24h", None))
 
                 if price <= 0:
                     continue
@@ -439,6 +453,29 @@ class MarketMonitor:
                 logger.debug(f"[Monitor] {symbol} analysed recently, skipping (cooldown)")
                 return
 
+            # Respect the scan loop's analysis cache — if it contains a recent SKIP for
+            # this coin, don't burn an API call re-analysing it. This also survives
+            # restarts (in-memory cooldowns are lost on restart; the cache is persistent).
+            try:
+                import time
+                import services.app_state as _state
+                from ml.scan_loop import get_scan_loop
+                _reuse_hours = get_scan_loop().analysis_reuse_hours
+                if _reuse_hours > 0:
+                    _cached = _state.get_cached_analysis(symbol)
+                    if _cached:
+                        _age_hours = (time.time() - _cached.get("_cached_at", 0)) / 3600
+                        if _age_hours <= _reuse_hours:
+                            _decision = _cached.get("analysis", {}).get("trade_decision", {})
+                            if not _decision.get("should_trade", False):
+                                logger.debug(
+                                    f"[Monitor] {symbol}: cached SKIP ({_age_hours:.1f}h old) "
+                                    f"— skipping monitor trigger"
+                                )
+                                return
+            except Exception:
+                pass
+
             # Reset daily counter if date changed
             today = datetime.utcnow().date()
             if today != self._auto_buy_date:
@@ -459,13 +496,23 @@ class MarketMonitor:
                 logger.debug(f"[Monitor] Budget exhausted, skipping auto-buy for {symbol}")
                 return
 
-            # Don't re-buy coins we already hold
+            # For held coins: allow top-ups but max 1 per coin per calendar day.
+            # No hard cap on total top-ups — the debate agent decides each time.
+            is_topup = False
             try:
                 from ml.portfolio_tracker import get_portfolio_tracker
                 tracker = get_portfolio_tracker()
-                if symbol.upper() in tracker.holdings:
-                    logger.debug(f"[Monitor] Already holding {symbol}, skipping auto-buy")
-                    return
+                holding = tracker.holdings.get(symbol.upper())
+                if holding and holding.get("quantity", 0) > 0:
+                    topup_date_key = f"topup_daily:{symbol.upper()}:{datetime.utcnow().date().isoformat()}"
+                    if topup_date_key in self._alert_cooldowns:
+                        logger.debug(f"[Monitor] {symbol} already topped up today, skipping")
+                        return
+                    logger.info(
+                        f"[Monitor] {symbol} held ({holding.get('trades', 1)} buy(s)) — "
+                        f"running top-up analysis"
+                    )
+                    is_topup = True
             except Exception:
                 pass
 
@@ -492,6 +539,11 @@ class MarketMonitor:
             coin_data["tradeable_exchanges"] = exchanges
             coin_data["primary_exchange"] = exchanges[0]
 
+            # Tag momentum/quick-scan buys as swing trades: they need tighter exits
+            # (15% trailing, 25% tier 1) not accumulate-mode wide stops (45%, 75%).
+            if trigger in ("momentum_surge", "quick_scan_gem"):
+                coin_data["play_type"] = "swing"
+
             logger.info(f"[Monitor] Auto-buy trigger: {symbol} (trigger={trigger})")
             self._stats["buy_triggers"] += 1
 
@@ -509,6 +561,11 @@ class MarketMonitor:
             if proposed:
                 self._auto_buys_today += 1
                 self._stats["buy_proposals"] += 1
+                # Mark per-coin daily top-up so we don't top-up again today
+                if is_topup:
+                    topup_date_key = f"topup_daily:{symbol.upper()}:{datetime.utcnow().date().isoformat()}"
+                    self._alert_cooldowns[topup_date_key] = datetime.utcnow()
+                    logger.info(f"[Monitor] Top-up proposal created for {symbol} — locked for rest of day")
                 logger.info(
                     f"[Monitor] Auto-buy proposed for {symbol}: "
                     f"outcome={outcome}, confidence={result.get('confidence', 0)}"
@@ -519,6 +576,7 @@ class MarketMonitor:
                     "symbol": symbol,
                     "confidence": result.get("confidence", 0),
                     "trigger": trigger,
+                    "is_topup": is_topup,
                 })
             else:
                 logger.info(
@@ -614,6 +672,13 @@ class MarketMonitor:
             now = datetime.utcnow()
 
             try:
+                # ── Prune stale alert cooldowns (prevents unbounded growth) ──
+                max_cooldown_min = max(self.alert_cooldown_min, self.buy_analysis_cooldown_min)
+                stale_cutoff = now - timedelta(minutes=max_cooldown_min + 60)
+                self._alert_cooldowns = {
+                    k: v for k, v in self._alert_cooldowns.items() if v > stale_cutoff
+                }
+
                 # ── Data refresh (every 15 min) ──
                 if self._minutes_since(self._last_data_refresh) >= self.data_refresh_interval:
                     self._last_data_refresh = now

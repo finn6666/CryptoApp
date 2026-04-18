@@ -8,17 +8,26 @@ import os
 import json
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 
-from ml.error_handling import retry, alert_exchange_down, alert_trade_failure
+from ml.error_handling import retry, alert_exchange_down
 
 logger = logging.getLogger(__name__)
 
 # Cache file for exchange trading pairs
 PAIRS_CACHE_FILE = Path("data/exchange_pairs_cache.json")
-PAIRS_CACHE_TTL = 3600 * 6  # 6 hours
+PAIRS_CACHE_TTL = 3600 * 2  # 2 hours — shorter TTL to catch new listings sooner
+# Minimum gap between event-driven refreshes (avoids hammering exchanges on every unknown coin)
+_PAIRS_REFRESH_MIN_GAP = 600  # 10 minutes
+
+FX_RATE_TTL_SECONDS = 3600  # Refresh live FX rates every hour
+
+# Maximum bid/ask spread (as % of mid-price) before skipping an exchange in price-routing.
+# Wide spreads indicate thin liquidity and lead to poor execution.
+# Override via MAX_ROUTING_SPREAD_PCT env var.
+_MAX_ROUTING_SPREAD_PCT: float = float(os.getenv("MAX_ROUTING_SPREAD_PCT", "3.0"))
 
 
 class ExchangeManager:
@@ -35,7 +44,8 @@ class ExchangeManager:
         self._exchanges: Dict[str, Any] = {}
         self._pairs: Dict[str, set] = {}  # exchange_id → set of "BASE/QUOTE" pairs
         self._coin_exchange_map: Dict[str, List[str]] = {}  # symbol → [exchange_ids]
-        self._fx_cache: Dict[str, float] = {}  # FX rate cache (per session)
+        self._fx_cache: Dict[str, Tuple[float, float]] = {}  # FX rate cache: key → (rate, fetched_at)
+        self._pairs_loaded_at: float = 0.0  # epoch time of last in-memory pairs load
 
         # Exchange priority from env (comma-separated)
         priority_str = os.getenv("EXCHANGE_PRIORITY", "kraken")
@@ -102,6 +112,17 @@ class ExchangeManager:
             passphrase = os.getenv("KUCOIN_PASSPHRASE", "")
             if key and secret and passphrase:
                 return {"apiKey": key, "secret": secret, "password": passphrase}
+        elif exchange_id == "bitget":
+            key = os.getenv("BITGET_API_KEY", "")
+            secret = os.getenv("BITGET_API_SECRET", "")
+            passphrase = os.getenv("BITGET_PASSPHRASE", "")
+            if key and secret and passphrase:
+                return {
+                    "apiKey": key,
+                    "secret": secret,
+                    "password": passphrase,
+                    "options": {"defaultType": "spot"},
+                }
         elif exchange_id == "mexc":
             key = os.getenv("MEXC_API_KEY", "")
             secret = os.getenv("MEXC_API_SECRET", "")
@@ -124,13 +145,19 @@ class ExchangeManager:
         """
         Load tradeable pairs for all configured exchanges.
         Uses disk cache if fresh enough, otherwise queries live.
+        In-memory cache also expires after PAIRS_CACHE_TTL to catch new listings.
         """
         if self._pairs_loaded and not force_refresh:
-            return
+            age = time.time() - self._pairs_loaded_at
+            if age < PAIRS_CACHE_TTL:
+                return
+            logger.info(f"Pairs cache expired in memory after {age/3600:.1f}h — refreshing")
+            self._pairs_loaded = False
 
         # Try loading from cache
         if not force_refresh and self._load_pairs_cache():
             self._pairs_loaded = True
+            self._pairs_loaded_at = time.time()
             self._rebuild_coin_exchange_map()
             return
 
@@ -141,6 +168,7 @@ class ExchangeManager:
         self._rebuild_coin_exchange_map()
         self._save_pairs_cache()
         self._pairs_loaded = True
+        self._pairs_loaded_at = time.time()
 
     def _fetch_pairs(self, exchange_id: str):
         """Fetch all trading pairs from an exchange."""
@@ -213,9 +241,20 @@ class ExchangeManager:
         return symbol.upper() in self._coin_exchange_map
 
     def get_exchanges_for_coin(self, symbol: str) -> List[str]:
-        """Get list of exchanges that list this coin, in priority order."""
+        """Get list of exchanges that list this coin, in priority order.
+        If the coin is not found and the cache is older than _PAIRS_REFRESH_MIN_GAP,
+        trigger a forced refresh (event-driven invalidation for new listings).
+        """
         self.load_pairs()
         available = self._coin_exchange_map.get(symbol.upper(), [])
+        if not available:
+            age = time.time() - self._pairs_loaded_at
+            if age > _PAIRS_REFRESH_MIN_GAP:
+                logger.info(
+                    f"{symbol} not found in pairs cache (age {age/60:.0f}min) — forcing refresh"
+                )
+                self.load_pairs(force_refresh=True)
+                available = self._coin_exchange_map.get(symbol.upper(), [])
         # Sort by priority
         return sorted(available, key=lambda e: (
             self.exchange_priority.index(e) if e in self.exchange_priority else 999
@@ -251,23 +290,153 @@ class ExchangeManager:
 
     # ─── Order Routing ────────────────────────────────────────
 
-    def find_best_pair(self, symbol: str) -> Optional[Tuple[str, str]]:
+    def find_best_pair(
+        self, symbol: str, side: str = None, preferred_exchange: str = None
+    ) -> Optional[Tuple[str, str]]:
         """
         Find the best exchange and trading pair for a symbol.
-        Tries exchanges in priority order.
+
+        When `side` is provided ("buy" or "sell"), fetches live prices from all
+        candidate exchanges and picks the best execution price (lowest ask for
+        buys, highest bid for sells), normalised to GBP.  Falls back to
+        priority-order selection if live price fetching fails on all exchanges.
+
+        When `side` is None (default), returns the first match in priority order
+        — used for price lookups and other non-trade callers.
+
+        For sells with `preferred_exchange` set, that exchange is tried first.
+        Best-price routing across all exchanges is only used as a fallback if
+        a valid pair on the preferred exchange cannot be found or fetched.
+
         Returns (exchange_id, "SYMBOL/QUOTE") or None.
         """
         self.load_pairs()
         exchanges = self.get_exchanges_for_coin(symbol)
+        if not exchanges:
+            return None
 
-        for exchange_id in exchanges:
-            pairs = self._pairs.get(exchange_id, set())
-            # Try quote currencies in preference order
+        if side is None:
+            # Priority-order fallback (unchanged behaviour for non-trade callers)
+            for exchange_id in exchanges:
+                pairs = self._pairs.get(exchange_id, set())
+                for quote in ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]:
+                    pair = f"{symbol.upper()}/{quote}"
+                    if pair in pairs:
+                        return exchange_id, pair
+            return None
+
+        # ── Preferred-exchange fast-path (sells routed to holding exchange) ──
+        if preferred_exchange and side == "sell":
+            pref_id = preferred_exchange.lower()
+            pairs = self._pairs.get(pref_id, set())
             for quote in ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]:
                 pair = f"{symbol.upper()}/{quote}"
                 if pair in pairs:
-                    return exchange_id, pair
+                    logger.info(
+                        f"Routing sell of {symbol} to preferred exchange {pref_id} "
+                        f"(tokens held there)"
+                    )
+                    return pref_id, pair
+            logger.warning(
+                f"Preferred exchange {pref_id} has no pair for {symbol} — "
+                f"falling back to best-price routing"
+            )
 
+        # ── Price-comparison routing ───────────────────────────────────
+        # Fetch ticker from every exchange that lists this coin and pick
+        # the best execution price (normalised to GBP).
+        QUOTE_ORDER = ["GBP", "USD", "USDT", "USDC", "EUR", "BTC"]
+        best_result: Optional[Tuple[str, str]] = None
+        best_price_gbp: Optional[float] = None
+
+        any_exchange = None  # used as reference exchange for FX lookups
+
+        for exchange_id in exchanges:
+            exchange = self.get_exchange(exchange_id)
+            if not exchange:
+                continue
+            if any_exchange is None:
+                any_exchange = exchange
+
+            pairs = self._pairs.get(exchange_id, set())
+            for quote in QUOTE_ORDER:
+                pair = f"{symbol.upper()}/{quote}"
+                if pair not in pairs:
+                    continue
+                try:
+                    ticker = self._fetch_ticker_with_retry(exchange, pair)
+                    if side == "buy":
+                        raw_price = ticker.get("ask") or ticker.get("last") or 0
+                    else:
+                        raw_price = ticker.get("bid") or ticker.get("last") or 0
+                    if not raw_price or raw_price <= 0:
+                        continue
+
+                    # ── Spread filter ─────────────────────────────────────
+                    # Skip exchanges where the bid/ask spread is too wide —
+                    # large spreads indicate thin liquidity and poor execution.
+                    ask = ticker.get("ask") or 0
+                    bid = ticker.get("bid") or 0
+                    mid = ticker.get("last") or ticker.get("close") or 0
+                    if ask > 0 and bid > 0 and mid > 0:
+                        spread_pct = (ask - bid) / mid * 100
+                        if spread_pct > _MAX_ROUTING_SPREAD_PCT:
+                            logger.debug(
+                                f"Skipping {exchange_id} for {pair}: spread {spread_pct:.2f}% "
+                                f"exceeds limit {_MAX_ROUTING_SPREAD_PCT:.1f}%"
+                            )
+                            continue
+
+                    # Normalise to GBP for cross-exchange comparison
+                    fx_rate = 1.0
+                    if quote != "GBP":
+                        fx_rate = self._get_fx_rate("GBP", quote, exchange) or 0
+                        if fx_rate <= 0:
+                            continue
+                    price_gbp = raw_price / fx_rate
+
+                    if side == "buy":
+                        if best_price_gbp is None or price_gbp < best_price_gbp:
+                            best_price_gbp = price_gbp
+                            best_result = (exchange_id, pair)
+                    else:  # sell
+                        if best_price_gbp is None or price_gbp > best_price_gbp:
+                            best_price_gbp = price_gbp
+                            best_result = (exchange_id, pair)
+
+                    break  # found a valid pair on this exchange — no need to try other quotes
+                except Exception as e:
+                    logger.debug(f"Price fetch failed on {exchange_id} for {pair}: {e}")
+                    continue
+
+        if best_result:
+            logger.info(
+                f"Best {side} exchange for {symbol}: {best_result[0]} "
+                f"({best_result[1]}, ~£{best_price_gbp:.6f})"
+            )
+            return best_result
+
+        # All live price fetches failed — fall back to priority order
+        logger.warning(f"Price comparison failed for {symbol}, falling back to priority order")
+        try:
+            from ml.error_handling import send_error_alert
+            send_error_alert(
+                subject=f"Exchange Routing Degraded -- {symbol}",
+                body=(
+                    f"Best-price routing failed for {symbol} ({side}).\n"
+                    f"All live price fetches failed across {len(exchanges)} exchanges.\n"
+                    f"Falling back to priority-order selection."
+                ),
+                category=f"routing_degraded_{symbol}",
+            )
+        except Exception:
+            pass
+        for exchange_id in exchanges:
+            pairs = self._pairs.get(exchange_id, set())
+            for quote in QUOTE_ORDER:
+                pair = f"{symbol.upper()}/{quote}"
+                if pair in pairs:
+                    return exchange_id, pair
         return None
 
     def get_exchange(self, exchange_id: str):
@@ -283,6 +452,8 @@ class ExchangeManager:
         amount_gbp: float,
         max_amount_gbp: float = None,
         quantity: float = None,
+        expected_price: float = None,
+        preferred_exchange: str = None,
     ) -> Dict[str, Any]:
         """
         Execute an order on the best available exchange.
@@ -298,8 +469,11 @@ class ExchangeManager:
                       amount_gbp→quantity reconversion and min-order bumping,
                       preventing failures when the GBP value and live exchange
                       price have diverged since the proposal was created.
+            preferred_exchange: For sells, the exchange where tokens are held.
+                                Tried first; falls back to best-price routing
+                                only if it fails.
         """
-        result = self.find_best_pair(symbol)
+        result = self.find_best_pair(symbol, side=side, preferred_exchange=preferred_exchange)
         if not result:
             return {
                 "success": False,
@@ -323,6 +497,27 @@ class ExchangeManager:
                     "success": False,
                     "error": f"No current price available for {pair} on {exchange_id} (ticker returned None)",
                 }
+
+            # Slippage guard: reject only on ADVERSE price movement since the proposal.
+            # For sells: adverse = price dropped (you'd receive less than expected).
+            # For buys:  adverse = price rose  (you'd pay more than expected).
+            # Favorable movements (price up on a sell, price down on a buy) are allowed.
+            if expected_price and expected_price > 0:
+                default_max = float(os.getenv("MAX_SLIPPAGE_PCT", "3.0"))
+                if side == "sell":
+                    max_slippage = float(os.getenv("MAX_SLIPPAGE_PCT_SELL", "15.0"))
+                    adverse_pct = (expected_price - current_price) / expected_price * 100
+                else:
+                    max_slippage = default_max
+                    adverse_pct = (current_price - expected_price) / expected_price * 100
+                if adverse_pct > max_slippage:
+                    return {
+                        "success": False,
+                        "error": (
+                            f"Slippage {adverse_pct:.1f}% exceeds limit {max_slippage:.1f}% "
+                            f"(expected £{expected_price:.6f}, current £{current_price:.6f})"
+                        ),
+                    }
 
             # Convert GBP amount to quote currency if pair isn't GBP-quoted
             quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
@@ -431,7 +626,6 @@ class ExchangeManager:
             }
         except Exception as e:
             logger.error(f"Order failed on {exchange_id}: {e}")
-            alert_trade_failure(symbol, str(e), {"exchange": exchange_id, "side": side})
             # Try next exchange
             exchanges = self.get_exchanges_for_coin(symbol)
             remaining = [eid for eid in exchanges if eid != exchange_id]
@@ -557,47 +751,82 @@ class ExchangeManager:
         """
         Get exchange rate from one fiat/stable to another.
         Uses the exchange's own ticker data (e.g. GBP/USD pair).
-        Falls back to hardcoded approximate rates if no direct pair exists.
+        Caches live rates for FX_RATE_TTL_SECONDS; falls back to approximate
+        rates only when the exchange cannot provide a live price.
         """
         if from_currency == to_currency:
             return 1.0
 
         cache_key = f"{from_currency}/{to_currency}"
+
+        # Return cached rate if still fresh
         if cache_key in self._fx_cache:
-            return self._fx_cache[cache_key]
+            cached_rate, fetched_at = self._fx_cache[cache_key]
+            if time.time() - fetched_at < FX_RATE_TTL_SECONDS:
+                return cached_rate
 
-        # Try direct pair on exchange (e.g. GBP/USD)
-        for direct_pair in [f"{from_currency}/{to_currency}", f"{to_currency}/{from_currency}"]:
-            try:
-                if direct_pair in getattr(exchange, "markets", {}):
-                    ticker = exchange.fetch_ticker(direct_pair)
-                    rate = ticker.get("last", 0)
-                    if rate and rate > 0:
-                        if direct_pair.startswith(from_currency):
-                            self._fx_cache[cache_key] = rate
+        # Build candidate pairs to try: direct pair first, then USD proxies for stablecoin quotes.
+        # Kraken and others don't list GBP/USDT but do list GBP/USD — USDT/USDC ≈ USD.
+        usd_proxy_map = {"USDT": "USD", "USDC": "USD", "DAI": "USD"}
+        effective_to = usd_proxy_map.get(to_currency, to_currency)
+        effective_from = usd_proxy_map.get(from_currency, from_currency)
+
+        candidate_pairs = [
+            (f"{from_currency}/{to_currency}", True),    # direct: rate = ticker.last
+            (f"{to_currency}/{from_currency}", False),   # inverse: rate = 1/ticker.last
+        ]
+        if effective_to != to_currency:  # to_currency is a stablecoin
+            candidate_pairs += [
+                (f"{from_currency}/{effective_to}", True),
+                (f"{effective_to}/{from_currency}", False),
+            ]
+        if effective_from != from_currency:  # from_currency is a stablecoin
+            candidate_pairs += [
+                (f"{effective_from}/{to_currency}", True),
+                (f"{to_currency}/{effective_from}", False),
+            ]
+
+        # Try against the passed-in exchange first, then fall back to any cached exchange
+        # that may have GBP pairs (e.g. Kraken has GBP/USD; KuCoin/MEXC typically don't).
+        exchanges_to_try = [exchange]
+        for ex_id, ex in self._exchanges.items():
+            if ex is not exchange:
+                exchanges_to_try.append(ex)
+
+        for ex_obj in exchanges_to_try:
+            for direct_pair, is_direct in candidate_pairs:
+                try:
+                    if direct_pair in getattr(ex_obj, "markets", {}):
+                        ticker = ex_obj.fetch_ticker(direct_pair)
+                        last = ticker.get("last", 0)
+                        if last and last > 0:
+                            rate = last if is_direct else 1.0 / last
+                            self._fx_cache[cache_key] = (rate, time.time())
                             return rate
-                        else:
-                            self._fx_cache[cache_key] = 1.0 / rate
-                            return 1.0 / rate
-            except Exception:
-                continue
+                except Exception:
+                    continue
 
-        # Fallback: approximate rates (GBP base)
+        # Return stale cached rate rather than falling back to hardcoded approximation
+        if cache_key in self._fx_cache:
+            stale_rate, _ = self._fx_cache[cache_key]
+            logger.debug(f"Using stale FX rate for {cache_key} (live fetch failed)")
+            return stale_rate
+
+        # Last resort: approximate rates (GBP base)
         approx_rates = {
             "GBP/USD": 1.27, "GBP/USDT": 1.27, "GBP/USDC": 1.27,
             "GBP/EUR": 1.17, "GBP/BTC": 0.000012,
         }
         if cache_key in approx_rates:
             rate = approx_rates[cache_key]
-            self._fx_cache[cache_key] = rate
+            self._fx_cache[cache_key] = (rate, time.time())
             logger.warning(f"Using approximate FX rate: {cache_key} = {rate}")
             return rate
 
-        # Try inverse
         inverse_key = f"{to_currency}/{from_currency}"
         if inverse_key in approx_rates:
             rate = 1.0 / approx_rates[inverse_key]
-            self._fx_cache[cache_key] = rate
+            self._fx_cache[cache_key] = (rate, time.time())
             logger.warning(f"Using approximate FX rate (inverse): {cache_key} = {rate:.6f}")
             return rate
 
@@ -664,10 +893,8 @@ class ExchangeManager:
 
             return {"ok": True}
         except Exception as e:
-            # If balance check fails, log but allow the order to proceed
-            # (the exchange will reject if funds are truly insufficient)
-            logger.warning(f"Balance check failed on {exchange_id} (proceeding anyway): {e}")
-            return {"ok": True}
+            logger.warning(f"Balance check failed on {exchange_id} — blocking order: {e}")
+            return {"ok": False, "error": f"Balance check failed: {e}"}
 
     def _auto_convert_gbp(
         self, exchange, exchange_id: str, target_currency: str,
@@ -805,7 +1032,7 @@ class ExchangeManager:
             quote_currency = pair.split("/")[1] if "/" in pair else "GBP"
             fx_rate = 1.0
             if quote_currency != "GBP":
-                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange) or 1.27
+                fx_rate = self._get_fx_rate("GBP", quote_currency, exchange) or 1.0
 
             # Minimum from quantity limit
             min_qty = self._get_min_order_quantity(exchange, pair)

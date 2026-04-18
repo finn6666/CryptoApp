@@ -1,0 +1,31 @@
+# CryptoApp Claude agent runner — between-scan portfolio manager
+# Runs every 90 minutes via cryptoapp-claude-agent.timer
+#
+# Setup:
+#   sudo cp ~/CryptoApp/deploy/cryptoapp-claude-agent.service /etc/systemd/system/
+#   sudo cp ~/CryptoApp/deploy/cryptoapp-claude-agent.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cryptoapp-claude-agent.timer
+#
+# Run manually: sudo systemctl start cryptoapp-claude-agent.service
+# View logs:    journalctl -u cryptoapp-claude-agent.service -n 50
+
+[Unit]
+Description=CryptoApp Claude Agent — Between-scan Portfolio Manager
+After=cryptoapp.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=finnbryant
+WorkingDirectory=/home/finnbryant/CryptoApp
+EnvironmentFile=/home/finnbryant/CryptoApp/.env
+ExecStart=/usr/bin/env bash -lc 'cd /home/finnbryant/CryptoApp && uv run python -m ml.claude_agent_runner'
+StandardOutput=journal
+StandardError=journal
+
+# Pi memory guard — 256 MB cap for this lightweight runner
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

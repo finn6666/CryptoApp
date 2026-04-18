@@ -27,6 +27,7 @@ import logging
 import math
 import os
 import random
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,6 +74,37 @@ def _confidence_tier(score: float) -> str:
     return "low"
 
 
+def _momentum_direction(pct_7d: float) -> str:
+    """Classify 7-day price change direction at entry time."""
+    if pct_7d > 5:
+        return "uptrend"
+    if pct_7d < -5:
+        return "downtrend"
+    return "flat"
+
+
+def _btc_regime() -> str:
+    """
+    Classify the current BTC market regime (bull / neutral / bear) from
+    BTC's 7-day price change in app state.  Falls back to 'neutral' if
+    the data is unavailable so the state space stays consistent.
+    """
+    try:
+        import services.app_state as state
+        if state.analyzer and state.analyzer.coins:
+            for coin in state.analyzer.coins:
+                if getattr(coin, "symbol", "").upper() in ("BTC", "WBTC"):
+                    pct = float(getattr(coin, "price_change_7d", 0) or 0)
+                    if pct > 10:
+                        return "bull"
+                    if pct < -10:
+                        return "bear"
+                    return "neutral"
+    except Exception:
+        pass
+    return "neutral"
+
+
 def _mcap_tier(mcap_gbp: float) -> str:
     if mcap_gbp >= 500_000_000:
         return "large"
@@ -104,10 +136,23 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         or coin_data.get("attractiveness_score", 0) * 10
         or 0
     )
+    try:
+        gem_raw = float(gem_raw)
+    except (TypeError, ValueError):
+        gem_raw = 0.0
     gem = _gem_tier(gem_raw)
 
+    try:
+        mcap_val = float(coin_data.get("market_cap", 0) or 0)
+    except (TypeError, ValueError):
+        mcap_val = 0.0
+    try:
+        vol_val = float(coin_data.get("volume_24h", 0) or 0)
+    except (TypeError, ValueError):
+        vol_val = 0.0
+
     vol = _volume_mcap_tier(
-        coin_data.get("volume_24h", 0) / max(coin_data.get("market_cap", 1), 1)
+        vol_val / max(mcap_val, 1)
     )
 
     # weekly change: coin_to_dict uses 'price_change_7d', not 'percent_change_7d'
@@ -116,9 +161,13 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         or coin_data.get("percent_change_7d")
         or 0
     )
+    try:
+        weekly_pct = float(weekly_pct)
+    except (TypeError, ValueError):
+        weekly_pct = 0.0
     wk = _weekly_change_tier(weekly_pct)
 
-    mc = _mcap_tier(coin_data.get("market_cap", 0))
+    mc = _mcap_tier(mcap_val)
 
     # agent/screen confidence at scan time (differentiates high vs low conviction buys)
     conf_raw = (
@@ -126,9 +175,15 @@ def discretise_state(coin_data: Dict[str, Any]) -> str:
         or coin_data.get("confidence")
         or 0
     )
+    try:
+        conf_raw = float(conf_raw)
+    except (TypeError, ValueError):
+        conf_raw = 0.0
     conf = _confidence_tier(conf_raw)
 
-    return f"{gem}|{vol}|{wk}|{mc}|{conf}"
+    momentum = _momentum_direction(weekly_pct)
+    btc = _btc_regime()
+    return f"{gem}|{vol}|{wk}|{mc}|{conf}|{momentum}|{btc}"
 
 
 # ─── Q-Learning Engine ────────────────────────────────────────
@@ -162,11 +217,12 @@ class QLearningTrader:
             os.environ.get("QL_GAMMA", "0.9")
         )
         # Exploration rate — probability of random action
+        # Lower default (0.10 vs legacy 0.3) to reduce random noise in live trading
         self.epsilon = epsilon if epsilon is not None else float(
-            os.environ.get("QL_EPSILON", "0.3")
+            os.environ.get("QL_EPSILON", "0.10")
         )
         self.epsilon_min = epsilon_min if epsilon_min is not None else float(
-            os.environ.get("QL_EPSILON_MIN", "0.05")
+            os.environ.get("QL_EPSILON_MIN", "0.02")
         )
         # Decay per episode (each completed trade outcome)
         self.epsilon_decay = epsilon_decay if epsilon_decay is not None else float(
@@ -174,7 +230,7 @@ class QLearningTrader:
         )
         # Minimum visits a state needs before Q-learning can block/adjust trades.
         # Prevents one bad trade from poisoning an entire state class.
-        self.min_visits_to_act = int(os.environ.get("QL_MIN_VISITS", "5"))
+        self.min_visits_to_act = int(os.environ.get("QL_MIN_VISITS", "3"))
 
         # Q-table: state → {action → value}
         self.q_table: Dict[str, Dict[str, float]] = defaultdict(
@@ -184,11 +240,17 @@ class QLearningTrader:
         self.visit_counts: Dict[str, Dict[str, int]] = defaultdict(
             lambda: {a: 0 for a in ACTIONS}
         )
-        # Track symbols that have lost money and how many times (capped at 5)
-        self.loss_memory: Dict[str, int] = {}
+        # Track symbols that have lost money: stores Unix timestamps of losses.
+        # Time-decayed: only losses within the last 90 days count toward penalties.
+        self.loss_memory: Dict[str, List[float]] = {}
         # State recorded at scan/buy time, keyed by symbol; used at close time
         # so record_outcome uses the real market-context state, not stale holding data
         self._symbol_state_cache: Dict[str, str] = {}
+        # Dedup guard: tracks (symbol, exit_trigger) → Unix timestamp of last outcome.
+        # Prevents the same closed position being recorded multiple times if the sell
+        # proposal is still pending when the market monitor re-runs (historical bug
+        # caused ESP/SUP to log 30+ duplicate outcomes in one session).
+        self._recent_outcomes: Dict[str, float] = {}  # key: "SYMBOL:trigger" → ts
         # Total update steps (increments twice per closed trade: buy + skip update)
         self.episodes = 0
         # Actual completed trade count — what the UI should display
@@ -260,13 +322,18 @@ class QLearningTrader:
         if base < 0:
             base *= 1.5
 
-        # 3. Repeat-loser penalty (loss count capped at 5 to prevent runaway penalties)
+        # 3. Repeat-loser penalty — count only losses within the last 90 days
+        loss_window = time.time() - 90 * 86400
         if pnl_pct < -5:
-            times_lost = self.loss_memory.get(symbol, 0)
-            self.loss_memory[symbol] = min(times_lost + 1, 5)
+            timestamps = self.loss_memory.get(symbol, [])
+            # Prune losses older than 90 days, then record this one
+            timestamps = [t for t in timestamps if t > loss_window]
+            timestamps.append(time.time())
+            self.loss_memory[symbol] = timestamps
+            times_lost = len(timestamps)
             # Progressive penalty: -0.1 first loss, -0.2 second, capped at -0.5
-            repeat_penalty = -0.1 * (times_lost + 1)
-            base += max(repeat_penalty, -0.5)  # Cap at -0.5
+            repeat_penalty = -0.1 * min(times_lost, 5)
+            base += max(repeat_penalty, -0.5)
         elif pnl_pct > 5:
             # Winning resets the loss counter
             self.loss_memory.pop(symbol, None)
@@ -363,6 +430,20 @@ class QLearningTrader:
         Called by sell automation when a position closes, or periodically
         for unrealised P&L checkpoints.
         """
+        # Dedup guard: skip if this (symbol, exit_trigger) was already recorded
+        # within the last 30 minutes. Prevents duplicate Q-updates when the sell
+        # proposal is still pending on the next market-monitor tick.
+        dedup_key = f"{symbol}:{exit_trigger}"
+        dedup_window = float(os.environ.get("QL_OUTCOME_DEDUP_MINUTES", "30")) * 60
+        last_ts = self._recent_outcomes.get(dedup_key, 0.0)
+        if time.time() - last_ts < dedup_window:
+            logger.debug(
+                f"Q-learning outcome skipped (dedup): {symbol} {exit_trigger} "
+                f"already recorded {(time.time() - last_ts) / 60:.1f}m ago"
+            )
+            return
+        self._recent_outcomes[dedup_key] = time.time()
+
         # Prefer the state cached at buy/scan time over recalculating from the
         # portfolio holding dict (which lacks live market data fields)
         state = (
@@ -438,6 +519,69 @@ class QLearningTrader:
 
     # ─── Diagnostics ──────────────────────────────────────────
 
+    def seed_from_backtest(self, backtest_result) -> int:
+        """
+        Pre-seed Q-table from backtest trades.
+
+        Accepts a BacktestResult (or dict with 'trades' list).
+        Each trade needs: symbol, side, confidence, pnl_pct, hold_days,
+        and optionally market_cap, volume_24h, price_change_7d.
+
+        Returns the number of outcomes seeded.
+        """
+        trades = backtest_result
+        if hasattr(backtest_result, "trades"):
+            trades = backtest_result.trades
+        elif isinstance(backtest_result, dict):
+            trades = backtest_result.get("trades", [])
+
+        # Group trades by symbol to pair buys with sells
+        buys: Dict[str, Dict] = {}
+        seeded = 0
+
+        for t in trades:
+            if isinstance(t, dict):
+                side = t.get("side", "")
+                symbol = t.get("symbol", "")
+            else:
+                side = getattr(t, "side", "")
+                symbol = getattr(t, "symbol", "")
+
+            if side == "buy":
+                buys[symbol] = t if isinstance(t, dict) else {
+                    "symbol": symbol,
+                    "confidence": getattr(t, "confidence", 50),
+                    "amount_gbp": getattr(t, "amount_gbp", 0),
+                }
+            elif side == "sell" and symbol in buys:
+                buy_trade = buys.pop(symbol)
+                td = t if isinstance(t, dict) else {}
+                pnl_pct = td.get("pnl_pct", 0) if isinstance(t, dict) else getattr(t, "pnl_pct", 0)
+                hold_days = td.get("hold_days", 0) if isinstance(t, dict) else getattr(t, "hold_days", 0)
+
+                # Build a synthetic coin_data for state discretisation
+                coin_data = {
+                    "symbol": symbol,
+                    "confidence": buy_trade.get("confidence", 50),
+                    "market_cap": buy_trade.get("market_cap", 0),
+                    "volume_24h": buy_trade.get("volume_24h", 0),
+                    "price_change_7d": buy_trade.get("price_change_7d", 0),
+                    "gem_score": buy_trade.get("gem_score", 0),
+                }
+
+                self.record_outcome(
+                    symbol=symbol,
+                    coin_data=coin_data,
+                    action="buy",
+                    pnl_pct=pnl_pct,
+                    hold_hours=hold_days * 24,
+                    exit_trigger="backtest_seed",
+                )
+                seeded += 1
+
+        logger.info(f"Q-table seeded with {seeded} backtest outcomes")
+        return seeded
+
     def get_stats(self) -> Dict[str, Any]:
         """Return Q-learning diagnostics for the dashboard."""
         total_states = len(self.q_table)
@@ -472,7 +616,10 @@ class QLearningTrader:
             "state_diversity": round(state_diversity, 2),
             "state_cache_size": len(self._symbol_state_cache),
             "total_visits": total_visits,
-            "loss_memory": dict(self.loss_memory),
+            "loss_memory": {
+                k: len([t for t in v if t > time.time() - 90 * 86400])
+                for k, v in self.loss_memory.items()
+            },
             "best_state": {
                 "state": best_state,
                 "q_buy": round(self.q_table[best_state]["buy"], 4) if best_state else 0,
@@ -527,14 +674,33 @@ class QLearningTrader:
             with open(Q_TABLE_FILE) as f:
                 data = json.load(f)
 
+            skipped_legacy = 0
             for state, actions in data.get("q_table", {}).items():
+                if state.count("|") != 6:
+                    skipped_legacy += 1
+                    continue
                 self.q_table[state] = actions
             for state, counts in data.get("visit_counts", {}).items():
+                if state.count("|") != 6:
+                    continue
                 self.visit_counts[state] = counts
+            if skipped_legacy:
+                logger.info(
+                    f"Q-table loaded: skipped {skipped_legacy} legacy state entries (dimension mismatch)"
+                )
 
-            # Sanitize loss_memory: values inflated by checkpoint calls get capped
+            # loss_memory is stored as lists of Unix timestamps.
+            # Migrate from legacy int format (counts) to timestamp list format.
             raw_loss = data.get("loss_memory", {})
-            self.loss_memory = {k: min(v, 5) for k, v in raw_loss.items()}
+            migrated = {}
+            for k, v in raw_loss.items():
+                if isinstance(v, list):
+                    migrated[k] = v
+                elif isinstance(v, (int, float)) and v > 0:
+                    # Legacy: count → synthesize timestamps spaced 1 day apart
+                    now_ts = time.time()
+                    migrated[k] = [now_ts - i * 86400 for i in range(min(int(v), 5))]
+            self.loss_memory = migrated
 
             self._symbol_state_cache = data.get("symbol_state_cache", {})
             loaded_eps = data.get("epsilon", self.epsilon)

@@ -8,25 +8,26 @@
  */
 async function loadDashboardSummary(prefetchedData = null) {
     try {
-        const data = prefetchedData || await fetch('/api/dashboard-summary', { headers: authHeaders() }).then(r => r.json());
+        let data;
+        if (prefetchedData) {
+            data = prefetchedData;
+        } else {
+            const ctrl = new AbortController();
+            const timeout = setTimeout(() => ctrl.abort(), 5000);
+            try {
+                const res = await fetch('/api/dashboard-summary', { headers: authHeaders(), signal: ctrl.signal });
+                data = await res.json();
+            } finally {
+                clearTimeout(timeout);
+            }
+        }
 
         // Budget pill
         _updatePill('pillBudget', () => {
             const t = data.trading || {};
             if (t.kill_switch) return { value: 'HALTED', cls: 'warning' };
-            const b = t.remaining_budget ?? t.budget_remaining ?? t.daily_budget ?? null;
+            const b = t.remaining_today_gbp ?? t.remaining_budget ?? t.budget_remaining ?? t.daily_budget ?? null;
             return { value: b !== null ? `£${Number(b).toFixed(2)}` : 'Active' };
-        });
-
-        // Portfolio P&L pill
-        _updatePill('pillPnl', () => {
-            const p = data.portfolio || {};
-            const pnl = p.unrealised_pnl_gbp ?? 0;
-            const val = p.total_value_gbp ?? 0;
-            const sign = pnl >= 0 ? '+' : '';
-            const cls  = pnl >= 0 ? 'positive' : 'negative';
-            if (!val && !pnl) return { value: '£0.00' };
-            return { value: `${sign}£${Math.abs(pnl).toFixed(2)}`, cls };
         });
 
         // Scanner pill
@@ -48,13 +49,11 @@ async function loadDashboardSummary(prefetchedData = null) {
 
         // Populate sidebar scanner stats
         const s = data.scanner || {};
-        _setText('sbScanNext',     s.next_scan  ? timeAgo(s.next_scan, true) : '—');
-        _setText('sbScanLast',     s.last_scan  ? timeAgo(s.last_scan)       : 'Never');
-        _setText('sbScanCoins',    s.coins_scanned ?? 0);
-        _setText('sbScanProposals',s.total_proposals ?? s.proposals_made ?? 0);
+        _setText('scanNextTime', s.next_scan ? timeAgo(s.next_scan, true) : '—');
+        _setText('scanLastRun',  s.last_scan ? timeAgo(s.last_scan)       : 'Never');
 
         // Populate sidebar scan-status badge
-        const scanBadge = document.getElementById('sbScanStatusBadge');
+        const scanBadge = document.getElementById('scanStatusDetail');
         if (scanBadge) {
             const running   = s.scan_running ?? s.running ?? false;
             const scheduled = s.scheduler_running ?? s.scheduler_active ?? false;
@@ -73,7 +72,7 @@ function _updatePill(id, fn) {
     try {
         const { value, cls } = fn();
         pill.textContent = value;
-        pill.className = 'status-pill__value' + (cls ? ' ' + cls : '');
+        pill.className = 'st-val' + (cls ? ' ' + cls : '');
     } catch (e) {
         pill.textContent = '—';
     }
@@ -82,34 +81,6 @@ function _updatePill(id, fn) {
 function _setText(id, val) {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
-}
-
-async function loadMarketConditions() {
-    try {
-        const response = await fetch('/api/market/conditions');
-        const data = await response.json();
-
-        if (data.error) {
-            console.warn('Market conditions unavailable:', data.error);
-            return;
-        }
-
-        // If data isn't loaded yet, auto-trigger a refresh
-        if (data.opportunity_level === 'UNKNOWN') {
-            try {
-                const refreshRes = await fetch('/api/refresh', { method: 'POST', headers: authHeadersJson() });
-                const refreshData = await refreshRes.json();
-                if (refreshData.success) {
-                    setTimeout(() => refreshData_afterAutoLoad(), 2000);
-                }
-            } catch (e) {
-                console.warn('Auto-refresh failed:', e);
-            }
-        }
-        
-    } catch (error) {
-        console.error('Error loading market conditions:', error);
-    }
 }
 
 async function loadMLStatus() {
@@ -238,30 +209,17 @@ async function trainMLModel() {
 async function refreshData() {
     await Promise.all([
         loadDashboardSummary(),
-        loadMarketConditions(),
         loadHeatmap(),
-    ]);
-}
-
-// Called after auto-refresh succeeds — reloads entire dashboard
-async function refreshData_afterAutoLoad() {
-    console.log('Data became available — reloading entire dashboard...');
-    await Promise.all([
-        loadDashboardSummary(),
-        loadMarketConditions(),
-        loadHeatmap(),
+        loadPortfolioCard(),
     ]);
 }
 
 async function forceRefresh() {
     if (refreshing) return;
-    
+
     const btn = document.getElementById('refreshBtn');
-    const originalText = btn.textContent;
-    
     refreshing = true;
-    btn.textContent = 'Refreshing...';
-    btn.disabled = true;
+    if (btn) { btn.textContent = 'Refreshing...'; btn.disabled = true; }
 
     try {
         const response = await fetch('/api/refresh', { method: 'POST', headers: authHeadersJson() });
@@ -278,8 +236,7 @@ async function forceRefresh() {
         showStatus(`Error: ${error.message}`, 'error');
     } finally {
         refreshing = false;
-        btn.textContent = originalText;
-        btn.disabled = false;
+        if (btn) { btn.textContent = 'Refresh'; btn.disabled = false; }
     }
 }
 

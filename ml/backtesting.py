@@ -3,7 +3,7 @@ Backtesting Framework
 Validates trading strategies against historical data.
 
 Supports:
-- Replay of historical price data through the gem detector + agent pipeline
+- Replay of historical price data through the agent pipeline
 - Simulated trade execution with budget constraints
 - P&L tracking and performance metrics (Sharpe, drawdown, win rate)
 - Comparison of different strategy configurations

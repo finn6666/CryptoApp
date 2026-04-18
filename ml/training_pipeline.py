@@ -5,7 +5,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import joblib
-import onnx
 from skl2onnx import convert_sklearn
 from skl2onnx.common.data_types import FloatTensorType
 import logging
@@ -239,7 +238,7 @@ class CryptoMLPipeline:
             confidence = max(0.1, min(0.9, 1.0 / (1.0 + abs(variance))))
             
             return round(confidence, 3)
-        except:
+        except Exception:
             return 0.5
     
     def create_sample_data(self, symbol="BTC", days=30):

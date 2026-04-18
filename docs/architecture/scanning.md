@@ -1,86 +1,54 @@
 # Scanning & Scheduling
 
-How coins are discovered, filtered, and fed into the analysis pipeline.
+How coins are discovered, filtered, analysed, and fed into the trading pipeline.
 
-## Scan Pipeline (every 12h)
+For current thresholds, intervals, and env vars, see [scanning.instructions.md](../../.github/instructions/scanning.instructions.md).
+
+## Scan Pipeline
+
+The scan loop runs periodically and is the primary way new trades get proposed.
 
 ```
-1. _refresh_data()
-   └─ CoinGecko API (free tier) → all tracked coins with price/volume/rank
-
-2. _get_tradeable_coins()
-   └─ ExchangeManager.filter_tradeable_coins() — removes stablecoins, checks Kraken pairs
-
-3. _select_candidates(tradeable)
-   └─ Priority: user favorites → attractiveness_score fallback
-   └─ Capped to SCAN_MAX_COINS (default 10)
-
-4. _analyse_and_evaluate(coin_data)  [per coin]
-   └─ ADK orchestrator → trade_decision dict
-   └─ Conviction ≥45% + should_trade=True → TradingEngine.propose_and_auto_execute()
-
-5. SellAutomation.check_and_propose_sells(live_prices)
+1. Refresh data       -- pull latest prices from CoinGecko
+2. Filter tradeable   -- remove stablecoins, check exchange pair availability
+3. Select candidates  -- prioritise user favorites, then rank by attractiveness score
+4. Quick screen       -- Tier 1: single Gemini call per coin, regime-aware threshold
+5. Full debate        -- Tier 2: 3-agent debate for survivors, capped per scan
+6. Propose trades     -- winners go through TradingEngine.propose_and_auto_execute()
+7. Check sells        -- SellAutomation evaluates all holdings against exit triggers
 ```
 
-## Market Monitor (between scans)
+**Why two tiers?** Full debate analysis costs 3 Gemini calls per coin. Quick screen costs 1. The two-tier approach lets the system evaluate more candidates cheaply and only spend the full budget on promising ones.
 
-Runs continuously in a background thread once `start_scheduler()` is called.
+## Regime-Aware Thresholds
 
-| Interval | Job | Purpose |
-|----------|-----|---------|
-| 5 min | Price check | Trigger stop-loss / profit-target sells |
-| 15 min | Momentum check | Alert on held-coin momentum changes |
-| 30 min | Quick scan | Score all coins by `attractiveness_score`, auto-buy opportunistically |
+Market regime (bull/neutral/bear) is determined by BTC's recent performance. Both the quick-screen pass threshold and the conviction threshold for proposing trades adjust based on regime:
 
-**Quick scan scoring:** `gem_score = coin.attractiveness_score`, `gem_probability = min(1.0, score / 10.0)`. Auto-buy fires if `gem_probability * 100 ≥ auto_buy_min_gem`.
+- **Bull**: lower thresholds -- more coins pass through, more trades proposed
+- **Bear**: higher thresholds -- stricter filtering saves API budget on weak candidates
 
-## Scheduling
+This is a cost control mechanism as much as a quality control one.
 
-**Default (interval mode):** Scans every `SCAN_INTERVAL_HOURS` (12h).
+## Market Monitor
 
-**Legacy daily mode:** Set `SCAN_INTERVAL_HOURS=0` → single scan at `SCAN_TIME` (12:00).
+Runs continuously between scans in a background thread. Three jobs at different intervals:
 
-Scheduler runs in a daemon thread checking every 30 seconds for pending jobs.
+- **Price check** (frequent): triggers stop-loss and profit-target sells for held coins
+- **Momentum check** (moderate): alerts on significant momentum changes in holdings
+- **Quick opportunity scan** (less frequent): scores all coins by attractiveness, can auto-buy opportunistically
+
+The monitor handles the "what if something happens between scans" problem without running full agent analysis.
 
 ## ML Scheduler
 
-| Job | Schedule | Purpose |
-|-----|----------|---------|
-| `weekly_retrain()` | Sunday 2 AM | Retrain ONNX model from trade outcomes |
-| `weekly_report_job()` | Monday 9 AM | Email performance report |
+Separate from the scan scheduler. Handles weekly maintenance:
+- Model retraining (scikit-learn -> ONNX export) from trade outcomes
+- Performance report emails
 
-## Files
+## Key Files
 
-| File | Class | Singleton |
-|------|-------|-----------|
-| `ml/scan_loop.py` | `ScanLoop` | `get_scan_loop()` |
-| `ml/market_monitor.py` | `MarketMonitor` | `get_market_monitor()` |
-| `ml/scheduler.py` | `MLScheduler` | `get_ml_scheduler()` |
-
-## Log Files
-
-| File | Format | Contents |
-|------|--------|----------|
-| `data/scan_logs/scan_YYYY-MM-DD.json` | JSON array | Per-coin results |
-| `data/trades/audit_log.jsonl` | JSONL | Every scan/proposal/execution event |
-| `data/monitor_logs/monitor_YYYY-MM-DD.jsonl` | JSONL | Market monitor alerts |
-
-## Environment Variables
-
-| Var | Default | Purpose |
-|-----|---------|---------|
-| `SCAN_ENABLED` | `true` | Enable/disable scan loop |
-| `SCAN_INTERVAL_HOURS` | `12` | Hours between scans |
-| `SCAN_TIME` | `12:00` | Daily scan time (legacy mode only) |
-| `SCAN_MAX_COINS` | `10` | Max coins per scan |
-| `SCAN_MAX_PROPOSALS` | `3` | Max trade proposals per scan |
-| `SCAN_COOLDOWN_HOURS` | `1` | Min hours between scans |
-| `MONITOR_ENABLED` | `true` | Start market monitor between scans |
-| `RETRAIN_ENABLED` | `true` | Enable weekly ML retrain |
-
-## Gotchas
-
-- Cooldown gates both scheduled and manual "Scan Now" requests
-- Conviction threshold in scan (≥45%) is lower than the trading agent's self-stated ≥55%
-- `propose_and_auto_execute()` means buys execute immediately during scans — no proposal queue
-- ADK 429 quota errors trigger `alert_api_quota()` — adds a backoff delay
+| File | Role |
+|------|------|
+| `ml/scan_loop.py` | Scan pipeline orchestration |
+| `ml/market_monitor.py` | Between-scan continuous monitoring |
+| `ml/scheduler.py` | Weekly retrain and report jobs |
