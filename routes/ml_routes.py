@@ -299,7 +299,6 @@ def gem_accuracy_report():
 # ─── Heatmap Data ─────────────────────────────────────────────
 
 @ml_bp.route('/api/heatmap-data')
-@require_trading_auth
 def heatmap_data():
     """Return top coins with gem scores for the dashboard heatmap.
     Sorted by attractiveness_score descending; max 60 coins.

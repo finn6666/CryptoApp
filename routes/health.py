@@ -170,7 +170,6 @@ def debug_coins():
 
 
 @health_bp.route('/api/market/state')
-@require_trading_auth
 def market_state():
     """Current crypto market state — Fear & Greed + news headlines + global stats"""
     try:
