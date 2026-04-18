@@ -566,6 +566,11 @@ rl = [
     { name = "torchvision" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "flake8" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.2" },
@@ -599,6 +604,9 @@ requires-dist = [
     { name = "torchvision", marker = "extra == 'rl'", specifier = ">=0.13.0" },
 ]
 provides-extras = ["rl", "dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "flake8", specifier = ">=7.3.0" }]
 
 [[package]]
 name = "cryptography"

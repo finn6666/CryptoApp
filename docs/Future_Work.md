@@ -8,12 +8,6 @@ Automated VC-style investment platform. AI agents evaluate early-stage tokens li
 - **Reporting:** weekly NAV, sector attribution, benchmark vs BTC/ETH; LP dashboard for external investors
 - **Revenue:** 2/20 fee structure on external capital, Telegram signal channel, exchange affiliate revenue
 
----
-
-### Orchestrator + exchange tuning
-- Monitor referee verdict quality vs old 5-agent chain; tune prompt aggression
-- Pair cache TTL (6h) misses new listings — consider shorter TTL or event-driven invalidation
-- Add bid/ask spread comparison to best-price routing (currently mid-price only)
 
 ---
 

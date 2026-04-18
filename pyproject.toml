@@ -41,3 +41,8 @@ dev = [
     "flake8>=4.0.0",
     "pip-audit>=2.7.0",
 ]
+
+[dependency-groups]
+dev = [
+    "flake8>=7.3.0",
+]
