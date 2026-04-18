@@ -377,6 +377,19 @@ class ExchangeManager:
 
         # All live price fetches failed — fall back to priority order
         logger.warning(f"Price comparison failed for {symbol}, falling back to priority order")
+        try:
+            from ml.error_handling import send_error_alert
+            send_error_alert(
+                subject=f"Exchange Routing Degraded -- {symbol}",
+                body=(
+                    f"Best-price routing failed for {symbol} ({side}).\n"
+                    f"All live price fetches failed across {len(exchanges)} exchanges.\n"
+                    f"Falling back to priority-order selection."
+                ),
+                category=f"routing_degraded_{symbol}",
+            )
+        except Exception:
+            pass
         for exchange_id in exchanges:
             pairs = self._pairs.get(exchange_id, set())
             for quote in QUOTE_ORDER:

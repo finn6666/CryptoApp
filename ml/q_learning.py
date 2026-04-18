@@ -519,6 +519,69 @@ class QLearningTrader:
 
     # ─── Diagnostics ──────────────────────────────────────────
 
+    def seed_from_backtest(self, backtest_result) -> int:
+        """
+        Pre-seed Q-table from backtest trades.
+
+        Accepts a BacktestResult (or dict with 'trades' list).
+        Each trade needs: symbol, side, confidence, pnl_pct, hold_days,
+        and optionally market_cap, volume_24h, price_change_7d.
+
+        Returns the number of outcomes seeded.
+        """
+        trades = backtest_result
+        if hasattr(backtest_result, "trades"):
+            trades = backtest_result.trades
+        elif isinstance(backtest_result, dict):
+            trades = backtest_result.get("trades", [])
+
+        # Group trades by symbol to pair buys with sells
+        buys: Dict[str, Dict] = {}
+        seeded = 0
+
+        for t in trades:
+            if isinstance(t, dict):
+                side = t.get("side", "")
+                symbol = t.get("symbol", "")
+            else:
+                side = getattr(t, "side", "")
+                symbol = getattr(t, "symbol", "")
+
+            if side == "buy":
+                buys[symbol] = t if isinstance(t, dict) else {
+                    "symbol": symbol,
+                    "confidence": getattr(t, "confidence", 50),
+                    "amount_gbp": getattr(t, "amount_gbp", 0),
+                }
+            elif side == "sell" and symbol in buys:
+                buy_trade = buys.pop(symbol)
+                td = t if isinstance(t, dict) else {}
+                pnl_pct = td.get("pnl_pct", 0) if isinstance(t, dict) else getattr(t, "pnl_pct", 0)
+                hold_days = td.get("hold_days", 0) if isinstance(t, dict) else getattr(t, "hold_days", 0)
+
+                # Build a synthetic coin_data for state discretisation
+                coin_data = {
+                    "symbol": symbol,
+                    "confidence": buy_trade.get("confidence", 50),
+                    "market_cap": buy_trade.get("market_cap", 0),
+                    "volume_24h": buy_trade.get("volume_24h", 0),
+                    "price_change_7d": buy_trade.get("price_change_7d", 0),
+                    "gem_score": buy_trade.get("gem_score", 0),
+                }
+
+                self.record_outcome(
+                    symbol=symbol,
+                    coin_data=coin_data,
+                    action="buy",
+                    pnl_pct=pnl_pct,
+                    hold_hours=hold_days * 24,
+                    exit_trigger="backtest_seed",
+                )
+                seeded += 1
+
+        logger.info(f"Q-table seeded with {seeded} backtest outcomes")
+        return seeded
+
     def get_stats(self) -> Dict[str, Any]:
         """Return Q-learning diagnostics for the dashboard."""
         total_states = len(self.q_table)
