@@ -46,6 +46,7 @@ class ExchangeManager:
         self._coin_exchange_map: Dict[str, List[str]] = {}  # symbol → [exchange_ids]
         self._fx_cache: Dict[str, Tuple[float, float]] = {}  # FX rate cache: key → (rate, fetched_at)
         self._pairs_loaded_at: float = 0.0  # epoch time of last in-memory pairs load
+        self._exchange_lock = __import__('threading').Lock()  # guards _init_exchange
 
         # Exchange priority from env (comma-separated)
         priority_str = os.getenv("EXCHANGE_PRIORITY", "kraken")
@@ -63,35 +64,40 @@ class ExchangeManager:
         if exchange_id in self._exchanges:
             return self._exchanges[exchange_id]
 
-        try:
-            import ccxt
-        except ImportError:
-            logger.error("ccxt not installed — run: pip install ccxt")
-            return None
+        with self._exchange_lock:
+            # Double-check after acquiring lock
+            if exchange_id in self._exchanges:
+                return self._exchanges[exchange_id]
 
-        config = self._get_exchange_config(exchange_id)
-        if not config:
-            logger.warning(f"No API keys configured for {exchange_id}")
-            return None
-
-        try:
-            exchange_class = getattr(ccxt, exchange_id, None)
-            if exchange_class is None:
-                logger.error(f"Unknown exchange: {exchange_id}")
+            try:
+                import ccxt
+            except ImportError:
+                logger.error("ccxt not installed — run: pip install ccxt")
                 return None
 
-            exchange = exchange_class({
-                **config,
-                "enableRateLimit": True,
-            })
-            self._load_markets_with_retry(exchange, exchange_id)
-            self._exchanges[exchange_id] = exchange
-            logger.info(f"{exchange_id} connected — {len(exchange.markets)} markets")
-            return exchange
-        except Exception as e:
-            logger.error(f"Failed to connect {exchange_id}: {e}")
-            alert_exchange_down(exchange_id, str(e))
-            return None
+            config = self._get_exchange_config(exchange_id)
+            if not config:
+                logger.warning(f"No API keys configured for {exchange_id}")
+                return None
+
+            try:
+                exchange_class = getattr(ccxt, exchange_id, None)
+                if exchange_class is None:
+                    logger.error(f"Unknown exchange: {exchange_id}")
+                    return None
+
+                exchange = exchange_class({
+                    **config,
+                    "enableRateLimit": True,
+                })
+                self._load_markets_with_retry(exchange, exchange_id)
+                self._exchanges[exchange_id] = exchange
+                logger.info(f"{exchange_id} connected — {len(exchange.markets)} markets")
+                return exchange
+            except Exception as e:
+                logger.error(f"Failed to connect {exchange_id}: {e}")
+                alert_exchange_down(exchange_id, str(e))
+                return None
 
     @staticmethod
     @retry(max_attempts=3, base_delay=2.0, backoff=2.0)
