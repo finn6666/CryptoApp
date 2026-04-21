@@ -485,6 +485,9 @@ class ScanLoop:
                     quick_screen_coin(symbol, coin, trade_ctx)
                 )
 
+                # Small delay between calls to avoid rate limit bursts
+                time.sleep(2)
+
                 did_pass = result.get("pass", True)
                 confidence = result.get("confidence", 0)
                 one_liner = result.get("one_liner", "")
@@ -509,9 +512,13 @@ class ScanLoop:
                     })
 
             except Exception as e:
-                # On failure, pass through to avoid missing opportunities
-                logger.warning(f"[Scan {scan_id}] Quick screen error for {symbol}: {e} — passing")
-                passed.append(coin)
+                err_str = str(e)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    logger.warning(f"[Scan {scan_id}] Quick screen rate limit for {symbol} — skipping")
+                else:
+                    # Non-rate-limit error: pass through to avoid missing opportunities
+                    logger.warning(f"[Scan {scan_id}] Quick screen error for {symbol}: {e} — passing")
+                    passed.append(coin)
 
         return passed
 

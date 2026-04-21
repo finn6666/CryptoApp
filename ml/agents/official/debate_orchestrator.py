@@ -111,23 +111,45 @@ Do NOT produce vague or balanced verdicts. Pick a side and defend it.""",
 
 # ─── Helpers ──────────────────────────────────────────────────
 
-def _run_agent(agent: Agent, prompt: str, session_id: str) -> str:
-    """Run a single ADK agent synchronously and return its full text output."""
-    session_service = InMemorySessionService()
-    runner = Runner(
-        app_name="debate_app",
-        agent=agent,
-        session_service=session_service,
-        auto_create_session=True,
-    )
-    message = types.Content(role="user", parts=[types.Part(text=prompt)])
-    result_text = ""
-    for event in runner.run(user_id="debate_user", session_id=session_id, new_message=message):
-        if hasattr(event, "content") and event.content and event.content.parts:
-            for part in event.content.parts:
-                if hasattr(part, "text") and part.text:
-                    result_text += part.text
-    return result_text
+def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 3) -> str:
+    """Run a single ADK agent synchronously and return its full text output.
+
+    Retries up to max_retries times on 429 RESOURCE_EXHAUSTED with exponential backoff.
+    """
+    import time as _time
+    delay = 10.0
+    last_exc: Optional[Exception] = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            session_service = InMemorySessionService()
+            runner = Runner(
+                app_name="debate_app",
+                agent=agent,
+                session_service=session_service,
+                auto_create_session=True,
+            )
+            message = types.Content(role="user", parts=[types.Part(text=prompt)])
+            result_text = ""
+            for event in runner.run(user_id="debate_user", session_id=session_id, new_message=message):
+                if hasattr(event, "content") and event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if hasattr(part, "text") and part.text:
+                            result_text += part.text
+            return result_text
+        except Exception as e:
+            last_exc = e
+            err_str = str(e)
+            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                if attempt < max_retries:
+                    logger.warning(
+                        f"[Debate] Rate limit hit for {agent.name} (attempt {attempt}/{max_retries}) "
+                        f"— retrying in {delay:.0f}s"
+                    )
+                    _time.sleep(delay)
+                    delay *= 3
+                    continue
+            raise
+    raise last_exc  # unreachable, but satisfies type checker
 
 
 def _parse_json(text: str) -> Optional[Dict]:

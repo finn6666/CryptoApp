@@ -106,15 +106,32 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
         )
 
         result_text = ""
-        for event in runner.run(
-            user_id="screener",
-            session_id=f"screen_{symbol}",
-            new_message=message,
-        ):
-            if hasattr(event, "content") and event.content and event.content.parts:
-                for part in event.content.parts:
-                    if hasattr(part, "text") and part.text:
-                        result_text += part.text
+        _delay = 10.0
+        for _attempt in range(1, 4):
+            try:
+                for event in runner.run(
+                    user_id="screener",
+                    session_id=f"screen_{symbol}",
+                    new_message=message,
+                ):
+                    if hasattr(event, "content") and event.content and event.content.parts:
+                        for part in event.content.parts:
+                            if hasattr(part, "text") and part.text:
+                                result_text += part.text
+                break  # success — exit retry loop
+            except Exception as _e:
+                _err = str(_e)
+                if ("429" in _err or "RESOURCE_EXHAUSTED" in _err) and _attempt < 3:
+                    import asyncio
+                    logger.warning(
+                        f"Quick screen rate limit for {symbol} (attempt {_attempt}/3) "
+                        f"— retrying in {_delay:.0f}s"
+                    )
+                    await asyncio.sleep(_delay)
+                    _delay *= 3
+                    result_text = ""
+                    continue
+                raise
 
         # Parse JSON from response.
         # Handle markdown code fences (```json ... ```) and nested objects.
@@ -155,6 +172,10 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
         return {"pass": True, "confidence": 100, "one_liner": "Could not parse screen result — passing to be safe", "play_type": "accumulate"}
 
     except Exception as e:
+        err_str = str(e)
+        if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+            logger.warning(f"Quick screen rate limit for {symbol} after retries — skipping to protect budget")
+            return {"pass": False, "confidence": 0, "one_liner": f"Rate limit: {e}", "play_type": "accumulate"}
         logger.warning(f"Quick screen failed for {symbol}: {e}")
-        # On error, pass through to avoid missing opportunities
+        # On non-rate-limit errors, pass through to avoid missing opportunities
         return {"pass": True, "confidence": 100, "one_liner": f"Screen error: {e}", "play_type": "accumulate"}
