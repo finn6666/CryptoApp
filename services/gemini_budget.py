@@ -11,13 +11,14 @@ Usage:
     budget.check_or_raise("quick_screen")   # raises if budget exceeded
     budget.record("quick_screen")           # record after the call
 
-Call types and their estimated cost (conservative, based on flash-lite pricing
-with ~10K input + 2K output tokens per call):
-    quick_screen    — 1 Gemini call   — £0.0010
-    full_analysis   — 6 Gemini calls  — £0.0060 (per coin, all 5 agents + orchestrator)
-    agent_recheck   — 6 Gemini calls  — £0.0060 (per coin, full orchestrator pipeline)
-    claude_runner   — 1 Gemini call   — £0.0015
-    generic         — 1 Gemini call   — £0.0015
+Call types and their estimated cost (calibrated against observed gemini-2.0-flash
+pricing at ~£0.000336/call with ~10K input + 2K output tokens):
+    quick_screen    — 1 Gemini call   — £0.0004
+    full_analysis   — 3 Gemini calls  — £0.0010 (debate: bull + bear + referee)
+    agent_recheck   — 3 Gemini calls  — £0.0010 (debate pipeline)
+    validator       — 6 Gemini calls  — £0.0020 (5-agent orchestrator)
+    claude_runner   — 1 Gemini call   — £0.0004
+    generic         — 1 Gemini call   — £0.0004
 """
 
 import json
@@ -28,13 +29,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Conservative per-call-type cost estimates in GBP (overestimates intentionally)
+# Per-call-type cost estimates in GBP (calibrated against observed gemini-2.0-flash pricing)
 CALL_COSTS_GBP: dict[str, float] = {
-    "quick_screen":  0.0010,
-    "full_analysis": 0.0060,
-    "agent_recheck": 0.0060,
-    "claude_runner": 0.0015,
-    "generic":       0.0015,
+    "quick_screen":  0.0004,
+    "full_analysis": 0.0010,
+    "agent_recheck": 0.0010,
+    "validator":     0.0020,
+    "claude_runner": 0.0004,
+    "generic":       0.0004,
 }
 
 _BUDGET_FILE = Path("data/gemini_budget.json")
