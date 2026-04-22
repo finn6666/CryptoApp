@@ -676,7 +676,16 @@ class ScanLoop:
                             f"[Scan] {symbol}: validator conviction={v_conviction}%, "
                             f"should_trade={v_should_trade}"
                         )
-                        if v_should_trade and v_conviction >= 45:
+                        # Only treat as a real disagreement if the validator returned a
+                        # meaningful conviction score. A 0 (or near-0) almost always means
+                        # the validator 429'd internally and returned an empty trade_decision —
+                        # don't punish the debate result for a failed API call.
+                        if v_conviction < 20:
+                            logger.warning(
+                                f"[Scan] {symbol}: validator returned very low conviction ({v_conviction}%) "
+                                f"— likely a 429 failure, ignoring validator result"
+                            )
+                        elif v_should_trade and v_conviction >= 45:
                             # Both agree — take the max conviction (validator validates the buy)
                             conviction = max(conviction, v_conviction)
                             trade_reasoning = (
@@ -685,9 +694,11 @@ class ScanLoop:
                             )
                             logger.info(f"[Scan] {symbol}: validator CONFIRMED — conviction={conviction}%")
                         else:
-                            # Validator disagrees — use the average, making it harder to clear threshold
+                            # Validator disagrees with real conviction — penalise by -10 rather
+                            # than halving, so a genuine disagreement blocks weak setups but
+                            # doesn't kill a strong debate result.
                             old_conviction = conviction
-                            conviction = (conviction + v_conviction) // 2
+                            conviction = max(0, conviction - 10)
                             logger.warning(
                                 f"[Scan] {symbol}: validator DISAGREED (v_conviction={v_conviction}%) — "
                                 f"conviction downgraded {old_conviction} -> {conviction}"
