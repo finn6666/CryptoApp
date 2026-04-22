@@ -44,7 +44,8 @@ bull_conviction — use the FULL range, do not cluster near 50:
 - 0-44: Weak — data actively contradicts a buy or only minor positives exist
 
 Focus on: breakout momentum, undervaluation vs peers, volume spikes, upcoming catalysts, low-cap asymmetry.
-Do NOT hedge. If the data is compelling, score 75+. If it is not, score below 45. Avoid the 50-65 range unless genuinely torn.""",
+Do NOT hedge. If the data is compelling, score 75+. If it is not, score below 45. Avoid the 50-65 range unless genuinely torn.
+NOTE: The Score field is out of 10 (not 100). A score of 6/10 or above indicates a decent project. Use this as a supporting signal, not a primary argument.""",
 )
 
 bear_advocate = Agent(
@@ -66,7 +67,8 @@ bear_conviction (strength of the case AGAINST buying) — use the FULL range:
 - 0-44: Weak bear case — risks are minor or already priced in, bull case holds up
 
 Read the bull case carefully and target its weakest claim. Look for: fading volume behind the move, project red flags (no GitHub, anonymous team, no TVL), better alternatives in same sector, thin orderbook, pump-and-dump patterns.
-Do NOT hedge. If there are serious red flags, score 75+. If the bull case is genuinely strong, score below 40. Avoid clustering near 50.""",
+Do NOT hedge. If there are serious red flags, score 75+. If the bull case is genuinely strong, score below 40. Avoid clustering near 50.
+NOTE: The Score field is out of 10 (not 100). A score of 6/10 or above is decent. Do not cite a score of 7/10 as a red flag — it is above average.""",
 )
 
 referee_agent = Agent(
@@ -88,10 +90,11 @@ Return JSON with exactly these fields:
 Verdict rules (apply in order):
 1. Calculate net_edge = bull_conviction - bear_conviction
 2. Required edge by regime: BULL=10, NEUTRAL=20, BEAR=30
-3. Add 10 to required edge if portfolio already holds 4+ positions
+3. Add 10 to required edge ONLY if portfolio holds 10+ positions AND cost data is available (total cost > £0). Ignore concentration if cost basis is unavailable — it means pre-existing legacy positions with unknown value.
 4. If net_edge >= required: should_trade = true
 5. If net_edge < required: should_trade = false — commit to PASS, do not hedge
 6. Existing position: HOLD bias — only should_trade=false (sell signal) if thesis clearly broken
+7. Score is out of 10. A score of 6+/10 is good. Do NOT treat a score of 7/10 as if it were 7/100.
 
 trade_conviction — your independent score reflecting how confident you are in the verdict:
 - 75-100: Obvious outcome, one side dominated
@@ -111,13 +114,13 @@ Do NOT produce vague or balanced verdicts. Pick a side and defend it.""",
 
 # ─── Helpers ──────────────────────────────────────────────────
 
-def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 3) -> str:
+def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5) -> str:
     """Run a single ADK agent synchronously and return its full text output.
 
     Retries up to max_retries times on 429 RESOURCE_EXHAUSTED with exponential backoff.
     """
     import time as _time
-    delay = 10.0
+    delay = 5.0
     last_exc: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
         try:
@@ -279,12 +282,17 @@ async def analyze_crypto_debate(
         pass
 
     history_block = f"\n\n{trade_history_ctx}" if trade_history_ctx else ""
-    portfolio_block = (
-        f"\n\nCurrent portfolio: {portfolio_summary.get('position_count', 0)} positions, "
-        f"symbols: {', '.join(portfolio_summary.get('held_symbols', [])) or 'none'}, "
-        f"total cost: £{portfolio_summary.get('total_cost_gbp', 0):.2f}"
-        if portfolio_summary else ""
-    )
+    if portfolio_summary:
+        position_count = portfolio_summary.get('position_count', 0)
+        total_cost = portfolio_summary.get('total_cost_gbp', 0)
+        symbols_list = ', '.join(portfolio_summary.get('held_symbols', [])) or 'none'
+        cost_note = " (cost basis unavailable for legacy positions)" if total_cost == 0 and position_count > 0 else f", total cost: £{total_cost:.2f}"
+        portfolio_block = (
+            f"\n\nCurrent portfolio: {position_count} positions{cost_note}, "
+            f"symbols: {symbols_list}"
+        )
+    else:
+        portfolio_block = ""
 
     referee_prompt = (
         f"Coin: {symbol} | Market regime: {regime}\n"

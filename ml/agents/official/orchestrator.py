@@ -133,7 +133,7 @@ def _build_market_data_str(coin_data: Optional[Dict[str, Any]], symbol: str = ""
         f"Rank: #{coin_data.get('market_cap_rank', 'N/A')}",
         f"MCap: £{coin_data.get('market_cap', 'N/A')}",
         f"Vol: £{coin_data.get('volume_24h', 'N/A')}",
-        f"Score: {coin_data.get('attractiveness_score', 'N/A')}/100",
+        f"Score: {coin_data.get('attractiveness_score', 'N/A')}/10",
     ]
 
     p30d = coin_data.get('price_change_30d')
