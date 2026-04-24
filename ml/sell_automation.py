@@ -575,7 +575,7 @@ class SellAutomation:
         """
         from ml.exchange_manager import get_exchange_manager
         from ml.trading_engine import get_trading_engine
-        from ml.agents.official.orchestrator import analyze_crypto
+        from ml.agents.official.debate_orchestrator import analyze_crypto_debate
         from services.gemini_budget import get_gemini_budget, BudgetExceededError
 
         proposals = []
@@ -627,8 +627,8 @@ class SellAutomation:
 
                 async def _run_recheck():
                     return await asyncio.wait_for(
-                        analyze_crypto(symbol, coin_data=holding),
-                        timeout=60.0,
+                        analyze_crypto_debate(symbol, coin_data=holding),
+                        timeout=120.0,
                     )
 
                 try:
