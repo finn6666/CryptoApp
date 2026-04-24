@@ -114,13 +114,25 @@ Do NOT produce vague or balanced verdicts. Pick a side and defend it.""",
 
 # ─── Helpers ──────────────────────────────────────────────────
 
+def _is_rate_limit_error(e: Exception) -> bool:
+    """Return True if the exception is a Gemini 429 / RESOURCE_EXHAUSTED error."""
+    type_name = type(e).__name__
+    err_str = str(e)
+    return (
+        "ResourceExhausted" in type_name
+        or "429" in err_str
+        or "RESOURCE_EXHAUSTED" in err_str
+    )
+
+
 def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5) -> str:
     """Run a single ADK agent synchronously and return its full text output.
 
     Retries up to max_retries times on 429 RESOURCE_EXHAUSTED with exponential backoff.
+    Initial delay is 15s to allow the RPM window to partially reset.
     """
     import time as _time
-    delay = 5.0
+    delay = 15.0
     last_exc: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
         try:
@@ -141,15 +153,14 @@ def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5)
             return result_text
         except Exception as e:
             last_exc = e
-            err_str = str(e)
-            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+            if _is_rate_limit_error(e):
                 if attempt < max_retries:
                     logger.warning(
-                        f"[Debate] Rate limit hit for {agent.name} (attempt {attempt}/{max_retries}) "
-                        f"— retrying in {delay:.0f}s"
+                        f"[Debate] Rate limit ({type(e).__name__}) for {agent.name} "
+                        f"(attempt {attempt}/{max_retries}) — retrying in {delay:.0f}s"
                     )
                     _time.sleep(delay)
-                    delay *= 3
+                    delay = min(delay * 2, 60.0)
                     continue
             raise
     raise last_exc  # unreachable, but satisfies type checker
@@ -233,6 +244,7 @@ async def analyze_crypto_debate(
     bull_case = ""
     bull_conviction = 0
     try:
+        import time as _debate_time
         bull_text = _run_agent(bull_advocate, bull_prompt, f"{session_id}_bull")
         parsed = _parse_json(bull_text)
         if parsed:
@@ -247,6 +259,9 @@ async def analyze_crypto_debate(
             "error": f"Bull advocate failed: {e}",
             "orchestrator": "debate_orchestrator",
         }
+
+    # Small inter-call delay to avoid RPM burst (3 calls in quick succession)
+    _debate_time.sleep(3)
 
     # ── Step 2: Bear Advocate ──────────────────────────────────
     bear_prompt = (
@@ -272,6 +287,9 @@ async def analyze_crypto_debate(
         logger.warning(f"[Debate] Bear advocate failed for {symbol}: {e}")
         bear_case = "Bear advocate unavailable."
         bear_conviction = 0
+
+    # Small inter-call delay before referee
+    _debate_time.sleep(3)
 
     # ── Step 3: Referee ────────────────────────────────────────
     portfolio_summary = {}
