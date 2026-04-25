@@ -485,12 +485,13 @@ class ScanLoop:
                     quick_screen_coin(symbol, coin, trade_ctx)
                 )
 
-                # Small delay between calls to avoid rate limit bursts
-                time.sleep(2)
-
                 did_pass = result.get("pass", True)
                 confidence = result.get("confidence", 0)
                 one_liner = result.get("one_liner", "")
+
+                # Longer pause after a rate-limit skip; normal inter-call delay otherwise
+                _rate_limited = not did_pass and ("rate limit" in one_liner.lower() or "rate limited" in one_liner.lower() or "no response" in one_liner.lower())
+                time.sleep(30 if _rate_limited else 4)
 
                 if did_pass and confidence >= effective_threshold:
                     logger.info(

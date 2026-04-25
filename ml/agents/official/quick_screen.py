@@ -106,7 +106,8 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
         )
 
         result_text = ""
-        _delay = 10.0
+        _delay = 15.0
+        import asyncio as _asyncio
         for _attempt in range(1, 4):
             try:
                 for event in runner.run(
@@ -118,20 +119,34 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
                         for part in event.content.parts:
                             if hasattr(part, "text") and part.text:
                                 result_text += part.text
+                # ADK can silently swallow a 429 and return empty content — detect that here
+                if not result_text.strip() and _attempt < 3:
+                    logger.warning(
+                        f"Quick screen empty response for {symbol} (attempt {_attempt}/3) "
+                        f"— possible silent rate limit, waiting {_delay:.0f}s"
+                    )
+                    await _asyncio.sleep(_delay)
+                    _delay = min(_delay * 2, 60.0)
+                    result_text = ""
+                    continue
                 break  # success — exit retry loop
             except Exception as _e:
                 _err = str(_e)
                 if ("429" in _err or "RESOURCE_EXHAUSTED" in _err) and _attempt < 3:
-                    import asyncio
                     logger.warning(
                         f"Quick screen rate limit for {symbol} (attempt {_attempt}/3) "
                         f"— retrying in {_delay:.0f}s"
                     )
-                    await asyncio.sleep(_delay)
-                    _delay *= 3
+                    await _asyncio.sleep(_delay)
+                    _delay = min(_delay * 2, 60.0)
                     result_text = ""
                     continue
                 raise
+
+        # If result_text is still empty after all attempts, skip to avoid wasting full analysis
+        if not result_text.strip():
+            logger.warning(f"Quick screen for {symbol}: no response after retries — skipping to protect budget")
+            return {"pass": False, "confidence": 0, "one_liner": "No response from screen — rate limited", "play_type": "accumulate"}
 
         # Parse JSON from response.
         # Handle markdown code fences (```json ... ```) and nested objects.
