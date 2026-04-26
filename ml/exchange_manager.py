@@ -86,9 +86,18 @@ class ExchangeManager:
                     logger.error(f"Unknown exchange: {exchange_id}")
                     return None
 
+                import requests
+                from requests.adapters import HTTPAdapter
+
+                session = requests.Session()
+                adapter = HTTPAdapter(pool_connections=4, pool_maxsize=20)
+                session.mount("https://", adapter)
+                session.mount("http://", adapter)
+
                 exchange = exchange_class({
                     **config,
                     "enableRateLimit": True,
+                    "session": session,
                 })
                 self._load_markets_with_retry(exchange, exchange_id)
                 self._exchanges[exchange_id] = exchange

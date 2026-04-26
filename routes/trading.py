@@ -688,7 +688,7 @@ def portfolio_holdings():
                         except Exception:
                             return sym, None, None
 
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(missing), 20)) as pool:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(missing), 8)) as pool:
                         done, _ = concurrent.futures.wait(
                             {pool.submit(_fetch_one, s): s for s in missing},
                             timeout=20,
