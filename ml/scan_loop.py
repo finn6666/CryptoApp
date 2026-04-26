@@ -867,24 +867,31 @@ class ScanLoop:
 
     def _scheduler_loop(self):
         """Background loop that triggers scans at the configured interval."""
-        import schedule
+        import time as _time
 
         if self.scan_interval_hours > 0:
-            # Interval mode: scan every N hours
-            interval_min = int(self.scan_interval_hours * 60)
-            schedule.every(interval_min).minutes.do(
-                lambda: self.run_scan(triggered_by="scheduled")
-            )
-            logger.info(f"Scan scheduled every {self.scan_interval_hours}h ({interval_min} min)")
+            interval_sec = int(self.scan_interval_hours * 3600)
+            logger.info(f"Scan scheduled every {self.scan_interval_hours}h ({interval_sec}s)")
+            next_run = _time.monotonic() + interval_sec
         else:
-            # Legacy mode: once daily at a fixed time
-            schedule.every().day.at(self.scan_time).do(
-                lambda: self.run_scan(triggered_by="scheduled")
-            )
+            # Legacy mode: once daily at a fixed time — convert to interval from now
+            from datetime import datetime as _dt
+            target_h, target_m = (int(p) for p in self.scan_time.split(":"))
+            now = _dt.utcnow()
+            target = now.replace(hour=target_h, minute=target_m, second=0, microsecond=0)
+            if target <= now:
+                target = target.replace(day=target.day + 1)
+            interval_sec = int((target - now).total_seconds())
             logger.info(f"Scan scheduled daily at {self.scan_time}")
+            next_run = _time.monotonic() + interval_sec
 
         while not self._stop_event.is_set():
-            schedule.run_pending()
+            if _time.monotonic() >= next_run:
+                self.run_scan(triggered_by="scheduled")
+                if self.scan_interval_hours > 0:
+                    next_run = _time.monotonic() + interval_sec
+                else:
+                    next_run = _time.monotonic() + 86400
             self._stop_event.wait(30)  # Check every 30 seconds
 
     # ─── Status ───────────────────────────────────────────────
