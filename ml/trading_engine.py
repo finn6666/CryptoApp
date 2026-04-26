@@ -898,17 +898,6 @@ class TradingEngine:
             from ml.portfolio_tracker import get_portfolio_tracker
             tracker = get_portfolio_tracker()
 
-            # For buys: retrieve the Q-learning state that was computed at scan time.
-            # Stored in the holding so record_outcome() at close time has the correct
-            # buy-time state even after a process restart (bypasses the in-memory cache).
-            ql_state = ""
-            if proposal.side.lower() == "buy":
-                try:
-                    from ml.q_learning import get_q_learner
-                    ql_state = get_q_learner()._symbol_state_cache.get(proposal.symbol, "")
-                except Exception:
-                    pass
-
             tracker.record_trade(
                 symbol=proposal.symbol,
                 side=proposal.side,
@@ -923,7 +912,6 @@ class TradingEngine:
                 fee_gbp=fee_gbp,
                 coin_name=proposal.coin_name or "",
                 trade_mode=getattr(proposal, "trade_mode", "accumulate"),
-                ql_state=ql_state,
             )
         except Exception as e:
             logger.error(f"Failed to record trade to portfolio: {e}")
@@ -1392,23 +1380,7 @@ def compute_allocation_pct(
         elif mcap >= 500_000_000:   # large/mid-cap: more liquid, allow larger position
             base_pct *= 1.15
 
-    # 3. Q-learning state performance scaling
-    # Only fires when the state has been visited enough times to be reliable
-    try:
-        from ml.q_learning import get_q_learner, discretise_state
-        ql = get_q_learner()
-        ql_state = discretise_state(coin_data)
-        total_visits = sum(ql.visit_counts[ql_state].values())
-        if total_visits >= ql.min_visits_to_act * 2:
-            q_buy = ql.q_table[ql_state]["buy"]
-            if q_buy > 0.15:
-                base_pct *= 1.2    # proven winning pattern — size up
-            elif q_buy < -0.15:
-                base_pct *= 0.75   # proven losing pattern — size down
-    except Exception:
-        pass
-
-    # 4. Portfolio concentration cap
+    # 3. Portfolio concentration cap
     # When we already have a meaningful holding, reduce the add-on size
     try:
         from ml.portfolio_tracker import get_portfolio_tracker

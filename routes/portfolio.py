@@ -1,4 +1,21 @@
 """
+Portfolio, exchange, and dashboard routes.
+"""
+
+import os
+import json as _json
+import logging
+from flask import Blueprint, jsonify, request, Response, stream_with_context
+
+from extensions import limiter
+import services.app_state as state
+from routes.trading import require_trading_auth
+
+logger = logging.getLogger(__name__)
+
+portfolio_bp = Blueprint('portfolio', __name__)
+
+"""
 Live trading engine and RL learning routes.
 """
 
@@ -54,7 +71,7 @@ def require_trading_auth(f):
 # Live Trading Engine Routes
 # ========================================
 
-@trading_bp.route('/api/trades/status')
+@portfolio_bp.route('/api/trades/status')
 @require_trading_auth
 def trading_status():
     """Get trading engine status — budget, active trades, kill switch state"""
@@ -67,7 +84,7 @@ def trading_status():
         return jsonify({"error": "Failed to get trading status"}), 500
 
 
-@trading_bp.route('/api/trades/pending')
+@portfolio_bp.route('/api/trades/pending')
 @require_trading_auth
 def pending_proposals():
     """Get all pending trade proposals awaiting approval"""
@@ -80,7 +97,7 @@ def pending_proposals():
         return jsonify({"error": "Failed to get pending proposals"}), 500
 
 
-@trading_bp.route('/api/trades/history')
+@portfolio_bp.route('/api/trades/history')
 @require_trading_auth
 def trade_history():
     """Get executed trade history"""
@@ -93,7 +110,7 @@ def trade_history():
         return jsonify({"error": "Failed to get trade history"}), 500
 
 
-@trading_bp.route('/api/trades/confirm/<token>', methods=['GET', 'POST'])
+@portfolio_bp.route('/api/trades/confirm/<token>', methods=['GET', 'POST'])
 @limiter.limit('10 per minute')
 def confirm_trade(token):
     """
@@ -262,7 +279,7 @@ def _error_page(title: str, message: str) -> str:
 # In-App Approve / Reject (no email token needed)
 # ========================================
 
-@trading_bp.route('/api/trades/approve/<proposal_id>', methods=['POST'])
+@portfolio_bp.route('/api/trades/approve/<proposal_id>', methods=['POST'])
 @limiter.limit('10 per minute')
 @require_trading_auth
 def approve_trade_api(proposal_id):
@@ -281,7 +298,7 @@ def approve_trade_api(proposal_id):
         return jsonify({'success': False, 'error': 'Failed to approve trade'}), 500
 
 
-@trading_bp.route('/api/trades/reject/<proposal_id>', methods=['POST'])
+@portfolio_bp.route('/api/trades/reject/<proposal_id>', methods=['POST'])
 @limiter.limit('10 per minute')
 @require_trading_auth
 def reject_trade_api(proposal_id):
@@ -300,7 +317,7 @@ def reject_trade_api(proposal_id):
         return jsonify({'success': False, 'error': 'Failed to reject trade'}), 500
 
 
-@trading_bp.route('/api/trades/propose', methods=['POST'])
+@portfolio_bp.route('/api/trades/propose', methods=['POST'])
 @limiter.limit('10 per hour')
 @require_trading_auth
 def propose_trade_api():
@@ -377,7 +394,7 @@ def propose_trade_api():
         return jsonify({"error": "Failed to create trade proposal"}), 500
 
 
-@trading_bp.route('/api/trades/kill-switch', methods=['POST'])
+@portfolio_bp.route('/api/trades/kill-switch', methods=['POST'])
 @limiter.limit('5 per minute')
 @require_trading_auth
 def toggle_kill_switch():
@@ -402,7 +419,7 @@ def toggle_kill_switch():
         return jsonify({"error": "Failed to toggle kill switch"}), 500
 
 
-@trading_bp.route('/api/trades/auto-evaluate', methods=['POST'])
+@portfolio_bp.route('/api/trades/auto-evaluate', methods=['POST'])
 @limiter.limit('10 per hour')
 @require_trading_auth
 def auto_evaluate_trade():
@@ -518,7 +535,7 @@ def auto_evaluate_trade():
 # Scan Loop Routes
 # ========================================
 
-@trading_bp.route('/api/trades/scan-now', methods=['POST'])
+@portfolio_bp.route('/api/trades/scan-now', methods=['POST'])
 @limiter.limit('5 per hour')
 @require_trading_auth
 def scan_now():
@@ -533,7 +550,7 @@ def scan_now():
         return jsonify({"error": "Failed to run scan"}), 500
 
 
-@trading_bp.route('/api/trades/scan-status')
+@portfolio_bp.route('/api/trades/scan-status')
 @require_trading_auth
 def scan_status():
     """Get scan loop status and recent scan results."""
@@ -549,7 +566,7 @@ def scan_status():
         return jsonify({"error": "Failed to get scan status"}), 500
 
 
-@trading_bp.route('/api/trades/audit-trail')
+@portfolio_bp.route('/api/trades/audit-trail')
 @require_trading_auth
 def audit_trail():
     """Get recent audit trail entries."""
@@ -567,7 +584,7 @@ def audit_trail():
 # Market Monitor Routes
 # ========================================
 
-@trading_bp.route('/api/monitor/status')
+@portfolio_bp.route('/api/monitor/status')
 @require_trading_auth
 def monitor_status():
     """Get market monitor status — intervals, stats, alerts."""
@@ -580,7 +597,7 @@ def monitor_status():
         return jsonify({"error": "Market monitor not available"}), 500
 
 
-@trading_bp.route('/api/monitor/alerts')
+@portfolio_bp.route('/api/monitor/alerts')
 @require_trading_auth
 def monitor_alerts():
     """Get recent market monitor alerts."""
@@ -594,7 +611,7 @@ def monitor_alerts():
         return jsonify({"error": "Failed to get monitor alerts"}), 500
 
 
-@trading_bp.route('/api/monitor/price-history/<symbol>')
+@portfolio_bp.route('/api/monitor/price-history/<symbol>')
 @require_trading_auth
 def monitor_price_history(symbol):
     """Get recent price snapshots for a symbol from the monitor."""
@@ -605,347 +622,4 @@ def monitor_price_history(symbol):
     except Exception as e:
         logger.error(f"Price history error: {e}")
         return jsonify({"error": "Failed to get price history"}), 500
-
-
-# ========================================
-# Trade Journal Routes
-# ========================================
-
-@trading_bp.route('/trades')
-def trades_page():
-    """Redirect to merged dashboard"""
-    return redirect('/')
-
-
-# ─── Sell Automation ──────────────────────────────────────────
-
-@trading_bp.route('/api/trades/sell-automation/status')
-def sell_automation_status():
-    """Get sell automation status and configuration."""
-    try:
-        from ml.sell_automation import get_sell_automation
-        auto = get_sell_automation()
-        return jsonify({'success': True, **auto.get_status()}), 200
-    except Exception as e:
-        logger.error(f"Sell automation status error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to get sell automation status'}), 500
-
-
-@trading_bp.route('/api/trades/sell-automation/check', methods=['POST'])
-@require_trading_auth
-def sell_automation_check():
-    """Manually trigger a sell-side check on all holdings."""
-    try:
-        from ml.sell_automation import get_sell_automation
-        import services.app_state as state
-
-        auto = get_sell_automation()
-
-        # Build live prices
-        live_prices = {}
-        if state.analyzer and state.analyzer.coins:
-            for coin in state.analyzer.coins:
-                live_prices[coin.symbol.upper()] = getattr(coin, 'price', 0)
-
-        if not live_prices:
-            return jsonify({'success': False, 'error': 'No live price data available'}), 400
-
-        proposals = auto.check_and_propose_sells(live_prices, force_agent_recheck=True)
-        return jsonify({
-            'success': True,
-            'sell_proposals': len(proposals),
-            'details': proposals,
-        }), 200
-    except Exception as e:
-        logger.error(f"Sell automation check failed: {e}")
-        return jsonify({'success': False, 'error': 'Sell automation check failed'}), 500
-
-
-# ========================================
-# Backtesting endpoints
-# ========================================
-
-@trading_bp.route('/api/backtest/run', methods=['POST'])
-@require_trading_auth
-def backtest_run():
-    """Run a backtest with synthetic or provided data."""
-    try:
-        from ml.backtesting import BacktestEngine
-        body = request.get_json(silent=True) or {}
-        engine = BacktestEngine(
-            initial_capital_gbp=body.get('initial_capital', 1.0),
-            daily_budget_gbp=body.get('daily_budget', float(os.getenv('DAILY_TRADE_BUDGET_GBP', '3.00'))),
-            fee_pct=body.get('fee_pct', 0.5),
-            slippage_pct=body.get('slippage_pct', 0.1),
-            profit_target_pct=body.get('profit_target_pct', 20.0),
-            stop_loss_pct=body.get('stop_loss_pct', -15.0),
-        )
-
-        historical_data = body.get('historical_data')
-        if not historical_data:
-            days = body.get('days', 90)
-            historical_data = BacktestEngine.generate_synthetic_data(days=days)
-
-        from dataclasses import asdict
-        result = engine.run_backtest(
-            historical_data=historical_data,
-            strategy_name=body.get('strategy_name', 'api_backtest'),
-            min_confidence=body.get('min_confidence', 75),
-        )
-        summary = {k: v for k, v in asdict(result).items() if k not in ('trades', 'equity_curve')}
-        summary['trade_count'] = len(result.trades)
-        summary['equity_points'] = len(result.equity_curve)
-        return jsonify({'success': True, 'result': summary}), 200
-    except Exception as e:
-        logger.exception("Backtest failed")
-        return jsonify({'success': False, 'error': 'Backtest failed'}), 500
-
-
-@trading_bp.route('/api/backtest/results')
-@require_trading_auth
-def backtest_results():
-    """List saved backtest results."""
-    try:
-        from ml.backtesting import BacktestEngine
-        results = BacktestEngine.list_results()
-        return jsonify({'success': True, 'results': results}), 200
-    except Exception as e:
-        logger.error(f"Backtest results error: {e}")
-        return jsonify({'success': False, 'error': 'Failed to list backtest results'}), 500
-
-
-
-
-# ========================================
-# Claude Agent Routes
-# ========================================
-
-@trading_bp.route('/api/claude/propose', methods=['POST'])
-@limiter.limit('20 per hour')
-@require_trading_auth
-def claude_propose():
-    """
-    Propose a trade from the Claude agent layer.
-    Accepts {symbol, side, reasoning, confidence} — fetches live price and
-    routes through propose_and_auto_execute() (respects BUY_AUTO_APPROVE).
-    Confidence drives allocation: 55-69% -> 40% of budget, 70%+ -> up to 100%.
-    """
-    try:
-        from ml.trading_engine import get_trading_engine, compute_allocation_pct
-        from ml.exchange_manager import get_exchange_manager
-        engine = get_trading_engine()
-
-        data = request.json
-        if not data:
-            return jsonify({"error": "Request body must be JSON"}), 400
-
-        # ── Validate required fields ──
-        for field_name in ('symbol', 'side', 'reasoning', 'confidence'):
-            if field_name not in data:
-                return jsonify({"error": f"Missing field: {field_name}"}), 400
-
-        symbol = str(data['symbol']).upper().strip()
-        if not symbol or len(symbol) > 20:
-            return jsonify({"error": "Invalid symbol"}), 400
-
-        side = str(data['side']).lower().strip()
-        if side not in ('buy', 'sell'):
-            return jsonify({"error": "side must be 'buy' or 'sell'"}), 400
-
-        reasoning = str(data['reasoning']).strip()
-        if not reasoning:
-            return jsonify({"error": "reasoning is required"}), 400
-
-        try:
-            confidence = int(data['confidence'])
-        except (ValueError, TypeError):
-            return jsonify({"error": "confidence must be an integer"}), 400
-        if not 0 <= confidence <= 100:
-            return jsonify({"error": "confidence must be 0-100"}), 400
-
-        # ── Safety: require minimum conviction for buys ──
-        if side == 'buy' and confidence < 55:
-            return jsonify({
-                "success": False,
-                "error": f"Confidence {confidence}% is below minimum threshold (55%) for buys",
-            }), 400
-
-        if engine.kill_switch:
-            return jsonify({"success": False, "error": "Trading is halted (kill switch active)"}), 400
-
-        # ── Fetch live price from exchange ──
-        mgr = get_exchange_manager()
-        current_price = None
-        try:
-            best = mgr.find_best_pair(symbol)
-            if best:
-                exchange_id, pair = best
-                exchange = mgr.get_exchange(exchange_id)
-                if exchange:
-                    ticker = mgr._fetch_ticker_with_retry(exchange, pair)
-                    raw_price = ticker.get("last") or ticker.get("close")
-                    if raw_price:
-                        quote = pair.split("/")[1] if "/" in pair else "GBP"
-                        if quote == "GBP":
-                            current_price = float(raw_price)
-                        else:
-                            fx = mgr._get_fx_rate("GBP", quote, exchange)
-                            if fx:
-                                current_price = float(raw_price) / fx
-        except Exception as e:
-            logger.warning(f"Claude propose — price fetch failed for {symbol}: {e}")
-
-        if not current_price or current_price <= 0:
-            return jsonify({"error": f"Could not fetch live price for {symbol}"}), 400
-
-        # ── Calculate amount based on confidence and remaining budget ──
-        remaining = engine.get_remaining_budget()
-        if side == 'buy':
-            alloc_pct = compute_allocation_pct(confidence, 0, {"symbol": symbol})
-            amount_gbp = round(remaining * (alloc_pct / 100), 2)
-        else:
-            # Sells: use sell_quantity from holdings if available
-            sell_qty = data.get('sell_quantity')
-            amount_gbp = round(current_price * float(sell_qty), 2) if sell_qty else round(remaining * 0.5, 2)
-
-        # For sells, look up the exchange where tokens are held
-        preferred_exchange = ""
-        if side == "sell":
-            try:
-                from ml.portfolio_tracker import get_portfolio_tracker
-                holding = get_portfolio_tracker().holdings.get(symbol.upper(), {})
-                preferred_exchange = holding.get("exchange", "")
-            except Exception:
-                pass
-
-        result = engine.propose_and_auto_execute(
-            symbol=symbol,
-            side=side,
-            amount_gbp=amount_gbp,
-            current_price=current_price,
-            reason=reasoning[:500],
-            confidence=confidence,
-            recommendation="BUY" if side == "buy" else "SELL",
-            coin_name=data.get("coin_name", ""),
-            sell_quantity=data.get("sell_quantity"),
-            preferred_exchange=preferred_exchange,
-        )
-        return jsonify(result), 200 if result.get("success") else 400
-
-    except Exception as e:
-        logger.error(f"Claude propose error: {e}")
-        return jsonify({"error": "Failed to create Claude trade proposal"}), 500
-
-
-@trading_bp.route('/api/claude/context')
-@require_trading_auth
-def claude_context():
-    """
-    Compact single-call context snapshot for the Claude agent.
-    Returns portfolio holdings, pending proposals, budget, market conditions,
-    and recent activity — everything needed for a portfolio review in one request.
-    """
-    ctx = {}
-
-    # ── Portfolio holdings with P&L ──
-    try:
-        from ml.portfolio_tracker import get_portfolio_tracker
-        tracker = get_portfolio_tracker()
-        live_prices = {}
-        if state.analyzer:
-            for coin in state.analyzer.coins:
-                if coin.price:
-                    live_prices[coin.symbol.upper()] = coin.price
-        holdings = tracker.get_holdings(live_prices)
-        summary = tracker.get_total_value(live_prices)
-        # Split holdings into priced (actionable) and unpriced (blind positions).
-        # Sending 20+ unpriced holdings as full objects to the agent wastes tokens
-        # and drowns out the actionable holdings in the analysis.
-        priced_holdings = []
-        unpriced_symbols = []
-        for h in holdings:
-            if h.get('current_price'):
-                priced_holdings.append({
-                    'symbol': h['symbol'],
-                    'coin_name': h.get('coin_name', ''),
-                    'quantity': h.get('quantity'),
-                    'avg_entry_price': h.get('avg_entry_price'),
-                    'current_price': h.get('current_price'),
-                    'current_value_gbp': h.get('current_value_gbp'),
-                    'unrealised_pnl_pct': h.get('unrealised_pnl_pct'),
-                    'unrealised_pnl_gbp': h.get('unrealised_pnl_gbp'),
-                    'first_buy': h.get('first_buy'),
-                    'price_change_24h': h.get('price_change_24h'),
-                })
-            else:
-                unpriced_symbols.append(h['symbol'])
-        ctx['holdings'] = priced_holdings
-        # Compact summary so the agent knows how many positions can't be priced.
-        # These are likely delisted/renamed on Kraken or absent from the CMC feed.
-        if unpriced_symbols:
-            ctx['unpriced_holdings'] = {
-                'count': len(unpriced_symbols),
-                'symbols': unpriced_symbols,
-                'note': 'No live price available — may be delisted or missing from CMC feed',
-            }
-        ctx['portfolio_summary'] = summary
-    except Exception as e:
-        logger.warning(f"Claude context — portfolio error: {e}")
-        ctx['holdings'] = []
-        ctx['portfolio_summary'] = {}
-
-    # ── Trading engine: budget + kill switch + pending proposals ──
-    try:
-        from ml.trading_engine import get_trading_engine
-        engine = get_trading_engine()
-        status = engine.get_status()
-        ctx['budget'] = {
-            'daily_budget_gbp': status.get('daily_budget_gbp'),
-            'spent_today_gbp': status.get('spent_today_gbp'),
-            'remaining_gbp': status.get('remaining_today_gbp'),
-        }
-        ctx['kill_switch'] = not status.get('active', True)
-        ctx['pending_proposals'] = engine.get_pending_proposals()
-    except Exception as e:
-        logger.warning(f"Claude context — trading error: {e}")
-        ctx['budget'] = {}
-        ctx['kill_switch'] = False
-        ctx['pending_proposals'] = []
-
-    # ── Market conditions (derived from analyzer coin data) ──
-    try:
-        all_coins = state.analyzer.get_all_coins() if state.analyzer else []
-        if all_coins:
-            total = len(all_coins)
-            avg_change = sum(c.price_change_24h or 0 for c in all_coins) / max(total, 1)
-            gainers = sum(1 for c in all_coins if (c.price_change_24h or 0) > 5)
-            losers = sum(1 for c in all_coins if (c.price_change_24h or 0) < -5)
-            ctx['market'] = {
-                'avg_change_24h': round(avg_change, 2),
-                'gainers_over_5pct': gainers,
-                'losers_over_5pct': losers,
-                'total_coins_tracked': total,
-            }
-        else:
-            ctx['market'] = {}
-    except Exception as e:
-        logger.warning(f"Claude context — market error: {e}")
-        ctx['market'] = {}
-
-    # ── Recent activity (last 10 audit trail entries) ──
-    try:
-        from ml.scan_loop import get_scan_loop
-        scanner = get_scan_loop()
-        scan_status = scanner.get_status()
-        ctx['scan'] = {
-            'last_scan': scan_status.get('last_scan'),
-            'next_scan': scan_status.get('next_scan'),
-            'scan_enabled': scan_status.get('enabled'),
-        }
-        ctx['recent_activity'] = scanner.get_audit_trail(limit=10)
-    except Exception as e:
-        logger.warning(f"Claude context — scan error: {e}")
-        ctx['scan'] = {}
-        ctx['recent_activity'] = []
-
 

@@ -89,12 +89,14 @@ from routes.coins import coins_bp        # noqa: E402
 from routes.ml_routes import ml_bp       # noqa: E402
 from routes.symbols import symbols_bp    # noqa: E402
 from routes.trading import trading_bp    # noqa: E402
+from routes.portfolio import portfolio_bp  # noqa: E402
 from routes.health import health_bp      # noqa: E402
 
 app.register_blueprint(coins_bp)
 app.register_blueprint(ml_bp)
 app.register_blueprint(symbols_bp)
 app.register_blueprint(trading_bp)
+app.register_blueprint(portfolio_bp)
 app.register_blueprint(health_bp)
 
 # ---------------------------------------------------------------------------

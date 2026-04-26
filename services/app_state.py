@@ -19,11 +19,6 @@ logger = logging.getLogger(__name__)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ─── Globals ──────────────────────────────────────────────────
-ml_pipeline = None
-ML_AVAILABLE = False
-
-data_pipeline = None
-SYMBOLS_AVAILABLE = False
 
 official_adk_available = False
 analyze_crypto_adk = None
@@ -65,42 +60,6 @@ def initialize_official_adk():
     except Exception as e:
         logger.warning(f"Official ADK not available: {e}")
         official_adk_available = False
-        return False
-
-
-def initialize_ml():
-    global ml_pipeline, ML_AVAILABLE
-    logger.info("Attempting to initialize ML components...")
-    try:
-        from ml.training_pipeline import CryptoMLPipeline
-        ml_pipeline = CryptoMLPipeline()
-        ML_AVAILABLE = True
-        try:
-            ml_pipeline.load_existing_model()
-            logger.info("ML model loaded successfully")
-        except Exception as e:
-            logger.warning(f"ML model not available: {e}")
-        logger.info("ML components initialized successfully")
-        return True
-    except Exception as e:
-        logger.error(f"ML components not available: {e}")
-        ML_AVAILABLE = False
-        ml_pipeline = None
-        return False
-
-
-def initialize_data_pipeline():
-    global data_pipeline, SYMBOLS_AVAILABLE
-    logger.info("Attempting to initialize data pipeline...")
-    try:
-        from ml.data_pipeline import CryptoDataPipeline
-        data_pipeline = CryptoDataPipeline()
-        SYMBOLS_AVAILABLE = True
-        logger.info("Data pipeline initialized successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Data pipeline not available: {e}")
-        SYMBOLS_AVAILABLE = False
         return False
 
 
@@ -161,11 +120,10 @@ def init_all():
     from src.core.crypto_analyzer import CryptoAnalyzer
     logger.info("Starting CryptoApp...")
 
-    for fn in (initialize_ml, initialize_data_pipeline, initialize_official_adk):
-        try:
-            fn()
-        except Exception as e:
-            logger.warning(f"Startup {fn.__name__} failed: {e}")
+    try:
+        initialize_official_adk()
+    except Exception as e:
+        logger.warning(f"Startup initialize_official_adk failed: {e}")
 
     load_analysis_cache()
 
@@ -185,7 +143,7 @@ def init_all():
 
     analyzer = CryptoAnalyzer(data_file=data_file)
     logger.info(
-        f"System ready - ML: {ML_AVAILABLE}, ADK: {official_adk_available}, "
+        f"System ready - ADK: {official_adk_available}, "
         f"Coins: {len(analyzer.coins)}"
     )
 
@@ -272,9 +230,6 @@ def fetch_and_add_new_symbol_data(symbol: str):
 
     cg_api_key = os.getenv('COINGECKO_API_KEY', '')
     logger.info(f"Fetching data for new symbol: {symbol}")
-
-    if not data_pipeline:
-        raise Exception("Data pipeline not available")
 
     headers = {'Accept': 'application/json'}
     if cg_api_key:
