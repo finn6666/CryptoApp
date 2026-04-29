@@ -660,7 +660,7 @@ class ExchangeManager:
             return {"success": False, "error": str(e)}
 
     @staticmethod
-    @retry(max_attempts=3, base_delay=1.0, backoff=2.0)
+    @retry(max_attempts=3, base_delay=1.0, backoff=2.0, warn_on_retry=False)
     def _fetch_ticker_with_retry(exchange, pair: str):
         """Fetch ticker with retry on transient network errors."""
         return exchange.fetch_ticker(pair, params={"timeout": 5000})
