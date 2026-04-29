@@ -443,10 +443,14 @@ class MarketMonitor:
                 })
 
                 # ── Opportunistic buy: feed high-scoring coins to trading pipeline ──
+                # Limit to the single best gem per cycle to protect Gemini RPM quota.
+                # The 6h per-coin cooldown in _trigger_buy_analysis prevents re-triggering;
+                # the daily cap (auto_buy_max_per_day) is enforced inside _trigger_buy_analysis.
                 if self.auto_buy_enabled:
-                    for gem in new_gems:
+                    for gem in new_gems:  # already sorted by gem_score desc
                         if gem["gem_score"] >= self.auto_buy_min_gem:
                             self._trigger_buy_analysis(gem, trigger="quick_scan_gem")
+                            break  # one debate per quick-scan cycle — next gem picks up next cycle
 
             self._stats["quick_scans"] += 1
             self._stats["last_quick_scan"] = datetime.utcnow().isoformat()

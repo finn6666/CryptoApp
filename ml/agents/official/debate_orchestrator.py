@@ -150,6 +150,22 @@ def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5)
                     for part in event.content.parts:
                         if hasattr(part, "text") and part.text:
                             result_text += part.text
+            # ADK can silently swallow a 429 and return empty content — detect and retry.
+            if not result_text.strip():
+                if attempt < max_retries:
+                    logger.warning(
+                        f"[Debate] Empty response for {agent.name} "
+                        f"(attempt {attempt}/{max_retries}) — possible silent rate limit, "
+                        f"retrying in {delay:.0f}s"
+                    )
+                    _time.sleep(delay)
+                    delay = min(delay * 2, 60.0)
+                    continue
+            if not result_text.strip() and attempt == max_retries:
+                logger.warning(
+                    f"[Debate] {agent.name}: all {max_retries} retries returned empty "
+                    f"— Gemini RPM quota likely exhausted"
+                )
             return result_text
         except Exception as e:
             last_exc = e

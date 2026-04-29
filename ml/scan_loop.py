@@ -318,7 +318,7 @@ class ScanLoop:
             live_data = fetch_and_update_data()
             if live_data:
                 # Also fetch any pipeline-tracked symbols
-                if state.SYMBOLS_AVAILABLE and state.data_pipeline:
+                if getattr(state, 'data_pipeline', None):
                     current_symbols = [c.symbol for c in state.analyzer.coins]
                     for symbol in state.data_pipeline.supported_symbols:
                         if symbol not in current_symbols:
@@ -489,9 +489,11 @@ class ScanLoop:
                 confidence = result.get("confidence", 0)
                 one_liner = result.get("one_liner", "")
 
-                # Longer pause after a rate-limit skip; normal inter-call delay otherwise
+                # Longer pause after a rate-limit skip; normal inter-call delay otherwise.
+                # 6s between calls keeps burst rate ~10 RPM, well below the 15 RPM free-tier limit
+                # and leaves headroom for concurrent monitor debate triggers.
                 _rate_limited = not did_pass and ("rate limit" in one_liner.lower() or "rate limited" in one_liner.lower() or "no response" in one_liner.lower())
-                time.sleep(30 if _rate_limited else 4)
+                time.sleep(30 if _rate_limited else 6)
 
                 if did_pass and confidence >= effective_threshold:
                     logger.info(
