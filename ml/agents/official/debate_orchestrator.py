@@ -136,6 +136,10 @@ def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5)
     last_exc: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
         try:
+            # Acquire a slot from the global RPM limiter before every Gemini call
+            from services.gemini_budget import get_gemini_ratelimiter
+            get_gemini_ratelimiter().acquire()
+
             session_service = InMemorySessionService()
             runner = Runner(
                 app_name="debate_app",

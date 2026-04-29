@@ -108,6 +108,10 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
         result_text = ""
         _delay = 15.0
         import asyncio as _asyncio
+        # Acquire a slot from the global RPM limiter before every Gemini call
+        from services.gemini_budget import get_gemini_ratelimiter
+        get_gemini_ratelimiter().acquire()
+
         for _attempt in range(1, 4):
             try:
                 for event in runner.run(

@@ -885,11 +885,21 @@ class TradingEngine:
             # "No trading pair found" error.
             if proposal.side == "sell":
                 raise RuntimeError(error or "Sell failed on all available exchanges")
+            # For buys: if ExchangeManager found a pair but failed to execute,
+            # don't fall through to legacy Kraken — it will just fail again with a
+            # misleading "No trading pair found" error. Fail fast and log clearly.
+            if result:
+                err_msg = result.get("error", "Unknown execution failure")
+                logger.warning(
+                    f"[Trade] {proposal.symbol}: ExchangeManager execution failed "
+                    f"({err_msg}) — not falling through to legacy path"
+                )
+                raise RuntimeError(err_msg)
             return None
         except RuntimeError:
             raise  # re-raise our own insufficient-funds errors
         except Exception as e:
-            logger.debug(f"Exchange manager not available, using legacy: {e}")
+            logger.warning(f"[Trade] ExchangeManager unavailable for {proposal.symbol}, using legacy Kraken path: {e}")
             return None
 
     def _record_to_portfolio(self, proposal: TradeProposal, exchange: str, fee_gbp: float = 0.0):

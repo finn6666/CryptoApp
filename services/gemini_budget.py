@@ -24,6 +24,8 @@ pricing at ~£0.000336/call with ~10K input + 2K output tokens):
 import json
 import logging
 import threading
+import time
+from collections import deque
 from datetime import date
 from pathlib import Path
 
@@ -165,3 +167,60 @@ def get_gemini_budget() -> GeminiBudget:
                 limit = float(os.getenv("GEMINI_DAILY_BUDGET_GBP", "1.0"))
                 _budget_instance = GeminiBudget(daily_limit_gbp=limit)
     return _budget_instance
+
+
+# ─── Global RPM Rate Limiter ──────────────────────────────────────────────────
+
+class GeminiRateLimiter:
+    """
+    Thread-safe sliding-window rate limiter for Gemini API calls.
+
+    All callers (scan quick-screen, debate agents, monitor triggers) share one
+    instance so concurrent threads can't collectively exceed the RPM cap.
+
+    acquire() blocks until a slot is available in the current 60-second window.
+    The cap defaults to 12 RPM (80% of the 15 RPM free-tier limit) to leave a
+    safety margin for bursts. Override via GEMINI_RPM_CAP env var.
+    """
+
+    def __init__(self, rpm_cap: int = 12):
+        self._cap = rpm_cap
+        self._window_sec = 60.0
+        self._timestamps: deque = deque()
+        self._lock = threading.Lock()
+
+    def acquire(self) -> None:
+        """Block until there is capacity in the current RPM window."""
+        while True:
+            with self._lock:
+                now = time.monotonic()
+                # Drop timestamps older than the window
+                while self._timestamps and now - self._timestamps[0] >= self._window_sec:
+                    self._timestamps.popleft()
+
+                if len(self._timestamps) < self._cap:
+                    self._timestamps.append(now)
+                    return  # slot acquired
+
+                # Window is full — calculate how long until the oldest slot expires
+                wait = self._window_sec - (now - self._timestamps[0])
+
+            # Release lock while sleeping so other threads can check
+            logger.debug("GeminiRateLimiter: window full (%d/%d RPM) — waiting %.1fs", len(self._timestamps), self._cap, wait)
+            time.sleep(max(0.1, wait))
+
+
+_ratelimiter_instance: GeminiRateLimiter | None = None
+_ratelimiter_lock = threading.Lock()
+
+
+def get_gemini_ratelimiter() -> GeminiRateLimiter:
+    """Return the module-level GeminiRateLimiter singleton."""
+    global _ratelimiter_instance
+    if _ratelimiter_instance is None:
+        with _ratelimiter_lock:
+            if _ratelimiter_instance is None:
+                import os
+                cap = int(os.getenv("GEMINI_RPM_CAP", "12"))
+                _ratelimiter_instance = GeminiRateLimiter(rpm_cap=cap)
+    return _ratelimiter_instance
