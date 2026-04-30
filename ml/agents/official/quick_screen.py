@@ -6,6 +6,7 @@ Saves ~80% of API calls by filtering out obvious skips early.
 
 import os
 import logging
+import uuid
 from typing import Dict, Any
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
@@ -13,8 +14,6 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-
-_session_service = InMemorySessionService()
 
 # Use a lighter/cheaper model for quick screen — it's a binary triage filter,
 # not a deep analysis. Override via QUICK_SCREEN_MODEL env var if needed.
@@ -72,13 +71,6 @@ async def quick_screen_coin(
     Returns:
         {"pass": bool, "confidence": int, "one_liner": str}
     """
-    runner = Runner(
-        app_name="quick_screen_app",
-        agent=quick_screen_agent,
-        session_service=_session_service,
-        auto_create_session=True,
-    )
-
     # Build a compact data line
     parts = [
         f"{coin_data.get('name', symbol)} ({symbol})",
@@ -106,17 +98,36 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
         )
 
         result_text = ""
-        _delay = 15.0
+        # Start backoff above the RPM window so the first retry clears it.
+        # Gemini's RPM window is 60s; beginning at 65s ensures retries land
+        # in a fresh window rather than compounding within the same minute.
+        _delay = 65.0
         import asyncio as _asyncio
-        # Acquire a slot from the global RPM limiter before every Gemini call
         from services.gemini_budget import get_gemini_ratelimiter
-        get_gemini_ratelimiter().acquire()
 
         for _attempt in range(1, 4):
+            # Acquire a rate-limiter slot before EVERY attempt (including retries)
+            # so that retries are counted against the RPM budget the same as
+            # first attempts. Previously a single acquire() covered all 3 retries,
+            # allowing up to 36 actual API calls per minute against a 12 RPM cap.
+            get_gemini_ratelimiter().acquire()
+            # Use a unique session ID per attempt so no conversation history
+            # accumulates across calls. Reusing session_id=f"screen_{symbol}"
+            # caused ADK to append every screen to the same session, ballooning
+            # the token count for coins screened repeatedly (T, TIA, etc.) and
+            # silently triggering TPM limits returned as empty responses.
+            _session_id = f"screen_{symbol}_{uuid.uuid4().hex[:8]}"
+            _session_service = InMemorySessionService()
             try:
+                runner = Runner(
+                    app_name="quick_screen_app",
+                    agent=quick_screen_agent,
+                    session_service=_session_service,
+                    auto_create_session=True,
+                )
                 for event in runner.run(
                     user_id="screener",
-                    session_id=f"screen_{symbol}",
+                    session_id=_session_id,
                     new_message=message,
                 ):
                     if hasattr(event, "content") and event.content and event.content.parts:
@@ -130,7 +141,7 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
                         f"— possible silent rate limit, waiting {_delay:.0f}s"
                     )
                     await _asyncio.sleep(_delay)
-                    _delay = min(_delay * 2, 60.0)
+                    _delay = min(_delay * 2, 120.0)
                     result_text = ""
                     continue
                 break  # success — exit retry loop
@@ -142,7 +153,7 @@ Return JSON: {{"action": "PASS"|"SKIP", "confidence": 0-100, "play_type": "accum
                         f"— retrying in {_delay:.0f}s"
                     )
                     await _asyncio.sleep(_delay)
-                    _delay = min(_delay * 2, 60.0)
+                    _delay = min(_delay * 2, 120.0)
                     result_text = ""
                     continue
                 raise
