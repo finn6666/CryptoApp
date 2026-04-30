@@ -729,6 +729,7 @@ class SellAutomation:
                 "peak_prices": self._peak_prices,
                 "last_recheck": self._last_recheck,
                 "last_recheck_conviction": self._last_recheck_conviction,
+                "last_drawdown_recheck": self._last_drawdown_recheck,
                 "tiers_taken": {k: list(v) for k, v in self._tiers_taken.items()},
                 "tightened_trailing": self._tightened_trailing,
             }
@@ -751,6 +752,7 @@ class SellAutomation:
             self._peak_prices = state.get("peak_prices", {})
             self._last_recheck = state.get("last_recheck", {})
             self._last_recheck_conviction = state.get("last_recheck_conviction", {})
+            self._last_drawdown_recheck = state.get("last_drawdown_recheck", {})
             self._tiers_taken = {
                 k: set(v) for k, v in state.get("tiers_taken", {}).items()
             }
