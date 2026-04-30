@@ -575,6 +575,7 @@ class SellAutomation:
                         f"({pnl_for_sym:.1f}%)"
                     )
                     self._last_drawdown_recheck[symbol] = now.isoformat()
+                    self._save_state()  # persist immediately so a restart mid-debate doesn't re-trigger
 
             try:
                 # Pre-check: skip positions too small to sell before spending API budget.
