@@ -129,10 +129,10 @@ def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5)
     """Run a single ADK agent synchronously and return its full text output.
 
     Retries up to max_retries times on 429 RESOURCE_EXHAUSTED with exponential backoff.
-    Initial delay is 15s to allow the RPM window to partially reset.
+    Initial delay is 65s to land retries in a fresh RPM window (Gemini window = 60s).
     """
     import time as _time
-    delay = 15.0
+    delay = 65.0
     last_exc: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
         try:
@@ -163,7 +163,7 @@ def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5)
                         f"retrying in {delay:.0f}s"
                     )
                     _time.sleep(delay)
-                    delay = min(delay * 2, 60.0)
+                    delay = min(delay * 2, 120.0)
                     continue
             if not result_text.strip() and attempt == max_retries:
                 logger.warning(
@@ -180,7 +180,7 @@ def _run_agent(agent: Agent, prompt: str, session_id: str, max_retries: int = 5)
                         f"(attempt {attempt}/{max_retries}) — retrying in {delay:.0f}s"
                     )
                     _time.sleep(delay)
-                    delay = min(delay * 2, 60.0)
+                    delay = min(delay * 2, 120.0)
                     continue
             raise
     raise last_exc  # unreachable, but satisfies type checker

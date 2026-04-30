@@ -482,9 +482,10 @@ class MarketMonitor:
                 logger.debug(f"[Monitor] {symbol} analysed recently, skipping (cooldown)")
                 return
 
-            # Respect the scan loop's analysis cache — if it contains a recent SKIP for
-            # this coin, don't burn an API call re-analysing it. This also survives
-            # restarts (in-memory cooldowns are lost on restart; the cache is persistent).
+            # Respect the scan loop's analysis cache — skip re-analysis if a recent
+            # result exists (SKIP or BUY). This survives restarts because the cache is
+            # persistent on disk; in-memory cooldowns are lost on restart and would
+            # otherwise re-trigger the same coin immediately after a service restart.
             try:
                 import time
                 import services.app_state as _state
@@ -495,13 +496,14 @@ class MarketMonitor:
                     if _cached:
                         _age_hours = (time.time() - _cached.get("_cached_at", 0)) / 3600
                         if _age_hours <= _reuse_hours:
-                            _decision = _cached.get("analysis", {}).get("trade_decision", {})
-                            if not _decision.get("should_trade", False):
-                                logger.debug(
-                                    f"[Monitor] {symbol}: cached SKIP ({_age_hours:.1f}h old) "
-                                    f"— skipping monitor trigger"
-                                )
-                                return
+                            # Skip regardless of should_trade: a recent positive result
+                            # already produced a proposal/trade; re-running it on restart
+                            # burns quota and can create duplicate proposals.
+                            logger.debug(
+                                f"[Monitor] {symbol}: cached result ({_age_hours:.1f}h old) "
+                                f"— skipping monitor trigger (cooldown survives restart)"
+                            )
+                            return
             except Exception:
                 pass
 
