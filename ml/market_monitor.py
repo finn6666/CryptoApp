@@ -486,11 +486,14 @@ class MarketMonitor:
             # result exists (SKIP or BUY). This survives restarts because the cache is
             # persistent on disk; in-memory cooldowns are lost on restart and would
             # otherwise re-trigger the same coin immediately after a service restart.
+            # Use the monitor's own buy_analysis_cooldown_min (default 6h) as the
+            # window, NOT scan_loop's analysis_reuse_hours (default 5h) — the monitor
+            # cooldown is the authoritative guard for how often a coin can be re-analysed
+            # by the monitor, so the cache check must use the same window to be effective.
             try:
                 import time
                 import services.app_state as _state
-                from ml.scan_loop import get_scan_loop
-                _reuse_hours = get_scan_loop().analysis_reuse_hours
+                _reuse_hours = self.buy_analysis_cooldown_min / 60.0
                 if _reuse_hours > 0:
                     _cached = _state.get_cached_analysis(symbol)
                     if _cached:
